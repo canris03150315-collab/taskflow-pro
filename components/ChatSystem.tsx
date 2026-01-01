@@ -1,0 +1,679 @@
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { User, DepartmentDef, ChatChannel, ChatMessage, Role } from '../types';
+import { api } from '../services/api';
+import { useToast } from './Toast';
+import { WebSocketClient, WebSocketMessage } from '../utils/websocketClient';
+import { ChatMessageReadStatusModal } from './ChatMessageReadStatusModal';
+import { CreateGroupModal } from './CreateGroupModal';
+import { GroupInfoModal } from './GroupInfoModal';
+
+interface ChatSystemProps {
+  currentUser: User;
+  users: User[];
+  departments: DepartmentDef[];
+}
+
+export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, departments }) => {
+  const toast = useToast();
+  const [channels, setChannels] = useState<ChatChannel[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messageInput, setMessageInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  
+  // Modals
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [readStatusMsg, setReadStatusMsg] = useState<ChatMessage | null>(null);
+  
+  // Sidebar mode: 'CHAT' or 'CONTACTS'
+  const [sidebarMode, setSidebarMode] = useState<'CHAT' | 'CONTACTS'>('CHAT');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const wsClientRef = useRef<WebSocketClient | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Sound
+  const notificationSound = useMemo(() => new Audio('/notification.mp3'), []);
+
+  // Initialize WebSocket (with fallback to polling for HTTPS)
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    // Skip WebSocket in production (HTTPS) due to mixed content restrictions
+    const isProduction = window.location.protocol === 'https:';
+    
+    if (!isProduction) {
+      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'ws://165.227.147.40:3001';
+      wsClientRef.current = new WebSocketClient(wsUrl);
+      
+      const handleMessage = (event: WebSocketMessage) => {
+        if (event.type === 'chat_message') {
+          const newMsg = event.payload as ChatMessage;
+          
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            if (newMsg.channelId === activeChannelId) {
+               return [...prev, newMsg];
+            }
+            return prev;
+          });
+
+          setChannels(prev => prev.map(ch => {
+              if (ch.id === newMsg.channelId) {
+                  const isCurrentChannel = newMsg.channelId === activeChannelId;
+                  return {
+                      ...ch,
+                      lastMessage: newMsg,
+                      unreadCount: isCurrentChannel ? 0 : (ch.unreadCount || 0) + 1
+                  };
+              }
+              return ch;
+          }).sort((a, b) => {
+              const timeA = a.lastMessage?.timestamp || '';
+              const timeB = b.lastMessage?.timestamp || '';
+              return new Date(timeB).getTime() - new Date(timeA).getTime();
+          }));
+
+          if (newMsg.userId !== currentUser.id) {
+              notificationSound.play().catch(e => console.error("Audio play failed", e));
+          }
+        }
+      };
+
+      wsClientRef.current.addMessageHandler(handleMessage);
+      wsClientRef.current.connect(token || undefined).then(() => {
+          setIsConnected(true);
+      }).catch(err => {
+          console.error("WS Connect Error", err);
+          setIsConnected(false);
+      });
+
+      return () => {
+          if (wsClientRef.current) {
+              wsClientRef.current.removeMessageHandler(handleMessage);
+              wsClientRef.current.disconnect();
+          }
+      };
+    } else {
+      // HTTPS mode: use polling only
+      console.log('Running in HTTPS mode, WebSocket disabled, using polling');
+      setIsConnected(false);
+    }
+  }, [currentUser.id, activeChannelId, notificationSound]);
+
+  // Load Channels
+  useEffect(() => {
+      loadChannels();
+  }, [currentUser.id]);
+
+  const loadChannels = async () => {
+      try {
+          const data = await api.chat.getChannels(currentUser.id);
+          setChannels(data.sort((a, b) => {
+              const timeA = a.lastMessage?.timestamp || '';
+              const timeB = b.lastMessage?.timestamp || '';
+              return new Date(timeB).getTime() - new Date(timeA).getTime();
+          }));
+      } catch (error) {
+          console.error("Failed to load channels", error);
+      }
+  };
+
+  // Load Messages when active channel changes
+  useEffect(() => {
+      if (activeChannelId) {
+          loadMessages(activeChannelId);
+          // Mark read
+          api.chat.markRead(activeChannelId, currentUser.id);
+          setChannels(prev => prev.map(ch => ch.id === activeChannelId ? { ...ch, unreadCount: 0 } : ch));
+      } else {
+          setMessages([]);
+      }
+  }, [activeChannelId]);
+
+  const loadMessages = async (channelId: string) => {
+      setIsLoading(true);
+      try {
+          const res = await api.chat.getMessages(channelId, { limit: 50 });
+          setMessages(res.messages.reverse()); 
+          setHasMoreMessages(res.hasMore);
+      } catch (error) {
+          console.error("Failed to load messages", error);
+          toast.error("載入訊息失敗");
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const scrollToBottom = () => {
+      setTimeout(() => {
+          if (messagesContainerRef.current) {
+              messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+          }
+      }, 100);
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!messageInput.trim() || !activeChannelId) return;
+
+      const tempId = `temp-${Date.now()}`;
+      const content = messageInput;
+      setMessageInput('');
+
+      // Optimistic update
+      const tempMsg: ChatMessage = {
+          id: tempId,
+          channelId: activeChannelId,
+          userId: currentUser.id,
+          userName: currentUser.name,
+          avatar: currentUser.avatar,
+          content: content,
+          timestamp: new Date().toISOString(),
+          readBy: [currentUser.id]
+      };
+      
+      setMessages(prev => [...prev, tempMsg]);
+      scrollToBottom();
+
+      try {
+          const newMsg = await api.chat.sendMessage(activeChannelId, currentUser.id, content, currentUser);
+          // Replace temp message
+          setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
+          
+          // Update channel list preview
+          setChannels(prev => prev.map(ch => {
+              if (ch.id === activeChannelId) {
+                  return { ...ch, lastMessage: newMsg };
+              }
+              return ch;
+          }).sort((a, b) => {
+              const timeA = a.lastMessage?.timestamp || '';
+              const timeB = b.lastMessage?.timestamp || '';
+              return new Date(timeB).getTime() - new Date(timeA).getTime();
+          }));
+
+      } catch (error) {
+          console.error("Send message failed", error);
+          toast.error("發送失敗");
+          setMessages(prev => prev.filter(m => m.id !== tempId));
+          setMessageInput(content); // Restore input
+      }
+  };
+
+  const handleCreateGroup = async (name: string, userIds: string[]) => {
+      try {
+          const newChannel = await api.chat.createGroupChannel(name, userIds);
+          setChannels(prev => [newChannel, ...prev]);
+          setActiveChannelId(newChannel.id);
+          setShowCreateGroupModal(false);
+          toast.success("群組建立成功");
+      } catch (error) {
+          console.error("Create group failed", error);
+          toast.error("建立失敗");
+      }
+  };
+
+  const handleLeaveGroup = async () => {
+      if (!activeChannelId) return;
+      try {
+          await api.chat.leaveChannel(activeChannelId);
+          setChannels(prev => prev.filter(c => c.id !== activeChannelId));
+          if (activeChannelId === activeChannelId) setActiveChannelId(null);
+          setShowGroupInfoModal(false);
+          toast.success("已退出群組");
+      } catch (error) {
+          console.error("Leave group failed", error);
+          toast.error("退出失敗");
+      }
+  };
+
+  const handleEditGroup = async (newName: string, newMembers: string[]) => {
+      if (!activeChannelId) return;
+      try {
+          const updatedChannel = await api.chat.editChannel(activeChannelId, newName, newMembers);
+          setChannels(prev => prev.map(c => c.id === activeChannelId ? updatedChannel : c));
+          setShowGroupInfoModal(false);
+          toast.success("群組已更新");
+      } catch (error) {
+          console.error("Edit group failed", error);
+          toast.error("更新失敗");
+      }
+  };
+
+  const getChannelName = (channel: ChatChannel) => {
+      if (channel.type === 'GROUP') return channel.name;
+      // Direct: find other user
+      const otherId = channel.participants.find(id => id !== currentUser.id);
+      const otherUser = users.find(u => u.id === otherId);
+      return otherUser?.name || 'Unknown User';
+  };
+
+  const getChannelAvatar = (channel: ChatChannel) => {
+      if (channel.type === 'GROUP') return null; // Or group icon
+      const otherId = channel.participants.find(id => id !== currentUser.id);
+      const otherUser = users.find(u => u.id === otherId);
+      return otherUser?.avatar;
+  };
+
+  const activeChannel = channels.find(c => c.id === activeChannelId);
+
+  const handleStartDirectChat = async (userId: string) => {
+      try {
+          const newChannel = await api.chat.createDirectChannel(currentUser.id, userId);
+          setChannels(prev => [newChannel, ...prev]);
+          setActiveChannelId(newChannel.id);
+          setSidebarMode('CHAT');
+          toast.success("已開始對話");
+      } catch (error) {
+          console.error("Start direct chat failed", error);
+          toast.error("開始對話失敗");
+      }
+  };
+
+  const handleDeleteChannel = async (channelId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!confirm('確定要刪除此聊天室嗎？所有訊息將被永久刪除。')) {
+          return;
+      }
+      try {
+          await api.chat.deleteChannel(channelId);
+          setChannels(prev => prev.filter(ch => ch.id !== channelId));
+          if (activeChannelId === channelId) {
+              setActiveChannelId(null);
+          }
+          toast.success("聊天室已刪除");
+      } catch (error) {
+          console.error("Delete channel failed", error);
+          toast.error("刪除聊天室失敗");
+      }
+  };
+
+  return (
+    <div className="flex h-[calc(100vh-100px)] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-80 border-r border-slate-200 flex flex-col bg-white">
+            {/* Search Bar */}
+            <div className="p-3 border-b border-slate-200">
+                <div className="relative">
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="搜尋聊天室或聯絡人..."
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <svg className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+            </div>
+            
+            {/* Sidebar Tabs */}
+            <div className="flex border-b border-slate-200">
+                <button 
+                    onClick={() => setSidebarMode('CHAT')}
+                    className={`flex-1 py-3 text-sm font-medium transition relative ${sidebarMode === 'CHAT' ? 'text-blue-600 bg-blue-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                    <div className="flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span>聊天</span>
+                    </div>
+                    {sidebarMode === 'CHAT' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
+                </button>
+                <button 
+                    onClick={() => setSidebarMode('CONTACTS')}
+                    className={`flex-1 py-3 text-sm font-medium transition relative ${sidebarMode === 'CONTACTS' ? 'text-blue-600 bg-blue-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                    <div className="flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        <span>通訊錄</span>
+                    </div>
+                    {sidebarMode === 'CONTACTS' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>}
+                </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+                {sidebarMode === 'CHAT' ? (
+                    <>
+                        {channels.length === 0 && (
+                            <div className="p-4 text-center text-slate-400 text-sm">
+                                尚無聊天記錄<br/>請切換至通訊錄發起對話
+                            </div>
+                        )}
+                        {channels.filter(ch => 
+                            searchQuery === '' || 
+                            getChannelName(ch).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            ch.lastMessage?.content.toLowerCase().includes(searchQuery.toLowerCase())
+                        ).map(channel => (
+                    <div 
+                        key={channel.id}
+                        onClick={() => setActiveChannelId(channel.id)}
+                        className={`p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 transition-all duration-200 ${activeChannelId === channel.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : 'border-l-4 border-l-transparent'} group relative`}
+                    >
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3 overflow-hidden flex-1">
+                                <div className="w-12 h-12 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center overflow-hidden relative">
+                                    {getChannelAvatar(channel) ? (
+                                        <img src={getChannelAvatar(channel)} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="text-slate-500 font-bold text-lg">{getChannelName(channel).charAt(0)}</span>
+                                    )}
+                                    {channel.type === 'DIRECT' && (
+                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                                    )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="font-semibold text-slate-800 truncate text-sm">{getChannelName(channel)}</div>
+                                        {channel.type === 'GROUP' && (
+                                            <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">{channel.participants.length}</span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-slate-500 truncate mt-0.5">
+                                        {channel.lastMessage?.content || '開始對話...'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="flex flex-col items-end gap-1">
+                                    <span className="text-xs text-slate-400">
+                                        {channel.lastMessage?.timestamp ? new Date(channel.lastMessage.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                                    </span>
+                                    {channel.unreadCount > 0 && (
+                                        <span className="w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">
+                                            {channel.unreadCount}
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={(e) => handleDeleteChannel(channel.id, e)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition text-red-500"
+                                    title="刪除聊天室"
+                                >
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                        ))}
+                    </>
+                ) : (
+                    <div className="p-4 space-y-4">
+                        <button 
+                            onClick={() => setShowCreateGroupModal(true)}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
+                        >
+                            <span className="text-xl">➕</span>
+                            <div className="text-left">
+                                <div className="font-bold text-sm">建立群組</div>
+                                <div className="text-xs opacity-80">選擇成員開始群聊</div>
+                            </div>
+                        </button>
+                        
+                        {/* 群組列表 */}
+                        {channels.filter(ch => ch.type === 'GROUP').length > 0 && (
+                            <div>
+                                <div className="text-xs font-bold text-slate-400 uppercase mb-2 px-2">群組</div>
+                                <div className="space-y-1">
+                                    {channels.filter(ch => ch.type === 'GROUP').map(channel => (
+                                        <button 
+                                            key={channel.id}
+                                            onClick={() => {
+                                                setActiveChannelId(channel.id);
+                                                setSidebarMode('CHAT');
+                                            }}
+                                            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 transition"
+                                        >
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex-shrink-0 flex items-center justify-center">
+                                                <span className="text-white font-bold text-xs">群組</span>
+                                            </div>
+                                            <div className="text-left flex-1">
+                                                <div className="text-sm font-bold text-slate-700">{channel.name}</div>
+                                                <div className="text-xs text-slate-500">{channel.participants.length} 位成員</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* 聯絡人列表 */}
+                        {departments.map(dept => {
+                            const deptUsers = users.filter(u => u.department === dept.id && u.id !== currentUser.id);
+                            if (deptUsers.length === 0) return null;
+                            return (
+                                <div key={dept.id}>
+                                    <div className="text-xs font-bold text-slate-400 uppercase mb-2 px-2">{dept.name}</div>
+                                    <div className="space-y-1">
+                                        {deptUsers.map(user => (
+                                            <button 
+                                                key={user.id}
+                                                onClick={() => handleStartDirectChat(user.id)}
+                                                className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 transition"
+                                            >
+                                                <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden">
+                                                    {user.avatar ? (
+                                                        <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <span className="text-slate-500 font-bold">{user.name.charAt(0)}</span>
+                                                    )}
+                                                </div>
+                                                <div className="text-left flex-1">
+                                                    <div className="text-sm font-bold text-slate-700">{user.name}</div>
+                                                    <div className="text-xs text-slate-500">{user.role}</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col">
+            {activeChannel ? (
+                <>
+                    <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
+                                {activeChannel.type === 'GROUP' ? '群' : getChannelName(activeChannel).charAt(0)}
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-slate-800 text-base">{getChannelName(activeChannel)}</h3>
+                                {activeChannel.type === 'GROUP' && (
+                                    <span className="text-xs text-slate-500">
+                                        {activeChannel.participants.length} 位成員
+                                    </span>
+                                )}
+                                {activeChannel.type === 'DIRECT' && (
+                                    <div className="flex items-center gap-1 text-xs text-green-600">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                        <span>在線</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {activeChannel.type === 'GROUP' && (
+                                <button 
+                                    onClick={() => setShowGroupInfoModal(true)}
+                                    className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                    title="群組資訊"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-50 to-white" ref={messagesContainerRef}>
+                        {messages.map((msg, index) => {
+                            const isMe = msg.userId === currentUser.id;
+                            const showAvatar = !isMe && (index === 0 || messages[index - 1].userId !== msg.userId);
+                            const showName = !isMe && (index === 0 || messages[index - 1].userId !== msg.userId);
+                            
+                            return (
+                                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}>
+                                    {!isMe && (
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-300 to-slate-400 flex-shrink-0 mr-2 overflow-hidden flex items-center justify-center">
+                                            {msg.avatar ? (
+                                                <img src={msg.avatar} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-white text-xs font-semibold">{msg.userName?.charAt(0)}</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div className={`max-w-[65%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
+                                        {showName && <span className="text-xs text-slate-600 mb-1 font-medium px-1">{msg.userName}</span>}
+                                        <div className="relative group/msg">
+                                            <div 
+                                                className={`px-4 py-2.5 rounded-2xl text-sm break-words shadow-sm ${
+                                                    isMe 
+                                                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-md' 
+                                                        : 'bg-white border border-slate-200 text-slate-800 rounded-bl-md hover:shadow-md transition-shadow'
+                                                }`}
+                                                onClick={() => isMe && setReadStatusMsg(msg)}
+                                            >
+                                                {msg.content}
+                                            </div>
+                                            {/* Quick Actions */}
+                                            <div className={`absolute top-0 ${isMe ? 'right-full mr-2' : 'left-full ml-2'} opacity-0 group-hover/msg:opacity-100 transition-opacity flex gap-1`}>
+                                                <button 
+                                                    className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm"
+                                                    title="回覆"
+                                                    onClick={() => setReplyToMessage(msg)}
+                                                >
+                                                    <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-1 px-1">
+                                            <span className="text-[10px] text-slate-400">
+                                                {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </span>
+                                            {isMe && msg.readBy && (
+                                                <span className="text-[10px] text-slate-400">
+                                                    · {msg.readBy.length > 1 ? `${msg.readBy.length - 1}人已讀` : '已送達'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {isMe && <div className="w-8"></div>}
+                                </div>
+                            );
+                        })}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-200 bg-white">
+                        {replyToMessage && (
+                            <div className="mb-2 p-2 bg-blue-50 border-l-4 border-blue-500 rounded flex justify-between items-start">
+                                <div className="flex-1">
+                                    <div className="text-xs text-blue-600 font-medium mb-0.5">回覆 {replyToMessage.userName}</div>
+                                    <div className="text-xs text-slate-600 truncate">{replyToMessage.content}</div>
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={() => setReplyToMessage(null)}
+                                    className="text-slate-400 hover:text-slate-600 ml-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+                        <div className="flex gap-2 items-end">
+                            <div className="flex-1 relative">
+                                <textarea
+                                    value={messageInput}
+                                    onChange={e => setMessageInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage(e as any);
+                                        }
+                                    }}
+                                    placeholder="輸入訊息... (Shift+Enter 換行)"
+                                    rows={1}
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                    style={{ minHeight: '44px', maxHeight: '120px' }}
+                                />
+                            </div>
+                            <button 
+                                type="submit"
+                                disabled={!messageInput.trim()}
+                                className="px-5 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md flex items-center gap-2 font-medium"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                                發送
+                            </button>
+                        </div>
+                    </form>
+                </>
+            ) : (
+                <div className="flex-1 flex items-center justify-center text-slate-400 flex-col gap-4">
+                    <div className="text-4xl"></div>
+                    <p>選擇一個聊天室開始對話</p>
+                </div>
+            )}
+        </div>
+
+        {/* Modals */}
+        {readStatusMsg && activeChannel && (
+            <ChatMessageReadStatusModal 
+                isOpen={!!readStatusMsg}
+                message={readStatusMsg} 
+                channel={activeChannel}
+                users={users} 
+                departments={departments}
+                onClose={() => setReadStatusMsg(null)} 
+            />
+        )}
+
+        {showCreateGroupModal && (
+            <CreateGroupModal
+                isOpen={showCreateGroupModal}
+                users={users.filter(u => u.id !== currentUser.id)}
+                currentUser={currentUser}
+                departments={departments}
+                onClose={() => setShowCreateGroupModal(false)}
+                onCreateGroup={handleCreateGroup}
+            />
+        )}
+
+        {showGroupInfoModal && activeChannel && (
+            <GroupInfoModal
+                isOpen={showGroupInfoModal}
+                channel={activeChannel}
+                users={users}
+                currentUser={currentUser}
+                departments={departments}
+                onClose={() => setShowGroupInfoModal(false)}
+                onLeaveGroup={handleLeaveGroup}
+                onEditGroup={handleEditGroup}
+            />
+        )}
+    </div>
+  );
+};

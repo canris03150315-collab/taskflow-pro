@@ -1,0 +1,1110 @@
+﻿
+import { 
+  User, Role, DepartmentDef, DEFAULT_DEPARTMENTS, Task, Announcement, 
+  Report, FinanceRecord, Suggestion, Memo, RoutineTemplate, AttendanceRecord, 
+  SystemLog, PerformanceReview, ChatChannel, ChatMessage, TaskStatus, Urgency,
+  MenuItemId, DEFAULT_MENU_GROUPS, MenuGroup, RoutineRecord, ReviewMetrics
+} from '../types';
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// ????嚗rue = 雿輻?汗?冽芋?祈??澈 (?格???; false = ???祕敺垢 API (?????
+const USE_MOCK_API = false; 
+
+// ?祕敺垢 API ?蝷楝敺?雿輻?詨?頝臬??? Netlify 隞??嚗?const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api'; 
+
+// ============================================================================
+// MOCK DATA & STORAGE (?格????澈)
+// ============================================================================
+
+// REMOVED: MOCK_USERS are now empty to force the Setup flow on first run.
+const MOCK_DB = {
+  users: [] as User[], // Empty for first run
+  departments: [...DEFAULT_DEPARTMENTS],
+  tasks: [] as Task[],
+  announcements: [] as Announcement[],
+  reports: [] as Report[],
+  finance: [] as FinanceRecord[],
+  suggestions: [] as Suggestion[],
+  memos: [] as Memo[],
+  routineTemplates: [] as RoutineTemplate[],
+  attendance: [] as AttendanceRecord[],
+  performance: [] as PerformanceReview[],
+  logs: [] as SystemLog[],
+  chatChannels: [] as ChatChannel[],
+  chatMessages: [] as ChatMessage[],
+  settings: {
+      menuGroups: DEFAULT_MENU_GROUPS as MenuGroup[]
+  }
+};
+
+const STORAGE_KEY = 'TASKFLOW_PRO_DB_V2';
+
+const loadFromStorage = () => {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) {
+        try {
+            const parsed = JSON.parse(data);
+            Object.keys(parsed).forEach(key => {
+                if ((MOCK_DB as any)[key] !== undefined && parsed[key] !== undefined) {
+                    (MOCK_DB as any)[key] = parsed[key];
+                }
+            });
+            // Self-Healing
+            if (MOCK_DB.attendance) {
+                MOCK_DB.attendance.forEach(r => {
+                    if (!r.status) r.status = r.clockOut ? 'OFFLINE' : 'ONLINE';
+                });
+            }
+        } catch (e) {
+            console.error('Failed to load mock DB', e);
+        }
+    }
+};
+
+const saveToStorage = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_DB));
+};
+
+if (USE_MOCK_API) {
+    loadFromStorage();
+}
+
+const delay = (ms = 400) => new Promise(resolve => setTimeout(resolve, ms));
+const getLocalDateString = () => new Date().toISOString().split('T')[0];
+
+const logSystemAction = (user: User | undefined, action: string, details: string, level: 'INFO' | 'WARNING' | 'DANGER' = 'INFO') => {
+    if (!USE_MOCK_API) return; 
+    const log: SystemLog = {
+        id: `log-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        userId: user?.id || 'SYSTEM',
+        userName: user?.name || 'System',
+        action,
+        details,
+        level
+    };
+    MOCK_DB.logs.unshift(log);
+    if (MOCK_DB.logs.length > 200) MOCK_DB.logs = MOCK_DB.logs.slice(0, 200);
+    saveToStorage();
+};
+
+// ============================================================================
+// REAL API IMPLEMENTATION (HTTP FETCH)
+// ============================================================================
+
+const getAuthHeaders = () => {
+    const token = localStorage.getItem('auth_token');
+    return {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+};
+
+const request = async <T>(method: string, endpoint: string, body?: any): Promise<T> => {
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method,
+            headers: getAuthHeaders(),
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : {};
+        
+        // ?芸? /chat/channels 頛詨摰?踵?
+        if (endpoint.includes('/chat/channels') && !endpoint.includes('/messages') && !endpoint.includes('/read')) {
+            console.log('?? 摰?駁??豢?:', data);
+        }
+        
+        if (!response.ok) {
+            const errorMessage = data.error || `API Error: ${response.statusText}`;
+            throw new Error(errorMessage);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error(`Request failed: ${method} ${endpoint}`, error);
+        throw error;
+    }
+};
+
+const RealApi = {
+    auth: {
+        login: async (username: string, password: string): Promise<User | undefined> => {
+            const res = await request<{ user: User, token: string }>('POST', '/auth/login', { username, password });
+            if (res.token) {
+                localStorage.setItem('auth_token', res.token);
+                return res.user;
+            }
+            return undefined;
+        },
+        setup: async (userData: any): Promise<User> => {
+            const res = await request<{ user: User, token: string }>('POST', '/auth/setup', userData);
+            if (res.token) {
+                localStorage.setItem('auth_token', res.token);
+            }
+            return res.user;
+        },
+        verify: async (): Promise<User | null> => {
+            try {
+                const token = localStorage.getItem('auth_token');
+                if (!token) return null;
+                const res = await request<{ user: User }>('POST', '/auth/verify', {});
+                return res.user;
+            } catch (error) {
+                localStorage.removeItem('auth_token');
+                return null;
+            }
+        },
+        logout: () => {
+            localStorage.removeItem('auth_token');
+        },
+        checkSetup: async (): Promise<{ needsSetup: boolean; userCount: number }> => {
+            return request<{ needsSetup: boolean; userCount: number }>('GET', '/auth/setup/check');
+        }
+    },
+    users: {
+        getAll: async (): Promise<User[]> => {
+            try {
+                const response = await request<{ users: any[] } | any[]>('GET', '/users');
+                return Array.isArray(response) ? response : (response.users || []);
+            } catch (error) {
+                console.error('Failed to get users', error);
+                return [];
+            }
+        },
+        create: async (user: User) => {
+            const response = await request<{ user: User, message: string }>('POST', '/users', user);
+            return response.user;
+        },
+        update: (user: User) => request<User>('PUT', `/users/${user.id}`, user),
+        delete: (id: string) => request<void>('DELETE', `/users/${id}`),
+        updateAvatar: async (userId: string, avatar: string) => {
+            return await request<{ avatar: string, message: string }>('POST', `/users/${userId}/avatar`, { avatar });
+        }
+    },
+    departments: {
+        getAll: async (): Promise<DepartmentDef[]> => {
+            try {
+                const response = await request<{ departments: any[] } | any[]>('GET', '/departments');
+                return Array.isArray(response) ? response : (response.departments || []);
+            } catch (error) {
+                console.error('Failed to get departments', error);
+                return [];
+            }
+        },
+        create: async (dept: DepartmentDef) => {
+            const response = await request<{ department: DepartmentDef, message: string }>('POST', '/departments', dept);
+            return response.department;
+        },
+        update: async (dept: DepartmentDef) => {
+            const response = await request<{ department: DepartmentDef, message: string }>('PUT', `/departments/${dept.id}`, dept);
+            return response.department;
+        },
+        delete: (id: string) => request<void>('DELETE', `/departments/${id}`)
+    },
+    tasks: {
+        getAll: async (): Promise<Task[]> => {
+            const response = await request<{ tasks: any[], pagination?: any }>('GET', '/tasks');
+            return (response.tasks || []).map((task: any) => ({
+                id: task.id,
+                title: task.title,
+                description: task.description,
+                urgency: task.urgency,
+                deadline: task.deadline,
+                createdAt: task.created_at,
+                status: task.status,
+                targetDepartment: task.target_department,
+                assignedToUserId: task.assigned_to_user_id,
+                assignedToDepartment: task.assigned_to_department,
+                acceptedByUserId: task.accepted_by_user_id,
+                completionNotes: task.completion_notes,
+                progress: task.progress || 0,
+                createdBy: task.created_by,
+                isArchived: task.is_archived === 1 || task.is_archived === true,
+                timeline: task.timeline || [],
+                unreadUpdatesForUserIds: task.unread_updates_for_user_ids || []
+            }));
+        },
+        create: (task: Task) => request<Task>('POST', '/tasks', task),
+        update: (task: Task) => request<Task>('PUT', `/tasks/${task.id}`, task),
+        updateProgress: (id: string, updates: Partial<Task>) => request<void>('PATCH', `/tasks/${id}`, updates),
+        accept: (id: string) => request<{ task: any }>('POST', `/tasks/${id}/accept`, {}),
+        delete: (id: string) => request<void>('DELETE', `/tasks/${id}`)
+    },
+    announcements: {
+        getAll: async (): Promise<Announcement[]> => {
+            try {
+                const response = await request<{ announcements: any[] }>('GET', '/announcements');
+                return (response.announcements || []).map((a: any) => ({
+                    ...a,
+                    readBy: a.read_by || a.readBy || [],
+                    createdAt: a.created_at || a.createdAt
+                }));
+            } catch (error) {
+                console.error('Failed to get announcements', error);
+                return [];
+            }
+        },
+        create: (ann: Announcement) => request<Announcement>('POST', '/announcements', ann),
+        markRead: (id: string, userId: string) => request<void>('POST', `/announcements/${id}/read`, { userId })
+    },
+    reports: {
+        getAll: async (): Promise<Report[]> => {
+            try {
+                const response = await request<{ reports: any[] }>('GET', '/reports');
+                return (response.reports || []).map((r: any) => ({
+                    ...r,
+                    createdAt: r.created_at || r.createdAt,
+                    userId: r.user_id || r.userId
+                }));
+            } catch (error) {
+                console.error('Failed to get reports', error);
+                return [];
+            }
+        },
+        create: (report: Report) => request<Report>('POST', '/reports', report)
+    },
+    finance: {
+        getAll: async (): Promise<FinanceRecord[]> => {
+            try {
+                const response = await request<{ records: any[] }>('GET', '/finance');
+                return (response.records || []).map((r: any) => ({
+                    ...r,
+                    departmentId: r.department_id || r.departmentId,
+                    ownerId: r.owner_id || r.ownerId,
+                    recordedBy: r.recorded_by || r.recordedBy
+                }));
+            } catch (error) {
+                console.error('Failed to get finance', error);
+                return [];
+            }
+        },
+        create: (record: FinanceRecord) => request<FinanceRecord>('POST', '/finance', record),
+        confirm: (id: string) => request<void>('POST', `/finance/${id}/confirm`),
+        delete: (id: string) => request<void>('DELETE', `/finance/${id}`)
+    },
+    forum: {
+        getAll: async (): Promise<Suggestion[]> => {
+            try {
+                const response = await request<{ suggestions: any[] }>('GET', '/forum');
+                return (response.suggestions || []).map((s: any) => ({
+                    ...s,
+                    authorId: s.author_id || s.authorId,
+                    targetDeptId: s.target_dept_id || s.targetDeptId,
+                    isAnonymous: s.is_anonymous === 1 || s.isAnonymous,
+                    createdAt: s.created_at || s.createdAt,
+                    upvotes: s.upvotes || [],
+                    comments: s.comments || []
+                }));
+            } catch (error) {
+                console.error('Failed to get forum', error);
+                return [];
+            }
+        },
+        create: (sug: Suggestion) => request<Suggestion>('POST', '/forum', sug),
+        update: (sug: Suggestion) => request<Suggestion>('PUT', `/forum/${sug.id}`, sug),
+        addComment: (suggestionId: string, content: string, isOfficial: boolean) => 
+            request<{ comment: any }>('POST', `/forum/${suggestionId}/comments`, { content, is_official: isOfficial })
+    },
+    memos: {
+        getAll: async (userId: string): Promise<Memo[]> => {
+            try {
+                const response = await request<{ memos: any[] }>('GET', `/memos`);
+                return (response.memos || []).map((m: any) => ({
+                    ...m,
+                    userId: m.user_id || m.userId,
+                    createdAt: m.created_at || m.createdAt,
+                    todos: m.todos || []
+                }));
+            } catch (error) {
+                console.error('Failed to get memos', error);
+                return [];
+            }
+        },
+        create: (memo: Memo) => request<Memo>('POST', '/memos', memo),
+        update: (memo: Memo) => request<Memo>('PUT', `/memos/${memo.id}`, memo),
+        delete: (id: string) => request<void>('DELETE', `/memos/${id}`)
+    },
+    routines: {
+        getTemplates: () => request<RoutineTemplate[]>('GET', '/routines/templates'),
+        saveTemplate: (tpl: RoutineTemplate) => request<RoutineTemplate>('POST', '/routines/templates', tpl),
+        deleteTemplate: (id: string) => request<void>('DELETE', `/routines/templates/${id}`),
+        markAsRead: (userId: string, templateId: string) => request<void>('POST', `/routines/templates/${templateId}/read`, { userId }),
+        getTodayRecord: (userId: string, deptId: string) => request<RoutineRecord | null>('GET', `/routines/today?userId=${userId}&deptId=${deptId}`),
+        getHistory: () => request<RoutineRecord[]>('GET', '/routines/history'),
+        toggleItem: (recordId: string, index: number, isCompleted: boolean) => request<void>('POST', `/routines/records/${recordId}/toggle`, { index, isCompleted })
+    },
+    attendance: {
+        getTodayStatus: async (userId: string): Promise<AttendanceRecord | null> => {
+            try {
+                const response = await request<{ today: { record: any } }>('GET', `/attendance/status`);
+                const record = response.today?.record;
+                if (!record) return null;
+                return {
+                    id: record.id,
+                    userId: record.user_id,
+                    date: record.date,
+                    clockIn: record.clock_in,
+                    clockOut: record.clock_out || null,
+                    durationMinutes: record.duration_minutes || 0,
+                    status: record.status
+                };
+            } catch (error) {
+                console.error('Failed to get attendance status', error);
+                return null;
+            }
+        },
+        getHistory: async (): Promise<AttendanceRecord[]> => {
+            const response = await request<{ records: any[] }>('GET', `/attendance`);
+            return (response.records || []).map((r: any) => ({
+                id: r.id,
+                userId: r.user_id,
+                date: r.date,
+                clockIn: r.clock_in,
+                clockOut: r.clock_out,
+                durationMinutes: r.duration_minutes,
+                status: r.status
+            }));
+        },
+        clockIn: async (userId: string): Promise<AttendanceRecord> => {
+            const response = await request<{ record: any }>('POST', '/attendance/clock-in', {});
+            const record = response.record;
+            return {
+                id: record.id,
+                userId: userId,
+                date: record.date,
+                clockIn: record.clock_in,
+                clockOut: record.clock_out || null,
+                durationMinutes: record.duration_minutes || 0,
+                status: record.status || 'ONLINE'
+            };
+        },
+        clockOut: async (recordId: string): Promise<AttendanceRecord> => {
+            const response = await request<{ record: any }>('POST', '/attendance/clock-out', { id: recordId });
+            const record = response.record;
+            return {
+                id: record.id,
+                userId: record.user_id,
+                date: record.date,
+                clockIn: record.clock_in,
+                clockOut: record.clock_out,
+                durationMinutes: record.duration_minutes,
+                status: record.status || 'OFFLINE'
+            };
+        }
+    },
+    performance: {
+        getReviews: (period: string, userId?: string) => request<PerformanceReview[]>(`GET`, `/performance/reviews?period=${period}${userId ? `&userId=${userId}` : ''}`),
+        getUserStats: (userId: string, period: string) => request<ReviewMetrics>('GET', `/performance/stats?userId=${userId}&period=${period}`),
+        saveReview: (review: PerformanceReview) => request<PerformanceReview>('POST', '/performance/reviews', review)
+    },
+    logs: {
+        getAll: () => request<SystemLog[]>('GET', '/logs')
+    },
+    system: {
+        resetFactoryDefault: () => request<void>('POST', '/system/reset'),
+        exportData: () => request<string>('GET', '/system/export'),
+        importData: (json: string) => request<boolean>('POST', '/system/import', { json }),
+        getSettings: () => request<{menuGroups?: MenuGroup[]}>('GET', '/system/settings'),
+        saveSettings: (settings: {menuGroups?: MenuGroup[]}) => request<void>('POST', '/system/settings', settings)
+    },
+    chat: {
+        getChannels: async (userId: string): Promise<ChatChannel[]> => {
+            try {
+                const response = await request<{ channels: any[] }>('GET', '/chat/channels');
+                return (response.channels || []).map((ch: any) => ({
+                    id: ch.id,
+                    type: ch.type,
+                    name: ch.name,
+                    participants: ch.participants || [],
+                    lastMessage: ch.lastMessage || ch.last_message ? {
+                        id: (ch.lastMessage || ch.last_message).id,
+                        channelId: (ch.lastMessage || ch.last_message).channel_id || (ch.lastMessage || ch.last_message).channelId,
+                        userId: (ch.lastMessage || ch.last_message).user_id || (ch.lastMessage || ch.last_message).userId,
+                        userName: (ch.lastMessage || ch.last_message).user_name || (ch.lastMessage || ch.last_message).userName,
+                        avatar: (ch.lastMessage || ch.last_message).avatar,
+                        content: (ch.lastMessage || ch.last_message).content,
+                        timestamp: (ch.lastMessage || ch.last_message).timestamp,
+                        readBy: (ch.lastMessage || ch.last_message).read_by || (ch.lastMessage || ch.last_message).readBy || []
+                    } : undefined,
+                    unreadCount: ch.unreadCount || ch.unread_count || 0,
+                    participantDetails: ch.participantDetails || ch.participant_details,
+                    created_at: ch.created_at
+                }));
+            } catch (error) {
+                console.error('Failed to get channels', error);
+                return [];
+            }
+        },
+        getMessages: async (channelId: string, options?: { limit?: number; before?: string; after?: string }): Promise<{ messages: ChatMessage[]; hasMore: boolean }> => {
+            const params = new URLSearchParams();
+            if (options?.limit) params.append('limit', options.limit.toString());
+            if (options?.before) params.append('before', options.before);
+            if (options?.after) params.append('after', options.after);
+            const queryString = params.toString();
+            const response = await request<{ messages: any[]; hasMore?: boolean }>('GET', `/chat/channels/${channelId}/messages${queryString ? `?${queryString}` : ''}`);
+            return {
+                messages: (response.messages || []).map((m: any) => ({
+                    id: m.id,
+                    channelId: m.channel_id,
+                    userId: m.user_id,
+                    userName: m.user_name,
+                    avatar: m.avatar,
+                    content: m.content,
+                    timestamp: m.timestamp,
+                    readBy: m.read_by || m.readBy || []
+                })),
+                hasMore: response.hasMore || false
+            };
+        },
+        sendMessage: async (channelId: string, userId: string, content: string, sender: User): Promise<ChatMessage> => {
+            const response = await request<{ message: any }>('POST', `/chat/channels/${channelId}/messages`, { content });
+            const m = response.message;
+            return {
+                id: m.id,
+                channelId: m.channel_id,
+                userId: m.user_id,
+                userName: m.user_name,
+                avatar: m.avatar,
+                content: m.content,
+                timestamp: m.timestamp,
+                readBy: m.read_by || m.readBy || []
+            };
+        },
+        markRead: async (channelId: string, userId: string): Promise<void> => {
+            await request('POST', `/chat/channels/${channelId}/read`, {});
+        },
+        createDirectChannel: async (userId1: string, userId2: string): Promise<ChatChannel> => {
+            const response = await request<any>('POST', '/chat/channels/direct', { user1: userId1, user2: userId2 });
+            const ch = response.channel || response;
+            return {
+                id: ch.id,
+                type: ch.type || 'DIRECT',
+                name: ch.name || '',
+                participants: Array.isArray(ch.participants) ? ch.participants : [],
+                unreadCount: ch.unreadCount || ch.unread_count || 0
+            };
+        },
+        createGroupChannel: async (name: string, participantIds: string[]): Promise<ChatChannel> => {
+            const response = await request<any>('POST', '/chat/channels', {
+                type: 'GROUP',
+                name: name,
+                participant_ids: participantIds
+            });
+            const ch = response.channel || response;
+            return {
+                id: ch.id,
+                type: ch.type || 'GROUP',
+                name: ch.name || name,
+                participants: Array.isArray(ch.participants) ? ch.participants : participantIds,
+                unreadCount: ch.unreadCount || ch.unread_count || 0
+            };
+        },
+        getUsers: async (): Promise<User[]> => {
+            try {
+                const response = await request<{ users: any[] }>('GET', '/chat/users');
+                return (response.users || []).map((u: any) => ({
+                    id: u.id,
+                    name: u.name,
+                    avatar: u.avatar,
+                    department: u.department,
+                    role: u.role,
+                    username: u.username || '',
+                    password: '', 
+                    permissions: u.permissions || []
+                }));
+            } catch (error) {
+                console.error('Failed to get chat users', error);
+                return [];
+            }
+        },
+        recallMessage: async (channelId: string, messageId: string): Promise<void> => {
+            await request('POST', `/chat/channels/${channelId}/messages/${messageId}/recall`, {});
+        },
+        leaveChannel: async (channelId: string): Promise<void> => {
+            await request('POST', `/chat/channels/${channelId}/leave`, {});
+        },
+        editChannel: async (channelId: string, name: string, participantIds: string[]): Promise<ChatChannel> => {
+            const response = await request<{ channel: any }>('PUT', `/chat/channels/${channelId}`, {
+                name: name,
+                participant_ids: participantIds
+            });
+            const ch = response.channel;
+            return {
+                id: ch.id,
+                type: ch.type,
+                name: ch.name,
+                participants: ch.participants,
+                unreadCount: 0
+            };
+        }
+    }
+};
+
+// ============================================================================
+// MOCK API IMPLEMENTATION (LOCAL STORAGE)
+// ============================================================================
+
+const MockApi = {
+    auth: {
+        login: async (username: string, password: string): Promise<User | undefined> => {
+            await delay();
+            return MOCK_DB.users.find(u => u.username === username && u.password === password);
+        },
+        setup: async (userData: any): Promise<User> => {
+            await delay(1000);
+            const adminUser: User = {
+                ...userData,
+                id: `u-admin-${Date.now()}`,
+                role: Role.BOSS,
+                department: 'Management',
+            };
+            MOCK_DB.users.push(adminUser);
+            logSystemAction(adminUser, 'INITIAL_SETUP', 'Created first admin account');
+            saveToStorage();
+            return adminUser;
+        },
+        verify: async (): Promise<User | null> => {
+            await delay();
+            const token = localStorage.getItem('auth_token');
+            if (!token) return null;
+            // Mock implementation: return first user as verified
+            return MOCK_DB.users.length > 0 ? MOCK_DB.users[0] : null;
+        },
+        logout: () => {
+            localStorage.removeItem('auth_token');
+        },
+        checkSetup: async (): Promise<{ needsSetup: boolean; userCount: number }> => {
+            await delay();
+            return { needsSetup: MOCK_DB.users.length === 0, userCount: MOCK_DB.users.length };
+        }
+    },
+    users: {
+        getAll: async (): Promise<User[]> => {
+            await delay();
+            return [...MOCK_DB.users];
+        },
+        create: async (user: User, operator?: User): Promise<User> => {
+            await delay();
+            MOCK_DB.users.push(user);
+            logSystemAction(operator, 'CREATE_USER', `Created user ${user.name} (${user.role})`);
+            saveToStorage();
+            return user;
+        },
+        update: async (user: User, operator?: User): Promise<User> => {
+            await delay();
+            const idx = MOCK_DB.users.findIndex(u => u.id === user.id);
+            if (idx !== -1) {
+                MOCK_DB.users[idx] = user;
+                logSystemAction(operator, 'UPDATE_USER', `Updated user ${user.name}`);
+                saveToStorage();
+            }
+            return user;
+        },
+        delete: async (id: string, operator?: User): Promise<void> => {
+            await delay();
+            const user = MOCK_DB.users.find(u => u.id === id);
+            MOCK_DB.users = MOCK_DB.users.filter(u => u.id !== id);
+            logSystemAction(operator, 'DELETE_USER', `Deleted user ${user?.name || id}`, 'WARNING');
+            saveToStorage();
+        },
+        updateAvatar: async (userId: string, avatar: string, operator?: User): Promise<{ avatar: string }> => {
+            await delay();
+            const user = MOCK_DB.users.find(u => u.id === userId);
+            if (user) {
+                user.avatar = avatar;
+                logSystemAction(operator, 'UPDATE_AVATAR', `Updated avatar for user ${user.name}`);
+                saveToStorage();
+                return { avatar };
+            }
+            throw new Error('User not found');
+        }
+    },
+    departments: {
+        getAll: async (): Promise<DepartmentDef[]> => {
+            await delay();
+            return [...MOCK_DB.departments];
+        },
+        create: async (dept: DepartmentDef, operator?: User): Promise<DepartmentDef> => {
+            await delay();
+            MOCK_DB.departments.push(dept);
+            logSystemAction(operator, 'CREATE_DEPT', `Created department ${dept.name}`);
+            saveToStorage();
+            return dept;
+        },
+        update: async (dept: DepartmentDef, operator?: User): Promise<DepartmentDef> => {
+            await delay();
+            const idx = MOCK_DB.departments.findIndex(d => d.id === dept.id);
+            if (idx !== -1) {
+                MOCK_DB.departments[idx] = dept;
+                logSystemAction(operator, 'UPDATE_DEPT', `Updated department ${dept.name}`);
+                saveToStorage();
+                return dept;
+            }
+            throw new Error('Department not found');
+        },
+        delete: async (id: string, operator?: User): Promise<void> => {
+            await delay();
+            const dept = MOCK_DB.departments.find(d => d.id === id);
+            MOCK_DB.departments = MOCK_DB.departments.filter(d => d.id !== id);
+            logSystemAction(operator, 'DELETE_DEPT', `Deleted department ${dept?.name || id}`, 'WARNING');
+            saveToStorage();
+        }
+    },
+    tasks: {
+        getAll: async (): Promise<Task[]> => {
+            await delay();
+            return [...MOCK_DB.tasks];
+        },
+        create: async (task: Task): Promise<Task> => {
+            await delay();
+            MOCK_DB.tasks.unshift(task);
+            saveToStorage();
+            return task;
+        },
+        update: async (task: Task): Promise<Task> => {
+            await delay();
+            const idx = MOCK_DB.tasks.findIndex(t => t.id === task.id);
+            if (idx !== -1) {
+                MOCK_DB.tasks[idx] = task;
+                saveToStorage();
+            }
+            return task;
+        },
+        updateProgress: async (id: string, updates: Partial<Task>): Promise<void> => {
+             await delay();
+             const idx = MOCK_DB.tasks.findIndex(t => t.id === id);
+             if (idx !== -1) {
+                 MOCK_DB.tasks[idx] = { ...MOCK_DB.tasks[idx], ...updates };
+                 saveToStorage();
+             }
+        },
+        delete: async (id: string): Promise<void> => {
+            await delay();
+            MOCK_DB.tasks = MOCK_DB.tasks.filter(t => t.id !== id);
+            saveToStorage();
+        },
+        accept: async (id: string): Promise<Task> => {
+            await delay();
+            const idx = MOCK_DB.tasks.findIndex(t => t.id === id);
+            if (idx !== -1) {
+                MOCK_DB.tasks[idx] = { ...MOCK_DB.tasks[idx], status: 'IN_PROGRESS' as TaskStatus };
+                saveToStorage();
+                return MOCK_DB.tasks[idx];
+            }
+            throw new Error('Task not found');
+        }
+    },
+    announcements: {
+        getAll: async (): Promise<Announcement[]> => {
+            await delay();
+            return [...MOCK_DB.announcements];
+        },
+        create: async (ann: Announcement): Promise<Announcement> => {
+            await delay();
+            MOCK_DB.announcements.unshift(ann);
+            saveToStorage();
+            return ann;
+        },
+        markRead: async (id: string, userId: string): Promise<void> => {
+            await delay();
+            const ann = MOCK_DB.announcements.find(a => a.id === id);
+            if (ann && !ann.readBy.includes(userId)) {
+                ann.readBy.push(userId);
+                saveToStorage();
+            }
+        }
+    },
+    reports: {
+        getAll: async (): Promise<Report[]> => {
+            await delay();
+            return [...MOCK_DB.reports];
+        },
+        create: async (report: Report): Promise<Report> => {
+            await delay();
+            MOCK_DB.reports.unshift(report);
+            saveToStorage();
+            return report;
+        }
+    },
+    finance: {
+        getAll: async (): Promise<FinanceRecord[]> => {
+            await delay();
+            return [...MOCK_DB.finance];
+        },
+        create: async (record: FinanceRecord): Promise<FinanceRecord> => {
+            await delay();
+            MOCK_DB.finance.unshift(record);
+            saveToStorage();
+            return record;
+        },
+        confirm: async (id: string): Promise<void> => {
+            await delay();
+            const rec = MOCK_DB.finance.find(r => r.id === id);
+            if (rec) {
+                rec.status = 'COMPLETED';
+                saveToStorage();
+            }
+        },
+        delete: async (id: string, operator?: User): Promise<void> => {
+             await delay();
+             MOCK_DB.finance = MOCK_DB.finance.filter(r => r.id !== id);
+             logSystemAction(operator, 'DELETE_FINANCE', `Deleted finance record ${id}`, 'WARNING');
+             saveToStorage();
+        }
+    },
+    forum: {
+        getAll: async (): Promise<Suggestion[]> => {
+            await delay();
+            return [...MOCK_DB.suggestions];
+        },
+        create: async (suggestion: Suggestion): Promise<Suggestion> => {
+            await delay();
+            MOCK_DB.suggestions.unshift(suggestion);
+            saveToStorage();
+            return suggestion;
+        },
+        update: async (suggestion: Suggestion): Promise<Suggestion> => {
+            await delay();
+            const idx = MOCK_DB.suggestions.findIndex(s => s.id === suggestion.id);
+            if (idx !== -1) {
+                MOCK_DB.suggestions[idx] = suggestion;
+                saveToStorage();
+            }
+            return suggestion;
+        }
+    },
+    memos: {
+        getAll: async (userId: string): Promise<Memo[]> => {
+            await delay();
+            return MOCK_DB.memos.filter(m => m.userId === userId);
+        },
+        create: async (memo: Memo): Promise<Memo> => {
+            await delay();
+            MOCK_DB.memos.unshift(memo);
+            saveToStorage();
+            return memo;
+        },
+        update: async (memo: Memo): Promise<Memo> => {
+            await delay();
+            const idx = MOCK_DB.memos.findIndex(m => m.id === memo.id);
+            if(idx !== -1) {
+                MOCK_DB.memos[idx] = memo;
+                saveToStorage();
+            }
+            return memo;
+        },
+        delete: async (id: string): Promise<void> => {
+            await delay();
+            MOCK_DB.memos = MOCK_DB.memos.filter(m => m.id !== id);
+            saveToStorage();
+        }
+    },
+    chat: {
+        getChannels: async (userId: string): Promise<ChatChannel[]> => {
+            try {
+                const response = await request<{ channels: any[] }>('GET', '/chat/channels');
+                const channels = (response.channels || []).map((ch: any) => {
+                    const lastMsg = ch.lastMessage || ch.last_message;
+                    const mapped = {
+                        id: ch.id,
+                        type: ch.type,
+                        name: ch.name,
+                        participants: ch.participants || [],
+                        lastMessage: lastMsg ? {
+                            id: lastMsg.id,
+                            channelId: lastMsg.channelId || lastMsg.channel_id,
+                            userId: lastMsg.userId || lastMsg.user_id,
+                            userName: lastMsg.userName || lastMsg.user_name,
+                            avatar: lastMsg.avatar,
+                            content: lastMsg.content,
+                            timestamp: lastMsg.timestamp,
+                            readBy: typeof lastMsg.read_by === 'string' ? JSON.parse(lastMsg.read_by) : (lastMsg.readBy || lastMsg.read_by || [])
+                        } : undefined,
+                        unreadCount: ch.unreadCount || ch.unread_count || 0,
+                        participantDetails: ch.participantDetails || ch.participant_details,
+                        created_at: ch.created_at
+                    };
+                    console.log('?????駁?:', mapped.id, '?敺???', mapped.lastMessage ? `${mapped.lastMessage.userName}: ${mapped.lastMessage.content}` : '??);
+                    return mapped;
+                });
+                return channels;
+            } catch (error) {
+                console.error('Failed to get channels', error);
+                return [];
+            }
+        },
+        getMessages: async (channelId: string, options?: { limit?: number; before?: string; after?: string }): Promise<{ messages: ChatMessage[]; hasMore: boolean }> => {
+            const params = new URLSearchParams();
+            if (options?.limit) params.append('limit', options.limit.toString());
+            if (options?.before) params.append('before', options.before);
+            if (options?.after) params.append('after', options.after);
+            
+            const queryString = params.toString();
+            const endpoint = `/chat/channels/${channelId}/messages${queryString ? `?${queryString}` : ''}`;
+            
+            const response = await request<{ messages: any[]; hasMore?: boolean }>('GET', endpoint);
+            const messages = response.messages || [];
+            const messagesArray = Array.isArray(messages) ? messages : [];
+            const result = messagesArray.map((m: any) => ({
+                id: m.id,
+                channelId: m.channel_id,
+                userId: m.user_id,
+                userName: m.user_name,
+                avatar: m.avatar,
+                content: m.content,
+                timestamp: m.created_at || m.timestamp,
+                readBy: Array.isArray(m.read_by) ? m.read_by : (m.read_by ? JSON.parse(m.read_by) : [])
+            }));
+            
+            return {
+                messages: result,
+                hasMore: response.hasMore || false
+            };
+        },
+        sendMessage: async (channelId: string, userId: string, content: string, sender: User): Promise<ChatMessage> => {
+            const response = await request<{ message: any }>('POST', `/chat/channels/${channelId}/messages`, { content });
+            const m = response.message;
+            return {
+                id: m.id,
+                channelId: m.channel_id,
+                userId: m.user_id,
+                userName: m.user_name,
+                avatar: m.avatar,
+                content: m.content,
+                timestamp: m.timestamp,
+                readBy: m.read_by || []
+            };
+        },
+        markRead: async (channelId: string, userId: string): Promise<void> => {
+            await request('POST', `/chat/channels/${channelId}/read`, {});
+        },
+        createDirectChannel: async (userId1: string, userId2: string): Promise<ChatChannel> => {
+            try {
+                const response = await request<any>('POST', '/chat/channels/direct', {
+                    user1: userId1,
+                    user2: userId2
+                });
+                // ??銝????撘?                const ch = response.channel || response;
+                return {
+                    id: ch.id,
+                    type: ch.type || 'DIRECT',
+                    name: ch.name || '',
+                    participants: Array.isArray(ch.participants) ? ch.participants : [],
+                    unreadCount: ch.unreadCount || ch.unread_count || 0
+                };
+            } catch (error) {
+                console.error('Failed to create direct channel', error);
+                throw error;
+            }
+        },
+        createGroupChannel: async (name: string, participantIds: string[]): Promise<ChatChannel> => {
+            try {
+                const response = await request<any>('POST', '/chat/channels', {
+                    type: 'GROUP',
+                    name: name,
+                    participant_ids: participantIds
+                });
+                const ch = response.channel || response;
+                return {
+                    id: ch.id,
+                    type: ch.type || 'GROUP',
+                    name: ch.name || name,
+                    participants: Array.isArray(ch.participants) ? ch.participants : participantIds,
+                    unreadCount: ch.unreadCount || ch.unread_count || 0
+                };
+            } catch (error) {
+                console.error('Failed to create group channel', error);
+                throw error;
+            }
+        },
+        getUsers: async (): Promise<User[]> => {
+            try {
+                const response = await request<{ users: any[] }>('GET', '/chat/users');
+                return (response.users || []).map((u: any) => ({
+                    id: u.id,
+                    name: u.name,
+                    avatar: u.avatar,
+                    department: u.department,
+                    role: u.role,
+                    username: '',
+                    permissions: []
+                }));
+            } catch (error) {
+                console.error('Failed to get chat users', error);
+                return [];
+            }
+        },
+        uploadFile: async (file: File): Promise<{ url: string; filename: string; originalName: string; isImage: boolean }> => {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const token = localStorage.getItem('auth_token');
+            const response = await fetch(`${API_BASE_URL}/chat/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || '銝憭望?');
+            }
+            
+            const data = await response.json();
+            return {
+                url: data.file.url,
+                filename: data.file.filename,
+                originalName: data.file.originalName,
+                isImage: data.file.isImage
+            };
+        }
+    },
+    routines: {
+        getTemplates: async (): Promise<RoutineTemplate[]> => {
+            await delay();
+            return [...MOCK_DB.routineTemplates];
+        },
+        saveTemplate: async (template: RoutineTemplate, operator?: User): Promise<RoutineTemplate> => {
+            await delay();
+            const localTemplate = { ...template, lastUpdated: getLocalDateString() };
+            const idx = MOCK_DB.routineTemplates.findIndex(t => t.id === template.id);
+            if (idx !== -1) {
+                localTemplate.readBy = MOCK_DB.routineTemplates[idx].readBy || [];
+                MOCK_DB.routineTemplates[idx] = localTemplate;
+                logSystemAction(operator, 'UPDATE_SOP', `Updated SOP: ${template.title}`);
+            } else {
+                localTemplate.readBy = [];
+                MOCK_DB.routineTemplates.push(localTemplate);
+                logSystemAction(operator, 'CREATE_SOP', `Created SOP: ${template.title}`);
+            }
+            saveToStorage();
+            return localTemplate;
+        },
+        deleteTemplate: async (id: string, operator?: User): Promise<void> => {
+            await delay();
+            const tpl = MOCK_DB.routineTemplates.find(t => t.id === id);
+            MOCK_DB.routineTemplates = MOCK_DB.routineTemplates.filter(t => t.id !== id);
+            logSystemAction(operator, 'DELETE_SOP', `Deleted SOP: ${tpl?.title || id}`, 'WARNING');
+            saveToStorage();
+        },
+        markAsRead: async (userId: string, templateId: string): Promise<void> => {
+            await delay();
+            const template = MOCK_DB.routineTemplates.find(t => t.id === templateId);
+            if (template) {
+                if (!template.readBy) template.readBy = [];
+                if (!template.readBy.includes(userId)) {
+                    template.readBy.push(userId);
+                    saveToStorage();
+                }
+            }
+        },
+        getTodayRecord: async (userId: string, departmentId: string): Promise<RoutineRecord | null> => { return null; },
+        getHistory: async (): Promise<RoutineRecord[]> => { return []; },
+        toggleItem: async () => { }
+    },
+    attendance: {
+        getTodayStatus: async (userId: string): Promise<AttendanceRecord | null> => {
+            await delay(100);
+            const reversedRecords = [...MOCK_DB.attendance].reverse();
+            const activeSession = reversedRecords.find(r => r.userId === userId && !r.clockOut);
+            if (activeSession) return activeSession;
+            const today = getLocalDateString();
+            const todayRecords = MOCK_DB.attendance.filter(r => r.userId === userId && r.date === today).sort((a,b) => b.clockIn.localeCompare(a.clockIn));
+            return todayRecords.length > 0 ? todayRecords[0] : null;
+        },
+        getHistory: async (): Promise<AttendanceRecord[]> => {
+            await delay();
+            return [...MOCK_DB.attendance];
+        },
+        clockIn: async (userId: string): Promise<AttendanceRecord> => {
+            await delay();
+            const record: AttendanceRecord = {
+                id: `att-${Date.now()}`,
+                userId,
+                date: getLocalDateString(),
+                clockIn: new Date().toISOString(),
+                status: 'ONLINE'
+            };
+            MOCK_DB.attendance.push(record);
+            saveToStorage();
+            return record;
+        },
+        clockOut: async (recordId: string): Promise<AttendanceRecord> => {
+            await delay();
+            const record = MOCK_DB.attendance.find(r => r.id === recordId);
+            if (!record) throw new Error("Record not found");
+            if (record.clockOut) return record;
+            record.clockOut = new Date().toISOString();
+            const diffMs = Math.max(0, new Date(record.clockOut).getTime() - new Date(record.clockIn).getTime());
+            record.durationMinutes = Math.floor(diffMs / 1000 / 60);
+            record.status = 'OFFLINE';
+            saveToStorage();
+            return record;
+        }
+    },
+    performance: {
+        getReviews: async (period: string, userId?: string): Promise<PerformanceReview[]> => {
+            await delay();
+            let result = MOCK_DB.performance.filter(r => r.period === period);
+            if (userId) result = result.filter(r => r.targetUserId === userId);
+            return result;
+        },
+        getUserStats: async (userId: string, period: string): Promise<ReviewMetrics> => {
+            await delay();
+            return { taskCompletionRate: 0, sopCompletionRate: 0, attendanceRate: 100 };
+        },
+        saveReview: async (review: PerformanceReview): Promise<PerformanceReview> => {
+            await delay();
+            const idx = MOCK_DB.performance.findIndex(r => r.id === review.id);
+            review.updatedAt = new Date().toISOString();
+            if (idx !== -1) MOCK_DB.performance[idx] = review;
+            else MOCK_DB.performance.push(review);
+            saveToStorage();
+            return review;
+        }
+    },
+    logs: {
+        getAll: async (): Promise<SystemLog[]> => {
+            await delay();
+            return [...MOCK_DB.logs];
+        }
+    },
+    system: {
+        resetFactoryDefault: async (operator: User): Promise<void> => {
+            await delay(1000);
+            localStorage.removeItem(STORAGE_KEY);
+            window.location.reload();
+        },
+        exportData: async (): Promise<string> => {
+            await delay();
+            return JSON.stringify(MOCK_DB, null, 2);
+        },
+        importData: async (jsonStr: string): Promise<boolean> => {
+            await delay();
+            try {
+                const data = JSON.parse(jsonStr);
+                Object.assign(MOCK_DB, data);
+                saveToStorage();
+                return true;
+            } catch (e) { return false; }
+        },
+        getSettings: async (): Promise<{menuGroups?: MenuGroup[]}> => {
+            await delay();
+            return MOCK_DB.settings;
+        },
+        saveSettings: async (settings: {menuGroups?: MenuGroup[]}): Promise<void> => {
+            await delay();
+            MOCK_DB.settings = { ...MOCK_DB.settings, ...settings };
+            saveToStorage();
+        }
+    }
+};
+
+export const api = USE_MOCK_API ? MockApi : RealApi;

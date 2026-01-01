@@ -1,0 +1,507 @@
+
+import React, { useState, useMemo } from 'react';
+import { Report, User, Role, DepartmentDef } from '../types';
+import { api } from '../services/api';
+import { useToast } from './Toast';
+
+interface ReportViewProps {
+  currentUser: User;
+  users: User[];
+  reports: Report[];
+  departments: DepartmentDef[];
+  onCreateClick: () => void;
+  onOpenReportModal: () => void;
+  onReportUpdated?: () => void;
+}
+
+export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, reports, departments, onCreateClick, onReportUpdated }) => {
+  const toast = useToast();
+  const [activeTab, setActiveTab] = useState<'MY_REPORTS' | 'TEAM_REPORTS'>('MY_REPORTS');
+  const [editingReport, setEditingReport] = useState<Report | null>(null);
+  const [editReason, setEditReason] = useState('');
+  
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number | 'ALL'>(currentMonth);
+  const [selectedDept, setSelectedDept] = useState<string>('ALL');
+
+  const isManager = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
+  const isSupervisor = currentUser.role === Role.SUPERVISOR;
+  const canViewTeam = isManager || isSupervisor;
+
+  useMemo(() => {
+    if (isSupervisor) {
+      setSelectedDept(currentUser.department);
+    }
+  }, [isSupervisor, currentUser.department]);
+
+  const getUser = (id: string) => users.find(u => u.id === id);
+  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
+
+  const displayReports = useMemo(() => {
+    let filtered = reports;
+
+    if (activeTab === 'MY_REPORTS') {
+       // 支援 userId 和 user_id 兩種格式
+       filtered = filtered.filter(r => (r.userId || (r as any).user_id) === currentUser.id);
+    } else {
+       if (isSupervisor) {
+          filtered = filtered.filter(r => users.find(user => user.id === r.userId)?.department === currentUser.department);
+       } else if (isManager) {
+          if (selectedDept !== 'ALL') {
+             filtered = filtered.filter(r => users.find(user => user.id === r.userId)?.department === selectedDept);
+          }
+       }
+    }
+
+    if (activeTab === 'TEAM_REPORTS') {
+        filtered = filtered.filter(r => {
+            const d = new Date(r.createdAt);
+            const matchYear = d.getFullYear() === selectedYear;
+            const matchMonth = selectedMonth === 'ALL' || (d.getMonth() + 1) === selectedMonth;
+            return matchYear && matchMonth;
+        });
+    }
+
+    return filtered.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [reports, activeTab, currentUser, users, selectedDept, selectedYear, selectedMonth, isSupervisor, isManager]);
+
+  const summaryStats = useMemo(() => {
+    if (activeTab !== 'TEAM_REPORTS') return null;
+
+    return displayReports.reduce((acc, curr) => {
+        const c = curr.content;
+        acc.totalDeposit += c.depositAmount || 0;
+        acc.totalWithdrawal += c.withdrawalAmount || 0;
+        acc.totalNet += c.netIncome || 0;
+        acc.totalRegistrations += c.registrations || 0;
+        acc.totalLeads += c.lineLeads || 0;
+        acc.reportCount += 1;
+        return acc;
+    }, {
+        totalDeposit: 0,
+        totalWithdrawal: 0,
+        totalNet: 0,
+        totalRegistrations: 0,
+        totalLeads: 0,
+        reportCount: 0
+    });
+  }, [displayReports, activeTab]);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(amount);
+  };
+
+  const yearOptions = Array.from({ length: 4 }, (_, i) => currentYear - 2 + i);
+
+  return (
+    <div className="space-y-6 animate-fade-in max-w-6xl mx-auto">
+       <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <span>📈</span> 營運報表中心
+          </h2>
+          <p className="text-sm text-slate-500 font-bold mt-1">
+             每日營運數據、財務盈虧與用戶增長分析
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 md:gap-3 w-full md:w-auto">
+           <div className="bg-slate-100 p-1 rounded-lg flex border border-slate-200 overflow-x-auto">
+              <button 
+                onClick={() => setActiveTab('MY_REPORTS')}
+                className={`px-4 py-2 rounded-md text-sm font-bold transition ${activeTab === 'MY_REPORTS' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                 我的報表
+              </button>
+              {canViewTeam && (
+                <button 
+                  onClick={() => setActiveTab('TEAM_REPORTS')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition ${activeTab === 'TEAM_REPORTS' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  團隊審閱
+                </button>
+              )}
+           </div>
+
+           <button 
+             onClick={onCreateClick}
+             className="px-3 md:px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition flex items-center gap-2 text-sm md:text-base whitespace-nowrap"
+           >
+              <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+              <span className="hidden md:inline">提交營運數據</span>
+              <span className="md:hidden">提交</span>
+           </button>
+        </div>
+      </div>
+
+      {activeTab === 'TEAM_REPORTS' && (
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase">年份</span>
+                  <select 
+                    value={selectedYear} 
+                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                      {yearOptions.map(y => <option key={y} value={y}>{y} 年</option>)}
+                  </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase">月份</span>
+                  <select 
+                    value={selectedMonth} 
+                    onChange={(e) => setSelectedMonth(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
+                    className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                      <option value="ALL">📅 全年度</option>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                          <option key={m} value={m}>{m} 月</option>
+                      ))}
+                  </select>
+              </div>
+
+              <div className="w-px h-6 bg-slate-200 hidden md:block"></div>
+
+              <div className="flex items-center gap-2 flex-1">
+                  <span className="text-xs font-bold text-slate-400 uppercase">部門</span>
+                  {isManager ? (
+                      <select 
+                        value={selectedDept}
+                        onChange={(e) => setSelectedDept(e.target.value)}
+                        className="w-full md:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                          <option value="ALL">🏢 全公司</option>
+                          {departments.map(d => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                      </select>
+                  ) : (
+                      <div className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm font-bold text-slate-500 cursor-not-allowed flex items-center gap-2">
+                          <span>🔒</span> {getDeptName(currentUser.department)}
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
+
+      {activeTab === 'TEAM_REPORTS' && summaryStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in">
+              <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl p-4 text-white shadow-lg shadow-blue-200">
+                  <div className="text-xs font-bold text-blue-100 uppercase mb-1">本期總淨入</div>
+                  <div className="text-2xl font-black font-mono tracking-tight">
+                      {formatCurrency(summaryStats.totalNet)}
+                  </div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                  <div className="text-xs font-bold text-slate-400 uppercase mb-1">本期總充值</div>
+                  <div className="text-2xl font-black font-mono text-slate-700">
+                      {formatCurrency(summaryStats.totalDeposit)}
+                  </div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                  <div className="text-xs font-bold text-slate-400 uppercase mb-1">本期總提現</div>
+                  <div className="text-2xl font-black font-mono text-red-500">
+                      {formatCurrency(summaryStats.totalWithdrawal)}
+                  </div>
+              </div>
+              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                  <div className="text-xs font-bold text-slate-400 uppercase mb-1">總註冊 / 報表數</div>
+                  <div className="text-2xl font-black font-mono text-slate-700">
+                      {summaryStats.totalRegistrations} <span className="text-sm text-slate-400 font-normal">/ {summaryStats.reportCount} 份</span>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <div className="space-y-6 pb-20">
+         {displayReports.length === 0 && (
+            <div className="text-center py-20 bg-white rounded-xl border border-slate-200 border-dashed">
+               <div className="text-4xl mb-2 grayscale opacity-50">📊</div>
+               <p className="text-slate-400 font-bold">目前沒有符合條件的營運報表</p>
+            </div>
+         )}
+
+         {displayReports.map(report => {
+            const reportUserId = report.userId || (report as any).user_id;
+            let author = getUser(reportUserId);
+            // 如果找不到用戶但報表是自己的，使用 currentUser
+            if (!author && reportUserId === currentUser.id) {
+              author = currentUser;
+            }
+            if (!author) return null;
+            const c = report.content;
+            const netIncome = c.netIncome;
+
+            return (
+               <div key={report.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                     <div className="flex items-center gap-3">
+                        <img src={author.avatar} alt={author.name} className="w-10 h-10 rounded-full border border-slate-200 bg-white" />
+                        <div>
+                           <div className="font-bold text-slate-800">{author.name} <span className="text-slate-400 font-normal text-xs ml-1">({report.createdAt})</span></div>
+                           <div className="text-xs text-slate-500 font-bold">{getDeptName(author.department)}</div>
+                        </div>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        {(report as any).editLogs?.length > 0 && (
+                           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-bold">已修改 {(report as any).editLogs.length} 次</span>
+                        )}
+                        {(isManager || isSupervisor) && (
+                           <>
+                              <button 
+                                 onClick={() => setEditingReport(report)}
+                                 className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-bold transition"
+                              >
+                                 ✏️ 修正
+                              </button>
+                              <button 
+                                 onClick={async () => {
+                                    if (!confirm('確定要刪除此報表嗎？此操作無法復原。')) return;
+                                    try {
+                                       await api.reports.delete(report.id);
+                                       toast.success('報表已刪除');
+                                       onReportUpdated?.();
+                                    } catch (error: any) {
+                                       toast.error(error.message || '刪除失敗');
+                                    }
+                                 }}
+                                 className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold transition"
+                              >
+                                 🗑️ 刪除
+                              </button>
+                           </>
+                        )}
+                     </div>
+                  </div>
+
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className={`p-4 rounded-xl border flex flex-col justify-center items-center col-span-1 md:col-span-2 lg:col-span-1 ${netIncome >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className={`text-xs font-bold uppercase mb-1 ${netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>淨入金額</div>
+                          <div className={`text-2xl font-black font-mono ${netIncome >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                              {netIncome >= 0 ? '+' : ''}{formatCurrency(netIncome)}
+                          </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex flex-col justify-center gap-2">
+                          <div className="flex justify-between items-center text-sm">
+                              <span className="text-slate-500 font-bold">充值</span>
+                              <span className="font-mono font-bold text-slate-800">{formatCurrency(c.depositAmount)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                              <span className="text-slate-500 font-bold">提現</span>
+                              <span className="font-mono font-bold text-red-500">-{formatCurrency(c.withdrawalAmount)}</span>
+                          </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex flex-col justify-center gap-2">
+                          <div className="flex justify-between text-sm">
+                              <span className="text-slate-500 font-bold">LINE 導入</span>
+                              <span className="font-bold text-slate-800">{c.lineLeads}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                              <span className="text-slate-500 font-bold">註冊人數</span>
+                              <span className="font-bold text-slate-800">{c.registrations}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                              <span className="text-slate-500 font-bold">首充人數</span>
+                              <span className="font-bold text-slate-800">{c.firstDeposits}</span>
+                          </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex flex-col justify-center items-center gap-2">
+                          <div className="text-center">
+                              <span className="block text-2xl font-black text-indigo-600">{c.conversionRate || 0}%</span>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase">轉化率</span>
+                          </div>
+                          <div className="w-full h-px bg-slate-200"></div>
+                          <div className="text-center">
+                              <span className="block text-xl font-black text-orange-500">{c.firstDepositRate || 0}%</span>
+                              <span className="text-[10px] text-slate-400 font-bold uppercase">首充率</span>
+                          </div>
+                      </div>
+                  </div>
+
+                  {c.notes && (
+                      <div className="px-6 pb-6 pt-0">
+                          <div className="text-xs font-bold text-slate-400 uppercase mb-1">備註 / 說明</div>
+                          <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-100">{c.notes}</p>
+                      </div>
+                  )}
+               </div>
+            );
+         })}
+      </div>
+
+      {/* 編輯報表 Modal */}
+      {editingReport && (
+        <EditReportModal 
+          report={editingReport} 
+          onClose={() => { setEditingReport(null); setEditReason(''); }}
+          onSave={async (content, reason) => {
+            try {
+              await api.reports.update(editingReport.id, content, reason);
+              toast.success('報表已修改');
+              setEditingReport(null);
+              setEditReason('');
+              onReportUpdated?.();
+              window.location.reload();
+            } catch (error) {
+              toast.error('修改失敗: ' + (error as Error).message);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// 編輯報表 Modal 組件
+const EditReportModal: React.FC<{
+  report: Report;
+  onClose: () => void;
+  onSave: (content: any, reason: string) => void;
+}> = ({ report, onClose, onSave }) => {
+  const toast = useToast();
+  const c = report.content;
+  const [depositAmount, setDepositAmount] = useState(c.depositAmount || 0);
+  const [withdrawalAmount, setWithdrawalAmount] = useState(c.withdrawalAmount || 0);
+  const [lineLeads, setLineLeads] = useState(c.lineLeads || 0);
+  const [registrations, setRegistrations] = useState(c.registrations || 0);
+  const [firstDeposits, setFirstDeposits] = useState(c.firstDeposits || 0);
+  const [notes, setNotes] = useState(c.notes || '');
+  const [reason, setReason] = useState('');
+
+  const netIncome = depositAmount - withdrawalAmount;
+  const conversionRate = lineLeads > 0 ? Math.round((registrations / lineLeads) * 100) : 0;
+  const firstDepositRate = registrations > 0 ? Math.round((firstDeposits / registrations) * 100) : 0;
+
+  const handleSubmit = () => {
+    if (!reason.trim()) {
+      toast.warning('請輸入修改原因');
+      return;
+    }
+    if (!window.confirm(`確定要修改此報表嗎？\n\n修改原因：${reason}\n\n此操作會被記錄。`)) {
+      return;
+    }
+    onSave({
+      depositAmount,
+      withdrawalAmount,
+      lineLeads,
+      registrations,
+      firstDeposits,
+      netIncome,
+      conversionRate,
+      firstDepositRate,
+      notes
+    }, reason);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">✏️ 修正報表</h2>
+            <p className="text-xs text-slate-500 mt-1">報表 ID: {report.id}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* 修改原因 - 必填 */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <label className="block text-sm font-bold text-amber-700 mb-2">⚠️ 修改原因 (必填)</label>
+            <input 
+              type="text"
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="例如：員工輸入錯誤，充值金額應為 5000"
+              className="w-full px-4 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+            />
+          </div>
+
+          {/* 財務數據 */}
+          <div>
+            <h3 className="text-sm font-bold text-slate-500 uppercase mb-3">💰 財務數據</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">充值金額</label>
+                <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">提現金額</label>
+                <input type="number" value={withdrawalAmount} onChange={(e) => setWithdrawalAmount(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-200 rounded-lg font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">淨入金額</label>
+                <div className={`px-3 py-2 rounded-lg font-mono font-bold ${netIncome >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                  ${netIncome.toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 營運數據 */}
+          <div>
+            <h3 className="text-sm font-bold text-slate-500 uppercase mb-3">📊 營運數據</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">LINE 導入</label>
+                <input type="number" value={lineLeads} onChange={(e) => setLineLeads(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-200 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">註冊人數</label>
+                <input type="number" value={registrations} onChange={(e) => setRegistrations(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-200 rounded-lg" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">首充人數</label>
+                <input type="number" value={firstDeposits} onChange={(e) => setFirstDeposits(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-200 rounded-lg" />
+              </div>
+            </div>
+          </div>
+
+          {/* 備註 */}
+          <div>
+            <label className="block text-sm font-bold text-slate-500 mb-2">📝 備註</label>
+            <textarea 
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-3 border border-slate-200 rounded-lg min-h-[80px]"
+              placeholder="備註說明..."
+            />
+          </div>
+
+          {/* 修改紀錄 */}
+          {(report as any).editLogs?.length > 0 && (
+            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+              <h3 className="text-sm font-bold text-slate-500 uppercase mb-3">📜 歷史修改紀錄</h3>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {(report as any).editLogs.map((log: any) => (
+                  <div key={log.id} className="text-xs bg-white p-2 rounded border border-slate-100">
+                    <span className="font-bold text-slate-700">{log.editor_name}</span>
+                    <span className="text-slate-400 ml-2">{log.edited_at}</span>
+                    <div className="text-slate-600 mt-1">原因：{log.reason}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-200 rounded-lg">取消</button>
+          <button onClick={handleSubmit} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md">
+            確認修改
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -1,0 +1,119 @@
+export class WebSocketClient {
+  private ws: WebSocket | null = null;
+  private url: string;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 3000;
+  private messageHandlers: ((data: any) => void)[] = [];
+  
+  public onConnect: (() => void) | null = null;
+  public onDisconnect: (() => void) | null = null;
+
+  constructor(url: string) {
+    this.url = url;
+  }
+
+  // Updated connect to accept token as optional argument (used for auth)
+  async connect(token?: string) {
+    try {
+      // If we have a token, we might append it to the URL query params or similar
+      // depending on backend implementation. For now, assuming basic connection.
+      // If the backend requires token in headers (not possible with standard WebSocket API in browser)
+      // or as first message.
+      const wsUrl = token ? `${this.url}?token=${token}` : this.url;
+      this.ws = new WebSocket(wsUrl);
+      
+      this.ws.onopen = () => {
+        console.log('WebSocket connected');
+        this.reconnectAttempts = 0;
+        if (this.onConnect) this.onConnect();
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.messageHandlers.forEach(handler => handler(data));
+        } catch (error) {
+          console.error('Failed to parse WebSocket message', error);
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error', error);
+      };
+
+      this.ws.onclose = () => {
+        console.log('WebSocket disconnected');
+        if (this.onDisconnect) this.onDisconnect();
+        this.ws = null;
+        this.attemptReconnect(token);
+      };
+    } catch (error) {
+      console.error('Failed to create WebSocket', error);
+    }
+  }
+
+  private attemptReconnect(token?: string) {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      setTimeout(() => this.connect(token), this.reconnectDelay);
+    }
+  }
+
+  send(data: any) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
+    }
+  }
+
+  sendMessage(channelId: string, content: string) {
+    this.send({
+      type: 'SEND_MESSAGE',
+      channelId,
+      content
+    });
+  }
+
+  subscribe(channelId: string) {
+    this.send({
+      type: 'SUBSCRIBE',
+      channelId
+    });
+  }
+
+  markRead(channelId: string) {
+    this.send({
+      type: 'MARK_READ',
+      channelId
+    });
+  }
+
+  addMessageHandler(handler: (data: any) => void) {
+    this.messageHandlers.push(handler);
+  }
+
+  removeMessageHandler(handler: (data: any) => void) {
+    this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
+  }
+
+  isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+}
+
+let wsClient: WebSocketClient | null = null;
+
+export const getWebSocketClient = (url: string = 'ws://165.227.147.40:3001'): WebSocketClient => {
+  if (!wsClient) {
+    wsClient = new WebSocketClient(url);
+  }
+  return wsClient;
+};
