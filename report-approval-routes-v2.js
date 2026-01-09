@@ -200,13 +200,26 @@ router.post('/approval/approve', async (req, res) => {
       WHERE id = ?
     `, [now, reason, clientIp, now, expiresAt, sessionId, authorizationId]);
     
-    // Get requester info
+    // Get requester info and updated authorization
     const requester = await db.get('SELECT * FROM users WHERE id = ?', [auth.requester_id]);
+    const updatedAuth = await db.get('SELECT * FROM report_authorizations WHERE id = ?', [authorizationId]);
     
     res.json({ 
       success: true,
       message: '\u5be9\u6838\u5b8c\u6210\uff0c' + requester.name + ' \u5df2\u7372\u5f97\u67e5\u770b\u6b0a\u96502030\u5206\u9418',
-      requesterName: requester.name
+      requesterName: requester.name,
+      authorization: {
+        id: updatedAuth.id,
+        approverId: updatedAuth.first_approver_id,
+        approverName: updatedAuth.first_approver_name,
+        approverDept: updatedAuth.first_approver_dept,
+        approvedAt: updatedAuth.first_approved_at,
+        approvalReason: updatedAuth.first_approval_reason,
+        authorizedAt: updatedAuth.authorized_at,
+        expiresAt: updatedAuth.expires_at,
+        isActive: true,
+        sessionId: updatedAuth.session_id
+      }
     });
     
   } catch (error) {
