@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
 **最後更新**: 2026-01-10  
-**版本**: v8.9.103-attendance-edit-fixed  
+**版本**: v8.9.106-manual-complete  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -9,24 +9,114 @@
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `69615d347e40182151706d40`
-- **測試環境 Deploy ID**: `69615c7ba721851e2675aac8`
+- **生產環境 Deploy ID**: `69618c4756ec8149ac77e779`
+- **測試環境 Deploy ID**: `696188ea5f419a423e9ba6f2`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
 - **WebSocket URL**: `wss://robust-managing-stay-largely.trycloudflare.com/ws`
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.98-report-edit-logs-table`
+- **Docker 映像**: `taskflow-pro:v8.9.106-manual-complete`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 12 個用戶，包含 report_edit_logs 表
+- **資料庫**: 12 個用戶，完整 attendance_records 表結構
+- **快照**: `taskflow-snapshot-v8.9.106-attendance-complete-20260109_233125.tar.gz` (213MB)
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
 - **來源**: 從 Netlify source map 恢復
 - **狀態**: ✅ 與生產環境同步
+
+---
+
+## 🎯 2026-01-10 更新記錄
+
+### 13. 儀表板優化與打卡編輯功能 ⭐
+**完成時間**: 2026-01-10 上午
+
+#### 儀表板優化
+- **P0 功能**:
+  - 快速操作區（5個快捷按鈕）
+  - 任務快速接取（一鍵接取待接收任務）
+  - 公告快速標記已讀
+- **UI/UX 改善**:
+  - 視覺層次優化（漸層、陰影、邊框）
+  - 空狀態優化（友善提示 + 行動按鈕）
+  - 動畫效果（slide-in, fade-in, scale）
+  - 互動反饋（hover, active 狀態）
+- **性能優化**:
+  - useMemo 優化數據計算
+  - useCallback 優化函數
+  - 減少不必要的重新渲染
+- **響應式設計**:
+  - 移動端優先設計
+  - 觸控區域 ≥ 44px（符合 iOS 標準）
+  - 字體大小適配
+  - 間距優化
+
+#### 打卡記錄編輯功能
+- **功能特性**:
+  - BOSS 可編輯所有打卡記錄
+  - 可編輯日期和時間
+  - 支持跨日打卡（獨立下班日期選擇）
+  - 自動計算工時
+  - 權限控制（僅 BOSS）
+- **技術實現**:
+  - 前端 API: `api.attendance.update()`
+  - 後端 API: `PUT /api/attendance/:id`
+  - 修復循環引用錯誤（使用 useMemo）
+  - 移除不存在的 notes 欄位
+
+#### 補登打卡功能修復
+- **問題**: 資料庫缺少補登相關欄位導致 500 錯誤
+- **解決方案**:
+  - 添加 `is_manual` 欄位（INTEGER DEFAULT 0）
+  - 添加 `manual_reason` 欄位（TEXT）
+  - 添加 `manual_by` 欄位（TEXT）
+  - 添加 `manual_at` 欄位（TEXT）
+- **結果**: 補登功能完全正常
+
+#### UI 優化
+- **月假表標籤**: 將「列表管理」改為「假表審核」，更準確描述功能
+
+#### 遇到的問題與解決方案
+
+**問題 1: 出勤資料不顯示**
+- **原因**: `filterDept` 初始化時 `isBoss` 變量未定義
+- **解決**: 重命名為 `isBossRole` 並提前聲明
+
+**問題 2: 循環引用錯誤**
+- **錯誤**: `Uncaught ReferenceError: Cannot access 'te' before initialization`
+- **原因**: `displayAttendance` 在計算過程中被引用
+- **解決**: 使用 `useMemo` 包裝過濾邏輯
+
+**問題 3: 編輯打卡 404 錯誤**
+- **原因**: 後端缺少 `PUT /api/attendance/:id` 路由
+- **解決**: 創建並部署編輯路由
+
+**問題 4: 編輯打卡 500 錯誤**
+- **原因**: 資料庫缺少 `notes` 欄位
+- **解決**: 移除 API 中對 `notes` 欄位的引用
+
+**問題 5: 補登打卡 500 錯誤**
+- **原因**: 資料庫缺少 `is_manual`, `manual_reason`, `manual_by`, `manual_at` 欄位
+- **解決**: 逐步添加所有缺失欄位
+- **腳本**: `add-all-manual-columns.js`
+
+**問題 6: 登入失敗**
+- **原因**: 容器重啟後欄位未完整添加
+- **解決**: 確保所有欄位添加完成後再重啟
+
+#### 部署信息
+- **前端生產**: Deploy ID `69618c4756ec8149ac77e779`
+- **前端測試**: Deploy ID `696188ea5f419a423e9ba6f2`
+- **後端版本**: `taskflow-pro:v8.9.106-manual-complete`
+- **快照備份**: `taskflow-snapshot-v8.9.106-attendance-complete-20260109_233125.tar.gz` (213MB)
+- **Git Commits**: 
+  - `72fa2c7` - Feature: Dashboard optimization + Attendance edit functionality
+  - `c421fc4` - UI: Change leave schedule tab label
 
 ---
 
