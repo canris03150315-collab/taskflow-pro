@@ -87,22 +87,15 @@ export const AuthorizationStatus: React.FC<AuthorizationStatusProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
           </svg>
           <div className="flex-1">
-            <div className="text-sm font-medium text-gray-900">第一審核：{authorization.firstApproverName}</div>
+            <div className="text-sm font-medium text-gray-900">審核者：{authorization.firstApproverName}</div>
             <div className="text-xs text-gray-600">
               {authorization.firstApproverDept} · {new Date(authorization.firstApprovedAt).toLocaleString('zh-TW')}
             </div>
-          </div>
-        </div>
-
-        <div className="flex items-start gap-2">
-          <svg className="w-5 h-5 text-green-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-          </svg>
-          <div className="flex-1">
-            <div className="text-sm font-medium text-gray-900">第二審核：{authorization.secondApproverName}</div>
-            <div className="text-xs text-gray-600">
-              {authorization.secondApproverDept} · {new Date(authorization.secondApprovedAt).toLocaleString('zh-TW')}
-            </div>
+            {authorization.firstApprovalReason && (
+              <div className="text-xs text-gray-600 mt-1">
+                審核意見：{authorization.firstApprovalReason}
+              </div>
+            )}
           </div>
         </div>
       </div>
