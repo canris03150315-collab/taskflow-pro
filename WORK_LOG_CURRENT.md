@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
 **最後更新**: 2026-01-10  
-**版本**: v8.9.100-module-loading-fix  
+**版本**: v8.9.103-attendance-edit-fixed  
 **狀態**: ✅ 穩定運行
 
 ---

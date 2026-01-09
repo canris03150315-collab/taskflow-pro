@@ -561,7 +561,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                📋 列表管理
+                📋 假表審核
               </button>
             </div>
             
