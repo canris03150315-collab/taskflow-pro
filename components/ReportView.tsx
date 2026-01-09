@@ -36,6 +36,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
+  
+  // Filter State
+  const [filterDepartment, setFilterDepartment] = useState<string>('all');
+  const [filterStartDate, setFilterStartDate] = useState<string>('');
+  const [filterEndDate, setFilterEndDate] = useState<string>('');
 
   useEffect(() => {
     // If props change, update local state
@@ -314,17 +319,105 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                 {/* Only show reports if authorized */}
                 {isAuthorized && (
                     <>
+                        {/* Filter Controls */}
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+                            <h3 className="font-semibold text-gray-900 mb-3">🔍 篩選報表</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Department Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">部門</label>
+                                    <select
+                                        value={filterDepartment}
+                                        onChange={(e) => setFilterDepartment(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="all">全部部門</option>
+                                        {departments.map(dept => (
+                                            <option key={dept.id} value={dept.id}>{dept.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                {/* Start Date Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
+                                    <input
+                                        type="date"
+                                        value={filterStartDate}
+                                        onChange={(e) => setFilterStartDate(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                                
+                                {/* End Date Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">結束日期</label>
+                                    <input
+                                        type="date"
+                                        value={filterEndDate}
+                                        onChange={(e) => setFilterEndDate(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Clear Filters Button */}
+                            {(filterDepartment !== 'all' || filterStartDate || filterEndDate) && (
+                                <button
+                                    onClick={() => {
+                                        setFilterDepartment('all');
+                                        setFilterStartDate('');
+                                        setFilterEndDate('');
+                                    }}
+                                    className="mt-3 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                                >
+                                    🔄 清除篩選
+                                </button>
+                            )}
+                        </div>
+
                         {loading ? (
                             <div className="p-8 text-center text-slate-400">載入中...</div>
                         ) : (
                             <div className="space-y-4">
-                                {reports.length === 0 && (
-                                    <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                                        尚無報表紀錄
-                                    </div>
-                                )}
-                
-                {reports.slice(0, visibleCount).map(report => (
+                                {(() => {
+                                    // Apply filters
+                                    let filteredReports = reports;
+                                    
+                                    // Filter by department
+                                    if (filterDepartment !== 'all') {
+                                        filteredReports = filteredReports.filter(report => {
+                                            const user = users.find(u => u.id === report.userId);
+                                            return user?.department === filterDepartment;
+                                        });
+                                    }
+                                    
+                                    // Filter by date range
+                                    if (filterStartDate) {
+                                        filteredReports = filteredReports.filter(report => {
+                                            const reportDate = new Date(report.createdAt).toISOString().split('T')[0];
+                                            return reportDate >= filterStartDate;
+                                        });
+                                    }
+                                    
+                                    if (filterEndDate) {
+                                        filteredReports = filteredReports.filter(report => {
+                                            const reportDate = new Date(report.createdAt).toISOString().split('T')[0];
+                                            return reportDate <= filterEndDate;
+                                        });
+                                    }
+                                    
+                                    if (filteredReports.length === 0) {
+                                        return (
+                                            <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                                                {filterDepartment !== 'all' || filterStartDate || filterEndDate 
+                                                    ? '沒有符合篩選條件的報表' 
+                                                    : '尚無報表紀錄'}
+                                            </div>
+                                        );
+                                    }
+                                    
+                                    return filteredReports.slice(0, visibleCount).map(report => (
                     <div key={report.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
                         {/* Report Header */}
                         <div 
@@ -479,9 +572,38 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                             </div>
                         )}
                     </div>
-                ))}
+                                    ));
+                                })()}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        )}
 
-                {reports.length > visibleCount && (
+        {/* Load More Button - only show when there are more filtered reports */}
+        {isAuthorized && (() => {
+            let filteredReports = reports;
+            if (filterDepartment !== 'all') {
+                filteredReports = filteredReports.filter(report => {
+                    const user = users.find(u => u.id === report.userId);
+                    return user?.department === filterDepartment;
+                });
+            }
+            if (filterStartDate) {
+                filteredReports = filteredReports.filter(report => {
+                    const reportDate = new Date(report.createdAt).toISOString().split('T')[0];
+                    return reportDate >= filterStartDate;
+                });
+            }
+            if (filterEndDate) {
+                filteredReports = filteredReports.filter(report => {
+                    const reportDate = new Date(report.createdAt).toISOString().split('T')[0];
+                    return reportDate <= filterEndDate;
+                });
+            }
+            return filteredReports.length > visibleCount;
+        })() && (
                     <button 
                         onClick={() => setVisibleCount(prev => prev + 5)}
                         className="w-full py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition border border-transparent hover:border-slate-200"
@@ -489,12 +611,6 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                         載入更多
                     </button>
                 )}
-            </div>
-        )}
-                    </>
-                )}
-            </div>
-        )}
 
         {/* Approval Modal */}
         {showApprovalModal && (
