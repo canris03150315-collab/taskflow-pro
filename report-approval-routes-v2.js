@@ -235,6 +235,80 @@ router.post('/approval/approve', async (req, res) => {
   }
 });
 
+// POST /api/reports/approval/reject
+// Reject approval request
+router.post('/approval/reject', async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    const { authorizationId, reason } = req.body;
+    
+    // Check role
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER' && currentUser.role !== 'SUPERVISOR') {
+      return res.status(403).json({ 
+        error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS\u3001MANAGER \u6216 SUPERVISOR \u53ef\u4ee5\u5be9\u6838' 
+      });
+    }
+    
+    // Validate reason
+    if (!reason || reason.length < 10) {
+      return res.status(400).json({ 
+        error: '\u62d2\u7d55\u539f\u56e0\u81f3\u5c11\u9700\u898110\u500b\u5b57' 
+      });
+    }
+    
+    // Get authorization
+    const auth = await db.get(
+      'SELECT * FROM report_authorizations WHERE id = ?',
+      [authorizationId]
+    );
+    
+    if (!auth) {
+      return res.status(404).json({ 
+        error: '\u627e\u4e0d\u5230\u5be9\u6838\u8a18\u9304' 
+      });
+    }
+    
+    // Check if already processed
+    if (auth.is_active === 1 || auth.first_approved_at !== '') {
+      return res.status(400).json({ 
+        error: '\u6b64\u7533\u8acb\u5df2\u7d93\u8655\u7406' 
+      });
+    }
+    
+    // Check if current user is the designated approver
+    if (currentUser.id !== auth.first_approver_id) {
+      return res.status(403).json({ 
+        error: '\u60a8\u4e0d\u662f\u6307\u5b9a\u7684\u5be9\u6838\u8005' 
+      });
+    }
+    
+    // CRITICAL: Check if approver is the same as requester (prevent self-rejection)
+    if (currentUser.id === auth.requester_id) {
+      return res.status(403).json({ 
+        error: '\u4e0d\u80fd\u5be9\u6838\u81ea\u5df1\u7684\u7533\u8acb' 
+      });
+    }
+    
+    // Get requester info
+    const requester = await db.get('SELECT * FROM users WHERE id = ?', [auth.requester_id]);
+    
+    // Delete the rejected authorization request
+    await db.run('DELETE FROM report_authorizations WHERE id = ?', [authorizationId]);
+    
+    res.json({
+      success: true,
+      message: '\u5df2\u62d2\u7d55 ' + requester.name + ' \u7684\u67e5\u770b\u7533\u8acb',
+      requesterName: requester.name,
+      rejectReason: reason
+    });
+    
+  } catch (error) {
+    console.error('Reject error:', error);
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
+  }
+});
+
 // GET /api/reports/approval/status
 // Check if current user (requester) has active authorization
 router.get('/approval/status', async (req, res) => {

@@ -346,6 +346,13 @@ const RealApi = {
                     { authorizationId, reason }
                 );
             },
+            reject: async (authorizationId: string, reason: string) => {
+                return request<{ success: boolean; message: string; requesterName: string; rejectReason: string }>(
+                    'POST', 
+                    '/reports/approval/reject', 
+                    { authorizationId, reason }
+                );
+            },
             checkStatus: async (sessionId: string) => {
                 const headers = {
                     ...getAuthHeaders(),
