@@ -557,6 +557,9 @@ const RealApi = {
                 reason
             });
         },
+        update: async (id: string, data: { clock_in?: string; clock_out?: string; notes?: string }): Promise<void> => {
+            await request<{ success: boolean }>('PUT', `/attendance/${id}`, data);
+        },
         delete: async (id: string): Promise<void> => {
             await request<{ success: boolean }>('DELETE', `/attendance/${id}`);
         },

@@ -30,8 +30,9 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
   financeRecords,
 }) => {
   const toast = useToast();
+  const isBossRole = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
   const [activeTab, setActiveTab] = useState<'ATTENDANCE' | 'REPORTS' | 'TASKS' | 'PERFORMANCE' | 'FINANCE'>('ATTENDANCE');
-  const [filterDept, setFilterDept] = useState<string>(currentUser.department);
+  const [filterDept, setFilterDept] = useState<string>(isBossRole ? 'ALL' : currentUser.department);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     // 考慮時區補償，確保獲取當地日期
@@ -52,8 +53,10 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isManualAttendanceModalOpen, setIsManualAttendanceModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [editDate, setEditDate] = useState('');
   const [editClockIn, setEditClockIn] = useState('');
   const [editClockOut, setEditClockOut] = useState('');
+  const [editClockOutDate, setEditClockOutDate] = useState('');
   const [editReason, setEditReason] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [summaryUserId, setSummaryUserId] = useState<string>('ALL');
@@ -61,6 +64,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
 
   const isBoss = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
   const canManualAttendance = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER || currentUser.role === Role.SUPERVISOR;
+  const canEditAttendance = currentUser.role === Role.BOSS; // 只有老闆可以編輯打卡記錄
 
   // Initialize Data
   useEffect(() => {
@@ -68,11 +72,13 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
         setIsLoading(true);
         try {
             const att = await api.attendance.getHistory();
+            console.log('出勤資料載入:', att.length, '筆記錄');
+            console.log('出勤資料範例:', att[0]);
             setAttendanceData(att);
             const reviews = await api.performance.getReviews(startDate.slice(0, 7)); // Initial load for current month
             setPerformanceData(reviews);
         } catch (e) {
-            console.error(e);
+            console.error('載入出勤資料錯誤:', e);
         } finally {
             setIsLoading(false);
         }
@@ -94,21 +100,58 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
   // Handle edit manual attendance
   const handleEditClick = (record: AttendanceRecord) => {
     setEditingRecord(record);
-    setEditClockIn(new Date(record.clockIn).toTimeString().slice(0, 5));
-    setEditClockOut(record.clockOut ? new Date(record.clockOut).toTimeString().slice(0, 5) : '');
+    setEditDate(record.date);
+    
+    // 處理上班時間
+    const clockInDate = new Date(record.clockIn);
+    setEditClockIn(clockInDate.toTimeString().slice(0, 5));
+    
+    // 處理下班時間（可能跨日）
+    if (record.clockOut) {
+      const clockOutDate = new Date(record.clockOut);
+      setEditClockOut(clockOutDate.toTimeString().slice(0, 5));
+      // 設置下班日期（可能與上班日期不同）
+      setEditClockOutDate(clockOutDate.toISOString().split('T')[0]);
+    } else {
+      setEditClockOut('');
+      setEditClockOutDate(record.date);
+    }
+    
     setEditReason((record as any).manualReason || '');
     setIsEditModalOpen(true);
   };
 
   const handleEditSubmit = async () => {
     if (!editingRecord) return;
+    
+    // 驗證必填欄位
+    if (!editDate || !editClockIn) {
+      toast.error('請填寫日期和上班時間');
+      return;
+    }
+    
     try {
-      await api.attendance.updateManualEntry(editingRecord.id, editClockIn, editClockOut, editReason);
+      // 構建完整的日期時間字符串（使用本地時間）
+      const clockInDateTime = `${editDate}T${editClockIn}:00`;
+      let clockOutDateTime = undefined;
+      
+      if (editClockOut) {
+        // 使用下班日期（可能跨日）
+        const outDate = editClockOutDate || editDate;
+        clockOutDateTime = `${outDate}T${editClockOut}:00`;
+      }
+      
+      await api.attendance.update(editingRecord.id, {
+        clock_in: clockInDateTime,
+        clock_out: clockOutDateTime,
+        notes: editReason || undefined
+      });
+      
       const att = await api.attendance.getHistory();
       setAttendanceData(att);
       setIsEditModalOpen(false);
       setEditingRecord(null);
-      toast.success('補登記錄已更新');
+      toast.success('打卡記錄已更新');
     } catch (e: any) {
       toast.error(e.message || '更新失敗');
     }
@@ -150,12 +193,42 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
   };
 
   // 1. Attendance Data
-  const displayAttendance = attendanceData.filter(r => {
-      const inDateRange = filterByDate(r.date);
-      const matchesDept = filterDept === 'ALL' || getUserDept(r.userId) === filterDept;
-      const matchesStatus = filterStatus === 'ALL' || r.status === filterStatus;
-      return inDateRange && matchesDept && matchesStatus;
-  }).sort((a,b) => b.date.localeCompare(a.date));
+  const displayAttendance = useMemo(() => {
+      const filtered = attendanceData.filter(r => {
+          const inDateRange = filterByDate(r.date);
+          const matchesDept = filterDept === 'ALL' || getUserDept(r.userId) === filterDept;
+          const matchesStatus = filterStatus === 'ALL' || r.status === filterStatus;
+          return inDateRange && matchesDept && matchesStatus;
+      }).sort((a,b) => b.date.localeCompare(a.date));
+      
+      // 調試：顯示過濾結果
+      console.log('出勤資料過濾結果:', {
+          原始數據: attendanceData.length,
+          過濾後: filtered.length,
+          部門過濾: filterDept,
+          日期範圍: `${startDate} ~ ${endDate}`,
+          狀態過濾: filterStatus
+      });
+      
+      // 調試：如果有數據但過濾後為空，顯示第一筆數據的過濾條件
+      if (attendanceData.length > 0 && filtered.length === 0 && attendanceData[0]) {
+          const r = attendanceData[0];
+          console.log('過濾條件檢查（第一筆數據）:', {
+              date: r.date,
+              inDateRange: filterByDate(r.date),
+              filterDept,
+              userDept: getUserDept(r.userId),
+              matchesDept: filterDept === 'ALL' || getUserDept(r.userId) === filterDept,
+              filterStatus,
+              status: r.status,
+              matchesStatus: filterStatus === 'ALL' || r.status === filterStatus,
+              startDate,
+              endDate
+          });
+      }
+      
+      return filtered;
+  }, [attendanceData, filterDept, startDate, endDate, filterStatus]);
 
   // Attendance Summary Statistics (filtered by selected user)
   const summaryAttendance = useMemo(() => {
@@ -489,7 +562,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                                         <td className="p-4"><span className={`px-2 py-0.5 rounded text-xs font-bold ${r.status === 'ONLINE' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{r.status}</span></td>
                                         <td className="p-4 flex gap-1 items-center">
                                             {r.isManual && <span className="px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-600">補登</span>}
-                                            {r.isManual && canManualAttendance && (
+                                            {canEditAttendance && (
                                                 <button onClick={() => handleEditClick(r)} className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-600 hover:bg-blue-200">編輯</button>
                                             )}
                                             {canManualAttendance && (
@@ -667,19 +740,30 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
         {isEditModalOpen && editingRecord && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">編輯補登記錄</h3>
+              <h3 className="text-lg font-bold text-slate-800 mb-4">編輯打卡記錄</h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1">員工</label>
                   <input type="text" value={getUserName(editingRecord.userId)} disabled className="w-full px-3 py-2 border rounded-lg bg-slate-100 text-slate-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">日期</label>
-                  <input type="text" value={editingRecord.date} disabled className="w-full px-3 py-2 border rounded-lg bg-slate-100 text-slate-500" />
+                  <label className="block text-sm font-medium text-slate-600 mb-1">上班日期 <span className="text-red-500">*</span></label>
+                  <input 
+                    type="date" 
+                    value={editDate} 
+                    onChange={e => {
+                      setEditDate(e.target.value);
+                      // 如果下班日期未設置，自動設為同一天
+                      if (!editClockOutDate) {
+                        setEditClockOutDate(e.target.value);
+                      }
+                    }} 
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 mb-1">上班時間</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">上班時間 <span className="text-red-500">*</span></label>
                     <input type="time" value={editClockIn} onChange={e => setEditClockIn(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
@@ -687,8 +771,19 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                     <input type="time" value={editClockOut} onChange={e => setEditClockOut(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </div>
+                {editClockOut && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">下班日期 <span className="text-xs text-slate-400">(跨日時修改)</span></label>
+                    <input 
+                      type="date" 
+                      value={editClockOutDate} 
+                      onChange={e => setEditClockOutDate(e.target.value)} 
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </div>
+                )}
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">補登原因</label>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">備註</label>
                   <textarea value={editReason} onChange={e => setEditReason(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" rows={2} />
                 </div>
               </div>

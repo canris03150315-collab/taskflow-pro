@@ -1142,7 +1142,7 @@ function AppContent() {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-8 pb-20 md:pb-8">
            <Suspense fallback={<PageSkeleton />}>
-             {currentPage === 'dashboard' && <DashboardView currentUser={currentUser} tasks={tasks} announcements={announcements} reports={reports} departments={departments} onChangePage={setCurrentPage} />}
+             {currentPage === 'dashboard' && <DashboardView currentUser={currentUser} tasks={tasks} announcements={announcements} reports={reports} departments={departments} onChangePage={setCurrentPage} onTaskUpdate={() => loadData(true)} onAnnouncementUpdate={() => loadData(true)} onOpenCreateTask={() => setCreateModalOpen(true)} />}
              {currentPage === 'bulletin' && <BulletinView currentUser={currentUser} announcements={announcements} users={users} departments={departments} onCreateAnnouncement={handleCreateAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onConfirmRead={handleConfirmRead} />}
              {currentPage === 'leaves' && <LeaveManagementView currentUser={currentUser} users={users} departments={departments} leaves={leaves} onRefresh={() => loadData(true)} />}
              {currentPage === 'personnel' && <PersonnelView currentUser={currentUser} users={users} departments={departments} onAddUser={() => { setEditingUser(null); setUserModalOpen(true); }} onEditUser={(u) => { setEditingUser(u); setUserModalOpen(true); }} onDeleteUser={handleDeleteUser} onAddDepartment={handleAddDepartment} onUpdateDepartment={handleUpdateDepartment} onDeleteDepartment={handleDeleteDepartment} />}
