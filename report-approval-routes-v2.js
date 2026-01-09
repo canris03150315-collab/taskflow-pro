@@ -69,6 +69,13 @@ router.post('/approval/request', async (req, res) => {
       });
     }
     
+    // CRITICAL: Delete all existing authorizations for this user (active and inactive)
+    // This ensures only one authorization record exists at a time
+    await db.run(
+      'DELETE FROM report_authorizations WHERE requester_id = ?',
+      [currentUser.id]
+    );
+    
     // Create pending authorization
     const authId = generateId();
     const now = new Date().toISOString();
@@ -443,19 +450,19 @@ router.post('/approval/revoke', async (req, res) => {
     const currentUser = req.user;
     const { authorizationId } = req.body;
     
+    // CRITICAL: Delete the authorization record instead of just setting is_active = 0
+    // This prevents old records from causing issues
     if (authorizationId) {
       // Revoke specific authorization (only if user is the requester)
       await db.run(`
-        UPDATE report_authorizations 
-        SET is_active = 0 
+        DELETE FROM report_authorizations 
         WHERE id = ? 
           AND requester_id = ?
       `, [authorizationId, currentUser.id]);
     } else {
       // Revoke all user's authorizations
       await db.run(`
-        UPDATE report_authorizations 
-        SET is_active = 0 
+        DELETE FROM report_authorizations 
         WHERE requester_id = ?
       `, [currentUser.id]);
     }
