@@ -17,12 +17,27 @@ export const AuthorizationStatus: React.FC<AuthorizationStatusProps> = ({
   onExtend,
   onRevoke
 }) => {
-  const [remainingTime, setRemainingTime] = useState(getRemainingTime());
+  // Calculate remaining time based on authorization.expiresAt
+  const calculateRemainingTime = () => {
+    if (!authorization?.expiresAt) return 0;
+    const expiresAt = new Date(authorization.expiresAt);
+    const now = new Date();
+    const remaining = Math.floor((expiresAt.getTime() - now.getTime()) / 1000);
+    return Math.max(0, remaining);
+  };
+
+  const [remainingTime, setRemainingTime] = useState(calculateRemainingTime());
   const [showWarning, setShowWarning] = useState(false);
+
+  // Reset timer when authorization changes
+  useEffect(() => {
+    setRemainingTime(calculateRemainingTime());
+    setShowWarning(false);
+  }, [authorization?.expiresAt]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      const time = getRemainingTime();
+      const time = calculateRemainingTime();
       setRemainingTime(time);
 
       // Show warning when 5 minutes left
@@ -38,7 +53,7 @@ export const AuthorizationStatus: React.FC<AuthorizationStatusProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [onExpired, showWarning]);
+  }, [onExpired, showWarning, authorization?.expiresAt]);
 
   const minutes = Math.floor(remainingTime / 60);
   const isWarning = minutes <= 5;
