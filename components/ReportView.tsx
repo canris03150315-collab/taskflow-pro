@@ -1,8 +1,11 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { User, Report, ReportType, DailyReportContent, DepartmentDef } from '../types';
+import { User, Report, ReportType, DailyReportContent, DepartmentDef, ReportAuthorization } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
 import WorkLogTab from './WorkLogTab';
+import { ApprovalModal } from './ApprovalModal';
+import { AuthorizationStatus } from './AuthorizationStatus';
+import { getAuthorization, isAuthorizationValid, clearAuthorization } from '../utils/authSession';
 
 interface ReportViewProps {
   currentUser: User;
@@ -26,6 +29,13 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
   // Edit State
   const [editingReport, setEditingReport] = useState<Report | null>(null);
   const [editContent, setEditContent] = useState<DailyReportContent | null>(null);
+  
+  // Approval State
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authorization, setAuthorization] = useState<ReportAuthorization | null>(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [showExpiredModal, setShowExpiredModal] = useState(false);
 
   useEffect(() => {
     // If props change, update local state
@@ -35,6 +45,70 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
         loadReports();
     }
   }, [propReports]);
+
+  // Check authorization status on mount and when switching to reports tab
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      checkAuthorizationStatus();
+      loadPendingApprovals();
+    }
+  }, [activeTab]);
+
+  const checkAuthorizationStatus = () => {
+    const auth = getAuthorization();
+    if (auth && isAuthorizationValid()) {
+      setIsAuthorized(true);
+      setAuthorization(auth);
+    } else {
+      setIsAuthorized(false);
+      setAuthorization(null);
+      clearAuthorization();
+    }
+  };
+
+  const loadPendingApprovals = async () => {
+    try {
+      const response = await api.reports.approval.getPending();
+      setPendingApprovals(response.pending || []);
+    } catch (error) {
+      console.error('Failed to load pending approvals:', error);
+    }
+  };
+
+  const handleInitiateApproval = () => {
+    setShowApprovalModal(true);
+  };
+
+  const handleApprovalSuccess = () => {
+    checkAuthorizationStatus();
+    loadPendingApprovals();
+    loadReports();
+  };
+
+  const handleAuthorizationExpired = () => {
+    setIsAuthorized(false);
+    setAuthorization(null);
+    clearAuthorization();
+    setShowExpiredModal(true);
+  };
+
+  const handleExtendAuthorization = () => {
+    setShowApprovalModal(true);
+  };
+
+  const handleRevokeAuthorization = async () => {
+    if (!confirm('確定要撤銷授權嗎？')) return;
+    try {
+      await api.reports.approval.revoke(authorization?.id);
+      setIsAuthorized(false);
+      setAuthorization(null);
+      clearAuthorization();
+      toast.success('授權已撤銷');
+    } catch (error) {
+      console.error('Failed to revoke authorization:', error);
+      toast.error('撤銷失敗');
+    }
+  };
 
   const loadReports = async () => {
     setLoading(true);
@@ -143,16 +217,99 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
             />
         ) : (
             <div>
+                {/* Authorization Status or Request Approval */}
+                {currentUser.role === 'BOSS' || currentUser.role === 'MANAGER' ? (
+                    <>
+                        {/* Show Authorization Status if authorized */}
+                        {isAuthorized && authorization ? (
+                            <AuthorizationStatus
+                                authorization={authorization}
+                                onExpired={handleAuthorizationExpired}
+                                onExtend={handleExtendAuthorization}
+                                onRevoke={handleRevokeAuthorization}
+                            />
+                        ) : (
+                            /* Show Request Approval UI if not authorized */
+                            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-xl font-bold text-gray-900">🔒 團隊報表需要雙重審核授權</h3>
+                                        <p className="text-sm text-gray-600 mt-1">為確保資料安全，查看團隊報表需要兩位不同部門的主管審核</p>
+                                    </div>
+                                </div>
 
-        {loading ? (
-            <div className="p-8 text-center text-slate-400">載入中...</div>
-        ) : (
-            <div className="space-y-4">
-                {reports.length === 0 && (
-                    <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                        尚無報表紀錄
-                    </div>
-                )}
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <h4 className="font-semibold text-blue-900 mb-2">📋 審核要求</h4>
+                                    <ul className="text-sm text-blue-800 space-y-1">
+                                        <li>✅ 兩位不同部門的主管審核</li>
+                                        <li>✅ 授權有效期 30 分鐘</li>
+                                        <li>✅ 關閉網頁後需重新審核</li>
+                                    </ul>
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-4">
+                                    <div>
+                                        <div className="font-medium text-gray-900">當前狀態</div>
+                                        <div className="text-sm text-gray-600">❌ 未授權</div>
+                                    </div>
+                                    <button
+                                        onClick={handleInitiateApproval}
+                                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold flex items-center gap-2 shadow-lg"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                        🔐 發起雙重審核
+                                    </button>
+                                </div>
+
+                                {/* Pending Approvals */}
+                                {pendingApprovals.length > 0 && (
+                                    <div className="border-t border-gray-200 pt-4">
+                                        <h4 className="font-semibold text-gray-900 mb-3">⏳ 待您審核的請求</h4>
+                                        <div className="space-y-2">
+                                            {pendingApprovals.map((pending) => (
+                                                <div key={pending.id} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="font-medium text-gray-900">{pending.firstApproverName} 的審核請求</div>
+                                                        <div className="text-sm text-gray-600">{pending.firstApproverDept} · {new Date(pending.firstApprovedAt).toLocaleString('zh-TW')}</div>
+                                                        <div className="text-xs text-gray-600 mt-1">原因：{pending.firstApprovalReason}</div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setShowApprovalModal(true);
+                                                        }}
+                                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium"
+                                                    >
+                                                        前往審核
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
+                ) : null}
+
+                {/* Only show reports if authorized (for BOSS/MANAGER) or always show for other roles */}
+                {(isAuthorized || currentUser.role === 'EMPLOYEE' || currentUser.role === 'SUPERVISOR') && (
+                    <>
+                        {loading ? (
+                            <div className="p-8 text-center text-slate-400">載入中...</div>
+                        ) : (
+                            <div className="space-y-4">
+                                {reports.length === 0 && (
+                                    <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                                        尚無報表紀錄
+                                    </div>
+                                )}
                 
                 {reports.slice(0, visibleCount).map(report => (
                     <div key={report.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
@@ -321,6 +478,61 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                 )}
             </div>
         )}
+                    </>
+                )}
+            </div>
+        )}
+
+        {/* Approval Modal */}
+        {showApprovalModal && (
+            <ApprovalModal
+                currentUser={currentUser}
+                mode={pendingApprovals.length > 0 ? 'complete' : 'initiate'}
+                pendingAuthId={pendingApprovals[0]?.id}
+                pendingAuthData={pendingApprovals[0]}
+                onClose={() => setShowApprovalModal(false)}
+                onSuccess={handleApprovalSuccess}
+            />
+        )}
+
+        {/* Expired Modal */}
+        {showExpiredModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-lg shadow-xl max-w-md mx-4 p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">⏰ 授權已過期</h3>
+                    </div>
+                    
+                    <p className="text-gray-700 mb-4">您的報表查看授權已過期</p>
+                    
+                    <p className="text-sm text-gray-600 mb-6">
+                        過期原因：已超過 30 分鐘授權期限<br />
+                        如需繼續查看報表，請重新發起審核
+                    </p>
+                    
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setShowExpiredModal(false)}
+                            className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                        >
+                            返回
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowExpiredModal(false);
+                                setShowApprovalModal(true);
+                            }}
+                            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        >
+                            🔐 重新審核
+                        </button>
+                    </div>
+                </div>
             </div>
         )}
     </div>
