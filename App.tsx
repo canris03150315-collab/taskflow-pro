@@ -119,9 +119,8 @@ function AppContent() {
                         const payload = JSON.parse(atob(token.split('.')[1]));
                         console.log('[App] Restoring session for user:', payload.id);
                         
-                        // Fetch all users to find current user
-                        const users = await api.users.getAll();
-                        const currentUserData = users.find(u => u.id === payload.id);
+                        // Fetch current user by ID (works for all roles including EMPLOYEE)
+                        const currentUserData = await api.users.getById(payload.id);
                         
                         if (currentUserData) {
                             console.log('[App] Session restored:', currentUserData.name);

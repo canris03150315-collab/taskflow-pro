@@ -147,6 +147,19 @@ const RealApi = {
                 return [];
             }
         },
+        getById: async (id: string): Promise<User | null> => {
+            try {
+                const user = await request<any>('GET', `/users/${id}`);
+                return {
+                    ...user,
+                    password: user.password || '',
+                    permissions: user.permissions || []
+                };
+            } catch (error) {
+                console.error('Failed to get user by id', error);
+                return null;
+            }
+        },
         create: async (user: User) => {
             const response = await request<{ user: User, message: string }>('POST', '/users', user);
             return response.user;
