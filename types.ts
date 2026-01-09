@@ -197,6 +197,56 @@ export interface Report {
   reviewedBy?: string;
 }
 
+// --- Report Authorization Types (雙重審核系統) ---
+
+export interface ReportAuthorization {
+  id: string;
+  
+  // 第一審核者
+  firstApproverId: string;
+  firstApproverName: string;
+  firstApproverDept: string;
+  firstApprovedAt: string;
+  firstApprovalReason: string;
+  firstApprovalIp?: string;
+  
+  // 第二審核者
+  secondApproverId: string;
+  secondApproverName: string;
+  secondApproverDept: string;
+  secondApprovedAt: string;
+  secondApprovalReason: string;
+  secondApprovalIp?: string;
+  
+  // 授權資訊
+  authorizedAt: string;
+  expiresAt: string;
+  isActive: boolean;
+  sessionId: string;
+  
+  // 審計追蹤
+  userAgent?: string;
+  createdAt: string;
+}
+
+export interface ApprovalRequest {
+  approverId: string;  // 選擇的第二審核者 ID
+  reason: string;      // 審核原因（至少10字）
+}
+
+export interface ApprovalStatus {
+  isAuthorized: boolean;
+  authorization?: ReportAuthorization;
+  remainingTime?: number;  // 剩餘秒數
+}
+
+export interface EligibleApprover {
+  id: string;
+  name: string;
+  role: Role;
+  department: string;
+}
+
 // --- Finance / Petty Cash Types ---
 
 export interface FinanceRecord {
