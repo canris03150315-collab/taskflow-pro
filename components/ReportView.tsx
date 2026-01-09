@@ -60,6 +60,30 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
     }
   }, [activeTab]);
 
+  // Auto-refresh authorization status when user is waiting for approval
+  useEffect(() => {
+    if (activeTab === 'reports' && !isAuthorized && currentUser.role !== 'EMPLOYEE') {
+      // Poll every 5 seconds to check if approval has been granted
+      const pollInterval = setInterval(async () => {
+        try {
+          const response = await api.reports.approval.checkStatus('');
+          if (response.isAuthorized && response.authorization) {
+            setIsAuthorized(true);
+            setAuthorization(response.authorization);
+            const { saveAuthorization } = await import('../utils/authSession');
+            saveAuthorization(response.authorization);
+            // Clear pending approvals since we got authorized
+            setPendingApprovals([]);
+          }
+        } catch (error) {
+          console.error('Failed to poll authorization status:', error);
+        }
+      }, 5000); // Poll every 5 seconds
+
+      return () => clearInterval(pollInterval);
+    }
+  }, [activeTab, isAuthorized, currentUser.role]);
+
   const checkAuthorizationStatus = () => {
     const auth = getAuthorization();
     if (auth && isAuthorizationValid()) {
