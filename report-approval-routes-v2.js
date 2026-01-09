@@ -18,6 +18,38 @@ function generateId() {
   return 'auth-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
+// Helper function to log audit trail
+async function logAudit(db, action, user, targetUser, authId, reason, metadata) {
+  const logId = 'audit-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  const now = new Date().toISOString();
+  
+  try {
+    await db.run(`
+      INSERT INTO approval_audit_log (
+        id, authorization_id, action, user_id, user_name, user_role, user_dept,
+        target_user_id, target_user_name, reason, created_at, metadata
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      logId,
+      authId || '',
+      action,
+      user.id,
+      user.name,
+      user.role,
+      user.department,
+      targetUser ? targetUser.id : '',
+      targetUser ? targetUser.name : '',
+      reason || '',
+      now,
+      metadata ? JSON.stringify(metadata) : ''
+    ]);
+    
+    console.log('[APPROVAL-AUDIT]', action, '- User:', user.name, '- Auth:', authId);
+  } catch (error) {
+    console.error('[APPROVAL-AUDIT-ERROR]', error);
+  }
+}
+
 // POST /api/reports/approval/request
 // Requester (A) requests approval from approver (B)
 router.post('/approval/request', async (req, res) => {
@@ -128,6 +160,12 @@ router.post('/approval/request', async (req, res) => {
       now
     ]);
     
+    // Log audit trail
+    await logAudit(db, 'REQUEST', currentUser, approver, authId, reason, {
+      ip: clientIp,
+      userAgent: userAgent
+    });
+    
     res.json({ 
       success: true, 
       authorizationId: authId,
@@ -218,6 +256,12 @@ router.post('/approval/approve', async (req, res) => {
     const requester = await db.get('SELECT * FROM users WHERE id = ?', [auth.requester_id]);
     const updatedAuth = await db.get('SELECT * FROM report_authorizations WHERE id = ?', [authorizationId]);
     
+    // Log audit trail
+    await logAudit(db, 'APPROVE', currentUser, requester, authorizationId, reason, {
+      ip: clientIp,
+      expiresAt: expiresAt
+    });
+    
     res.json({ 
       success: true,
       message: '\u5be9\u6838\u5b8c\u6210\uff0c' + requester.name + ' \u5df2\u7372\u5f97\u67e5\u770b\u6b0a\u96502030\u5206\u9418',
@@ -299,6 +343,9 @@ router.post('/approval/reject', async (req, res) => {
     
     // Get requester info
     const requester = await db.get('SELECT * FROM users WHERE id = ?', [auth.requester_id]);
+    
+    // Log audit trail before deletion
+    await logAudit(db, 'REJECT', currentUser, requester, authorizationId, reason, {});
     
     // Delete the rejected authorization request
     await db.run('DELETE FROM report_authorizations WHERE id = ?', [authorizationId]);
@@ -450,6 +497,9 @@ router.post('/approval/revoke', async (req, res) => {
     const currentUser = req.user;
     const { authorizationId } = req.body;
     
+    // Log audit trail before deletion
+    await logAudit(db, 'REVOKE', currentUser, null, authorizationId || 'all', '', {});
+    
     // CRITICAL: Delete the authorization record instead of just setting is_active = 0
     // This prevents old records from causing issues
     if (authorizationId) {
@@ -481,14 +531,17 @@ router.post('/approval/revoke', async (req, res) => {
 // Cleanup expired authorizations (called periodically)
 async function cleanupExpiredAuthorizations(db) {
   try {
-    await db.run(`
-      UPDATE report_authorizations
-      SET is_active = 0
+    const result = await db.run(`
+      DELETE FROM report_authorizations
       WHERE is_active = 1
-        AND datetime(expires_at) < datetime('now')
+        AND datetime(expires_at) <= datetime('now')
     `);
+    
+    if (result.changes > 0) {
+      console.log('[APPROVAL-CLEANUP] Deleted', result.changes, 'expired authorizations');
+    }
   } catch (error) {
-    console.error('Cleanup error:', error);
+    console.error('[APPROVAL-CLEANUP-ERROR]', error);
   }
 }
 
