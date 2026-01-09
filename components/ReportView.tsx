@@ -39,6 +39,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
   
   // Filter State
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
+  const [filterEmployee, setFilterEmployee] = useState<string>('all');
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
 
@@ -322,7 +323,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                         {/* Filter Controls */}
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
                             <h3 className="font-semibold text-gray-900 mb-3">🔍 篩選報表</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {/* Department Filter */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">部門</label>
@@ -338,6 +339,25 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                     </select>
                                 </div>
                                 
+                                {/* Employee Filter */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">員工</label>
+                                    <select
+                                        value={filterEmployee}
+                                        onChange={(e) => setFilterEmployee(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="all">全部員工</option>
+                                        {users
+                                            .filter(user => filterDepartment === 'all' || user.department === filterDepartment)
+                                            .map(user => (
+                                                <option key={user.id} value={user.id}>
+                                                    {user.name} ({user.role})
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                                
                                 {/* Start Date Filter */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
@@ -346,6 +366,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                         value={filterStartDate}
                                         onChange={(e) => setFilterStartDate(e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="不限"
                                     />
                                 </div>
                                 
@@ -357,15 +378,17 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                         value={filterEndDate}
                                         onChange={(e) => setFilterEndDate(e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="不限"
                                     />
                                 </div>
                             </div>
                             
                             {/* Clear Filters Button */}
-                            {(filterDepartment !== 'all' || filterStartDate || filterEndDate) && (
+                            {(filterDepartment !== 'all' || filterEmployee !== 'all' || filterStartDate || filterEndDate) && (
                                 <button
                                     onClick={() => {
                                         setFilterDepartment('all');
+                                        setFilterEmployee('all');
                                         setFilterStartDate('');
                                         setFilterEndDate('');
                                     }}
@@ -392,7 +415,14 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                         });
                                     }
                                     
-                                    // Filter by date range
+                                    // Filter by employee
+                                    if (filterEmployee !== 'all') {
+                                        filteredReports = filteredReports.filter(report => {
+                                            return report.userId === filterEmployee;
+                                        });
+                                    }
+                                    
+                                    // Filter by date range (only if date is specified)
                                     if (filterStartDate) {
                                         filteredReports = filteredReports.filter(report => {
                                             const reportDate = new Date(report.createdAt).toISOString().split('T')[0];
@@ -410,7 +440,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                     if (filteredReports.length === 0) {
                                         return (
                                             <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                                                {filterDepartment !== 'all' || filterStartDate || filterEndDate 
+                                                {filterDepartment !== 'all' || filterEmployee !== 'all' || filterStartDate || filterEndDate 
                                                     ? '沒有符合篩選條件的報表' 
                                                     : '尚無報表紀錄'}
                                             </div>
@@ -588,6 +618,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                 filteredReports = filteredReports.filter(report => {
                     const user = users.find(u => u.id === report.userId);
                     return user?.department === filterDepartment;
+                });
+            }
+            if (filterEmployee !== 'all') {
+                filteredReports = filteredReports.filter(report => {
+                    return report.userId === filterEmployee;
                 });
             }
             if (filterStartDate) {
