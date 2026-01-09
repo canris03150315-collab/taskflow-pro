@@ -114,6 +114,18 @@
   - `ae65bf6` - Deploy complete audit log viewing feature to production
   - `9d29fa5` - Fix report delete error by creating report_edit_logs table
 
+### 10. 資料庫自動備份頻率調整 ⭐
+- **需求**: 將自動備份從每天 1 次改為每天 4 次
+- **修改前**: 每天凌晨 02:00 (UTC) 備份一次
+- **修改後**: 每天 00:00、06:00、12:00、18:00 (UTC) 備份四次
+- **台灣時間**: 08:00、14:00、20:00、02:00（次日）
+- **優點**:
+  - 更頻繁的備份保護
+  - 數據丟失風險從 24 小時降至 6 小時
+  - 每 6 小時一個恢復點
+- **Cron 配置**: 已更新並驗證
+- **文檔**: `BACKUP-SCHEDULE-UPDATE.md`
+
 ---
 
 ## 📁 重要文件清單
