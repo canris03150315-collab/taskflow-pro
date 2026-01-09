@@ -6,19 +6,32 @@
 
 ---
 
-## 🚀 開始前必讀
+## � AI 必須先做的事
 
-### 第一步：讀取這些文件
+**⚠️ 重要：每次開始新對話時，AI 必須先完成以下步驟！**
+
+### 第零步：閱讀強制性檢查清單
+1. **先讀** `AI-MUST-READ-FIRST.md` - ⚠️ 這是最重要的文件
+   - 包含絕對禁止的操作
+   - 包含必須遵守的工作流程
+   - 包含 AI 自我檢查問題
+   - 包含違規後果
+
+### 第一步：讀取核心文件（按順序）
 1. **本文件** (`PROJECT-QUICKSTART.md`) - 快速了解專案狀態
 2. `WORK_LOG_CURRENT.md` - 當前工作日誌和最新狀態
 3. `PROJECT-KNOWLEDGE-BASE.md` - 項目知識庫
 4. `BACKUP-GUIDE.md` - 備份系統指南
+5. **全域規則** (`c:\Users\USER\.codeium\windsurf\memories\global_rules.md`) - 必須遵守的規則
 
 ### 第二步：檢查系統狀態
 ```powershell
 # 執行系統狀態檢查
 .\check-system-status.ps1
 ```
+
+### 第三步：確認理解
+在開始工作前，AI 必須能回答 `AI-MUST-READ-FIRST.md` 中的 10 個自我檢查問題。
 
 ---
 
