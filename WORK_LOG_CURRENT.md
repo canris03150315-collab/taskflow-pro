@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-09  
-**版本**: v8.9.98-report-edit-complete  
+**最後更新**: 2026-01-10  
+**版本**: v8.9.99-employee-refresh-fix  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -9,8 +9,8 @@
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6960bcbc5bb7dddf3edbb70e`
-- **測試環境 Deploy ID**: `6960843ec9bc3c7b0f2eb32d`
+- **生產環境 Deploy ID**: `69615b9646e5c91962756af4`
+- **測試環境 Deploy ID**: `69615b3d1a459f1a853695d3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
 - **WebSocket URL**: `wss://robust-managing-stay-largely.trycloudflare.com/ws`
@@ -125,6 +125,27 @@
   - 每 6 小時一個恢復點
 - **Cron 配置**: 已更新並驗證
 - **文檔**: `BACKUP-SCHEDULE-UPDATE.md`
+
+### 11. 一般員工重新整理被登出問題修復 ⭐ (2026-01-10)
+- **問題**: 一般員工（EMPLOYEE）重新整理頁面後會被登出
+- **根本原因**:
+  - `GET /api/users` 路由需要 BOSS/MANAGER/SUPERVISOR 權限
+  - 一般員工無權訪問，導致 403 Forbidden
+  - 前端 session 恢復時調用此 API 失敗 → 清除 token → 被登出
+- **解決方案**:
+  - 改用 `GET /api/users/:id` 替代 `GET /api/users`
+  - 此路由有 `requireSelfOrAdmin` 中間件，允許用戶查看自己的資料
+  - 所有角色都可使用，無需管理員權限
+- **修改內容**:
+  1. `services/api.ts` - 新增 `getById` 方法
+  2. `App.tsx` - 修改 session 恢復邏輯使用 `getById`
+- **結果**:
+  - ✅ 一般員工重新整理不會被登出
+  - ✅ 其他角色不受影響
+  - ✅ 無需修改後端代碼
+- **版本**: v8.9.99-employee-refresh-fix
+- **Git Commit**: `42d4e56` - Fix: Employee logout on refresh
+- **詳細文檔**: `fix-employee-refresh-logout.md`
 
 ---
 
