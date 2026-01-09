@@ -311,8 +311,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                     </>
                 ) : null}
 
-                {/* Only show reports if authorized (for BOSS/MANAGER/SUPERVISOR) or always show for EMPLOYEE */}
-                {(isAuthorized || currentUser.role === 'EMPLOYEE') && (
+                {/* Only show reports if authorized */}
+                {isAuthorized && (
                     <>
                         {loading ? (
                             <div className="p-8 text-center text-slate-400">載入中...</div>
