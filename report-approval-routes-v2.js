@@ -528,6 +528,95 @@ router.post('/approval/revoke', async (req, res) => {
   }
 });
 
+// GET /api/reports/approval/audit-log
+// Get audit log (BOSS/MANAGER can see all, SUPERVISOR can see their dept)
+router.get('/approval/audit-log', async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    
+    // Check role
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER' && currentUser.role !== 'SUPERVISOR') {
+      return res.status(403).json({ 
+        error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS\u3001MANAGER \u6216 SUPERVISOR \u53ef\u4ee5\u67e5\u770b\u5be9\u6838\u8a18\u9304' 
+      });
+    }
+    
+    // Get query parameters
+    const { action, startDate, endDate, limit = 50, offset = 0 } = req.query;
+    
+    // Build query
+    let query = 'SELECT * FROM approval_audit_log WHERE 1=1';
+    const params = [];
+    
+    // Filter by action
+    if (action && action !== 'ALL') {
+      query += ' AND action = ?';
+      params.push(action);
+    }
+    
+    // Filter by date range
+    if (startDate) {
+      query += ' AND datetime(created_at) >= datetime(?)';
+      params.push(startDate);
+    }
+    if (endDate) {
+      query += ' AND datetime(created_at) <= datetime(?)';
+      params.push(endDate);
+    }
+    
+    // SUPERVISOR can only see their department
+    if (currentUser.role === 'SUPERVISOR') {
+      query += ' AND (user_dept = ? OR target_user_id IN (SELECT id FROM users WHERE department = ?))';
+      params.push(currentUser.department, currentUser.department);
+    }
+    
+    // Order by created_at DESC
+    query += ' ORDER BY created_at DESC';
+    
+    // Add limit and offset
+    query += ' LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const logs = await db.all(query, params);
+    
+    // Get total count
+    let countQuery = 'SELECT COUNT(*) as total FROM approval_audit_log WHERE 1=1';
+    const countParams = [];
+    
+    if (action && action !== 'ALL') {
+      countQuery += ' AND action = ?';
+      countParams.push(action);
+    }
+    if (startDate) {
+      countQuery += ' AND datetime(created_at) >= datetime(?)';
+      countParams.push(startDate);
+    }
+    if (endDate) {
+      countQuery += ' AND datetime(created_at) <= datetime(?)';
+      countParams.push(endDate);
+    }
+    if (currentUser.role === 'SUPERVISOR') {
+      countQuery += ' AND (user_dept = ? OR target_user_id IN (SELECT id FROM users WHERE department = ?))';
+      countParams.push(currentUser.department, currentUser.department);
+    }
+    
+    const { total } = await db.get(countQuery, countParams);
+    
+    res.json({
+      success: true,
+      logs: logs,
+      total: total,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+    
+  } catch (error) {
+    console.error('Audit log error:', error);
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
+  }
+});
+
 // Cleanup expired authorizations (called periodically)
 async function cleanupExpiredAuthorizations(db) {
   try {

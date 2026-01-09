@@ -383,6 +383,19 @@ const RealApi = {
                     '/reports/approval/revoke', 
                     { authorizationId }
                 );
+            },
+            getAuditLog: async (filters?: { action?: string; startDate?: string; endDate?: string; limit?: number; offset?: number }) => {
+                const params = new URLSearchParams();
+                if (filters?.action) params.append('action', filters.action);
+                if (filters?.startDate) params.append('startDate', filters.startDate);
+                if (filters?.endDate) params.append('endDate', filters.endDate);
+                if (filters?.limit) params.append('limit', filters.limit.toString());
+                if (filters?.offset) params.append('offset', filters.offset.toString());
+                
+                return request<{ success: boolean; logs: any[]; total: number; limit: number; offset: number }>(
+                    'GET',
+                    `/reports/approval/audit-log?${params.toString()}`
+                );
             }
         }
     },
