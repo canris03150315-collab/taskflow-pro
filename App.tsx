@@ -273,6 +273,11 @@ function AppContent() {
           }
         }
         
+        // 工作日誌系統事件
+        if (msg.type === 'work_log_created' || msg.type === 'work_log_updated' || msg.type === 'work_log_deleted') {
+          window.dispatchEvent(new CustomEvent('worklog-updated'));
+        }
+        
         // 建議系統事件
         if (msg.type === 'SUGGESTION_CREATED' || msg.type === 'SUGGESTION_UPDATED' || msg.type === 'SUGGESTION_DELETED') {
           try {

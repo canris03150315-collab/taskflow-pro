@@ -2,6 +2,7 @@
 import { User, Report, ReportType, DailyReportContent, DepartmentDef } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import WorkLogTab from './WorkLogTab';
 
 interface ReportViewProps {
   currentUser: User;
@@ -14,12 +15,8 @@ interface ReportViewProps {
 
 export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, reports: propReports, departments, onCreateClick, onOpenReportModal }) => {
   const toast = useToast();
-  // We use propReports as the source of truth if provided, otherwise fetch?
-  // Since App.tsx passes reports, we should use them. 
-  // However, for simplicity and to match the previous logic of local editing/updates within this component without prop callbacks for updates,
-  // we might want to maintain local state initialized from props, or just fetch fresh data.
-  // The prompt asked to fix the props mismatch. App.tsx passes `reports`.
-  // Let's use a local state `localReports` initialized with `propReports` but also capable of fetching/updating.
+  // Tab state - default to 'worklogs'
+  const [activeTab, setActiveTab] = useState<'worklogs' | 'reports'>('worklogs');
   
   const [reports, setReports] = useState<Report[]>(propReports || []);
   const [loading, setLoading] = useState(false);
@@ -92,20 +89,60 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 animate-fade-in">
-        <div className="flex justify-between items-end border-b border-slate-200 pb-4">
-            <div>
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                    <span></span> 工作報表中心
-                </h2>
-                <p className="text-slate-500 text-sm mt-1">查看與管理每日營運報表</p>
+        <div className="border-b border-slate-200 pb-4">
+            <div className="flex justify-between items-end mb-4">
+                <div>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                        <span>📝</span> 工作報表中心
+                    </h2>
+                    <p className="text-slate-500 text-sm mt-1">
+                        {activeTab === 'worklogs' ? '查看與管理工作日誌' : '查看與管理每日營運報表'}
+                    </p>
+                </div>
+                {activeTab === 'reports' && (
+                    <button 
+                        onClick={onCreateClick}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
+                    >
+                        + 新增報表
+                    </button>
+                )}
             </div>
-            <button 
-                onClick={onCreateClick}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
-            >
-                + 新增報表
-            </button>
+
+            {/* Tab Navigation */}
+            <div className="flex gap-2">
+                <button
+                    onClick={() => setActiveTab('worklogs')}
+                    className={`px-4 py-2 font-semibold rounded-lg transition-colors ${
+                        activeTab === 'worklogs'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                >
+                    工作日誌
+                </button>
+                <button
+                    onClick={() => setActiveTab('reports')}
+                    className={`px-4 py-2 font-semibold rounded-lg transition-colors ${
+                        activeTab === 'reports'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                >
+                    新增報表
+                </button>
+            </div>
         </div>
+
+        {/* Tab Content */}
+        {activeTab === 'worklogs' ? (
+            <WorkLogTab 
+                currentUser={currentUser}
+                departments={departments}
+                users={users}
+            />
+        ) : (
+            <div>
 
         {loading ? (
             <div className="p-8 text-center text-slate-400">載入中...</div>
@@ -282,6 +319,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                         載入更多
                     </button>
                 )}
+            </div>
+        )}
             </div>
         )}
     </div>

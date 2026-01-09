@@ -2,7 +2,7 @@
   User, Role, DepartmentDef, DEFAULT_DEPARTMENTS, Task, Announcement, 
   Report, FinanceRecord, Suggestion, Memo, RoutineTemplate, AttendanceRecord, 
   SystemLog, PerformanceReview, ChatChannel, ChatMessage, TaskStatus, Urgency,
-  MenuItemId, DEFAULT_MENU_GROUPS, MenuGroup, RoutineRecord, ReviewMetrics
+  MenuItemId, DEFAULT_MENU_GROUPS, MenuGroup, RoutineRecord, ReviewMetrics, WorkLog
 } from '../types';
 
 // ============================================================================
@@ -988,6 +988,32 @@ const RealApi = {
                 throw new Error(error.error || 'Failed to update schedule');
             }
             return response.json();
+        }
+    },
+
+    workLogs: {
+        getAll: async (params?: { departmentId?: string; userId?: string; date?: string; startDate?: string; endDate?: string }): Promise<{ logs: WorkLog[] }> => {
+            const queryParams = new URLSearchParams();
+            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
+            if (params?.userId) queryParams.append('userId', params.userId);
+            if (params?.date) queryParams.append('date', params.date);
+            if (params?.startDate) queryParams.append('startDate', params.startDate);
+            if (params?.endDate) queryParams.append('endDate', params.endDate);
+            
+            const queryString = queryParams.toString();
+            return request<{ logs: WorkLog[] }>('GET', `/work-logs${queryString ? '?' + queryString : ''}`);
+        },
+        
+        create: async (data: { date: string; todayTasks: string; tomorrowTasks: string; notes?: string }): Promise<{ success: boolean; log: WorkLog }> => {
+            return request<{ success: boolean; log: WorkLog }>('POST', '/work-logs', data);
+        },
+        
+        update: async (id: string, data: { todayTasks?: string; tomorrowTasks?: string; notes?: string }): Promise<{ success: boolean; log: WorkLog }> => {
+            return request<{ success: boolean; log: WorkLog }>('PUT', `/work-logs/${id}`, data);
+        },
+        
+        delete: async (id: string): Promise<{ success: boolean; message: string }> => {
+            return request<{ success: boolean; message: string }>('DELETE', `/work-logs/${id}`);
         }
     },
 };

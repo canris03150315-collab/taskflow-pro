@@ -428,3 +428,18 @@ export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = 
   personnel: { label: '人員帳號管理', icon: '👥' },
   settings: { label: '系統設定', icon: '⚙️' },
 };
+
+// Work Log Types
+export interface WorkLog {
+  id: string;
+  userId: string;
+  userName: string;
+  departmentId: string;
+  departmentName: string;
+  date: string; // YYYY-MM-DD
+  todayTasks: string; // 今日工作事項
+  tomorrowTasks: string; // 明天工作事項
+  notes: string; // 特別備註
+  createdAt: string;
+  updatedAt: string;
+}
