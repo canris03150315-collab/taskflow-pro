@@ -622,14 +622,16 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                             {report.content.notes || "無備註"}
                                         </div>
 
-                                        {report.userId === currentUser.id && (
+                                        {(report.userId === currentUser.id || currentUser.role === 'BOSS' || currentUser.role === 'MANAGER') && (
                                             <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100">
-                                                <button 
-                                                    onClick={() => handleEditClick(report)}
-                                                    className="text-sm text-blue-600 hover:underline font-bold"
-                                                >
-                                                    編輯報表
-                                                </button>
+                                                {(currentUser.role === 'BOSS' || currentUser.role === 'MANAGER') && (
+                                                    <button 
+                                                        onClick={() => handleEditClick(report)}
+                                                        className="text-sm text-blue-600 hover:underline font-bold"
+                                                    >
+                                                        編輯報表
+                                                    </button>
+                                                )}
                                                 <button 
                                                     onClick={() => handleDelete(report.id)}
                                                     className="text-sm text-red-500 hover:underline font-bold"
