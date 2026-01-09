@@ -178,8 +178,16 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
   const handleSaveEdit = async () => {
       if (!editingReport || !editContent) return;
       try {
-          await api.reports.update(editingReport.id, editContent);
-          setReports(reports.map(r => r.id === editingReport.id ? { ...r, content: editContent } : r));
+          // Recalculate computed values
+          const updatedContent = {
+              ...editContent,
+              netIncome: (editContent.depositAmount || 0) - (editContent.withdrawalAmount || 0),
+              conversionRate: editContent.lineLeads > 0 ? Math.round((editContent.registrations / editContent.lineLeads) * 100) : 0,
+              firstDepositRate: editContent.registrations > 0 ? Math.round((editContent.firstDeposits / editContent.registrations) * 100) : 0
+          };
+          
+          await api.reports.update(editingReport.id, updatedContent);
+          setReports(reports.map(r => r.id === editingReport.id ? { ...r, content: updatedContent } : r));
           setEditingReport(null);
           setEditContent(null);
           toast.success('報表已更新');
