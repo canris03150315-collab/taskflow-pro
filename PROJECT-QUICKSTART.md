@@ -116,13 +116,58 @@ ssh root@165.227.147.40 "/root/create-snapshot-improved.sh v版本號"
 ```
 
 ### 部署操作
-```powershell
-# 測試環境部署
-.\deploy-test.ps1
 
-# 生產環境部署
+#### 前端部署流程
+
+**測試環境部署**：
+```powershell
+# 1. 構建前端
+npm run build
+
+# 2. 部署到測試環境
+$env:NETLIFY_SITE_ID = "480c7dd5-1159-4f1d-867a-0144272d1e0b"
+netlify deploy --prod --dir=dist --no-build
+
+# 或使用腳本
+.\deploy-test.ps1
+```
+
+**生產環境部署**：
+```powershell
+# 1. 構建前端
+npm run build
+
+# 2. 部署到生產環境
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+
+# 或使用腳本
 .\deploy-prod.ps1
 ```
+
+#### 後端部署流程
+
+**修改後端代碼**：
+```powershell
+# 1. 創建修復腳本（例如 fix-something.js）
+# 2. 上傳到伺服器
+Get-Content "fix-something.js" -Raw | ssh root@165.227.147.40 "cat > /app/fix-something.js"
+
+# 3. 在容器內執行
+ssh root@165.227.147.40 "docker exec -w /app taskflow-pro node fix-something.js"
+
+# 4. 重啟容器
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+
+# 5. Commit 新映像
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v版本號"
+```
+
+**重要提醒**：
+- ⚠️ 不要使用 `scp` 命令（會要求密碼）
+- ⚠️ 使用 `Get-Content | ssh` 管道上傳文件
+- ⚠️ 修改後必須 `docker commit` 創建新映像
+- ⚠️ 容器重啟後未 commit 的修改會丟失
 
 ### Git 操作
 ```powershell
@@ -181,6 +226,36 @@ git tag -l
 - **問題**: 測試部署覆蓋生產版本
 - **解決**: 建立獨立測試環境
 - **教訓**: 測試和生產環境必須分離
+
+### 5. PowerShell 語法問題
+- **問題**: PowerShell 不支援 `&&` 運算符
+- **解決**: 使用分號 `;` 分隔命令
+- **教訓**: Windows 和 Linux 命令語法不同
+
+### 6. TypeScript 編譯問題
+- **問題**: 後端 TypeScript 編譯後枚舉值與資料庫不匹配
+- **解決**: 直接使用 JavaScript，不編譯 TypeScript
+- **教訓**: 編譯後的代碼可能與預期不同
+
+### 7. 文件上傳問題
+- **問題**: 使用 `scp` 命令會要求密碼
+- **解決**: 使用 `Get-Content | ssh` 管道上傳
+- **教訓**: 使用 SSH 管道可以避免密碼提示
+
+### 8. Docker Commit 時機
+- **問題**: 修改後忘記 `docker commit` 創建新映像
+- **解決**: 每次修改後必須 commit 並標記版本
+- **教訓**: Docker 容器重啟後未 commit 的修改會丟失
+
+### 9. 前後端通訊架構
+- **問題**: Netlify 無法直接連接 HTTPS 後端（自簽名證書）
+- **解決**: 後端同時監聽 3000 (HTTPS) 和 3001 (HTTP)，Netlify 使用 HTTP 端口
+- **教訓**: 反向代理需要考慮證書驗證問題
+
+### 10. 資料庫備份不等於完整備份
+- **問題**: 只備份資料庫無法完整恢復系統
+- **解決**: 必須同時備份 Docker 映像、資料庫、配置文件
+- **教訓**: 完整快照包含所有必要組件才能完整恢復
 
 ---
 
