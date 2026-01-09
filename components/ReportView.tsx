@@ -85,19 +85,21 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
     setShowApprovalModal(true);
   };
 
-  const handleApprovalSuccess = async () => {
-    // Reload authorization status from backend
-    try {
-      const response = await api.reports.approval.checkStatus('');
-      if (response.isAuthorized && response.authorization) {
-        setIsAuthorized(true);
-        setAuthorization(response.authorization);
-        // Save to sessionStorage
-        const { saveAuthorization } = await import('../utils/authSession');
-        saveAuthorization(response.authorization);
+  const handleApprovalSuccess = async (isApprovalAction: boolean = false) => {
+    // Only reload authorization status if this was an approval action (not a request)
+    if (isApprovalAction) {
+      try {
+        const response = await api.reports.approval.checkStatus('');
+        if (response.isAuthorized && response.authorization) {
+          setIsAuthorized(true);
+          setAuthorization(response.authorization);
+          // Save to sessionStorage
+          const { saveAuthorization } = await import('../utils/authSession');
+          saveAuthorization(response.authorization);
+        }
+      } catch (error) {
+        console.error('Failed to check authorization status:', error);
       }
-    } catch (error) {
-      console.error('Failed to check authorization status:', error);
     }
     
     loadPendingApprovals();

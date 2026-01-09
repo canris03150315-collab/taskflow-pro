@@ -11,7 +11,7 @@ interface ApprovalModalProps {
   pendingAuthId?: string;
   pendingAuthData?: any;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (isApprovalAction?: boolean) => void;
 }
 
 export const ApprovalModal: React.FC<ApprovalModalProps> = ({
@@ -73,12 +73,13 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
       if (mode === 'request') {
         await api.reports.approval.request(selectedApproverId, reason);
         toast.success('申請已發送，等待審核者批准');
+        onSuccess(false); // This is a request, not an approval
       } else {
         const response = await api.reports.approval.approve(pendingAuthId!, reason);
         toast.success(`審核完成，${response.requesterName} 已獲得查看權限 30 分鐘`);
+        onSuccess(true); // This is an approval action
       }
 
-      onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Approval failed:', error);
