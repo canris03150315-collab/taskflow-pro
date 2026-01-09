@@ -181,6 +181,13 @@ router.post('/approval/approve', async (req, res) => {
       });
     }
     
+    // CRITICAL: Check if approver is the same as requester (prevent self-approval)
+    if (currentUser.id === auth.requester_id) {
+      return res.status(403).json({ 
+        error: '\u4e0d\u80fd\u5be9\u6838\u81ea\u5df1\u7684\u7533\u8acb' 
+      });
+    }
+    
     // Approve and activate authorization for REQUESTER
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes

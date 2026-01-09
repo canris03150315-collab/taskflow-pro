@@ -61,6 +61,12 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
       return;
     }
 
+    // Check if user selected themselves as approver
+    if (mode === 'request' && selectedApproverId === currentUser.id) {
+      toast.error('不能選擇自己作為審核者');
+      return;
+    }
+
     setLoading(true);
 
     try {
