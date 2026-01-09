@@ -1,5 +1,5 @@
-// report-approval-routes.js
-// Pure ASCII version - Report approval API routes
+// report-approval-routes-v2.js
+// Pure ASCII version - Simplified approval: A requests -> B approves -> A gets access
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
@@ -18,27 +18,25 @@ function generateId() {
   return 'auth-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
-// POST /api/reports/approval/initiate
-// Initiate first approval
-router.post('/approval/initiate', async (req, res) => {
+// POST /api/reports/approval/request
+// Requester (A) requests approval from approver (B)
+router.post('/approval/request', async (req, res) => {
   try {
     const db = req.db;
-    const currentUser = req.user;
+    const currentUser = req.user; // This is the REQUESTER (A)
     const { approverId, reason } = req.body;
     
     // Check role - must be BOSS, MANAGER, or SUPERVISOR
     if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER' && currentUser.role !== 'SUPERVISOR') {
       return res.status(403).json({ 
-        error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS\u3001MANAGER \u6216 SUPERVISOR \u53ef\u4ee5\u767c\u8d77\u5be9\u6838' 
-        // Permission denied, only BOSS, MANAGER, or SUPERVISOR can initiate
+        error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS\u3001MANAGER \u6216 SUPERVISOR \u53ef\u4ee5\u7533\u8acb\u67e5\u770b\u5831\u8868' 
       });
     }
     
     // Validate reason length
     if (!reason || reason.length < 10) {
       return res.status(400).json({ 
-        error: '\u5be9\u6838\u539f\u56e0\u81f3\u5c11\u9700\u898110\u500b\u5b57' 
-        // Reason must be at least 10 characters
+        error: '\u7533\u8acb\u539f\u56e0\u81f3\u5c11\u9700\u898110\u500b\u5b57' 
       });
     }
     
@@ -47,7 +45,6 @@ router.post('/approval/initiate', async (req, res) => {
     if (!approver) {
       return res.status(404).json({ 
         error: '\u627e\u4e0d\u5230\u6307\u5b9a\u7684\u5be9\u6838\u8005' 
-        // Approver not found
       });
     }
     
@@ -55,7 +52,6 @@ router.post('/approval/initiate', async (req, res) => {
     if (approver.role !== 'BOSS' && approver.role !== 'MANAGER' && approver.role !== 'SUPERVISOR') {
       return res.status(400).json({ 
         error: '\u5be9\u6838\u8005\u5fc5\u9808\u662f BOSS\u3001MANAGER \u6216 SUPERVISOR' 
-        // Approver must be BOSS, MANAGER, or SUPERVISOR
       });
     }
     
@@ -63,7 +59,6 @@ router.post('/approval/initiate', async (req, res) => {
     if (approverId === currentUser.id) {
       return res.status(400).json({ 
         error: '\u4e0d\u80fd\u9078\u64c7\u81ea\u5df1\u4f5c\u70ba\u5be9\u6838\u8005' 
-        // Cannot select yourself as approver
       });
     }
     
@@ -71,11 +66,10 @@ router.post('/approval/initiate', async (req, res) => {
     if (approver.department === currentUser.department) {
       return res.status(400).json({ 
         error: '\u5be9\u6838\u8005\u5fc5\u9808\u4f86\u81ea\u4e0d\u540c\u90e8\u9580' 
-        // Approver must be from different department
       });
     }
     
-    // Create pending authorization (waiting for second approval)
+    // Create pending authorization
     const authId = generateId();
     const now = new Date().toISOString();
     const clientIp = getClientIp(req);
@@ -106,22 +100,22 @@ router.post('/approval/initiate', async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       authId,
-      currentUser.id,  // requester is the current user (申請者)
-      currentUser.id,  // first approver is also current user
-      currentUser.name,
-      currentUser.department,
-      now,
-      reason,
-      clientIp,
-      approverId,  // second approver is the selected approver
+      currentUser.id,  // REQUESTER (A) - the person who will get access
+      approverId,      // APPROVER (B) - the person who will approve
       approver.name,
       approver.department,
-      '', // pending
-      '', // pending
+      '',  // pending approval
+      '',  // pending
       '',
-      '', // pending
-      '', // pending
-      0,  // not active yet
+      '',  // not used in single approval
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',  // pending
+      '',  // pending
+      0,   // not active yet
       '',
       userAgent,
       now
@@ -130,29 +124,27 @@ router.post('/approval/initiate', async (req, res) => {
     res.json({ 
       success: true, 
       authorizationId: authId,
-      message: '\u7b2c\u4e00\u6b21\u5be9\u6838\u5b8c\u6210\uff0c\u7b49\u5f85\u7b2c\u4e8c\u5be9\u6838' 
-      // First approval complete, waiting for second approval
+      message: '\u7533\u8acb\u5df2\u767c\u9001\uff0c\u7b49\u5f85\u5be9\u6838\u8005\u6279\u51c6' 
     });
     
   } catch (error) {
-    console.error('Initiate approval error:', error);
-    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' }); // Server error
+    console.error('Request approval error:', error);
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
   }
 });
 
-// POST /api/reports/approval/complete
-// Complete second approval
-router.post('/approval/complete', async (req, res) => {
+// POST /api/reports/approval/approve
+// Approver (B) approves the request, giving access to requester (A)
+router.post('/approval/approve', async (req, res) => {
   try {
     const db = req.db;
-    const currentUser = req.user;
+    const currentUser = req.user; // This is the APPROVER (B)
     const { authorizationId, reason } = req.body;
     
-    // Check role - must be BOSS, MANAGER, or SUPERVISOR
+    // Check role
     if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER' && currentUser.role !== 'SUPERVISOR') {
       return res.status(403).json({ 
         error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS\u3001MANAGER \u6216 SUPERVISOR \u53ef\u4ee5\u5be9\u6838' 
-        // Permission denied, only BOSS, MANAGER, or SUPERVISOR can approve
       });
     }
     
@@ -160,7 +152,6 @@ router.post('/approval/complete', async (req, res) => {
     if (!reason || reason.length < 10) {
       return res.status(400).json({ 
         error: '\u5be9\u6838\u539f\u56e0\u81f3\u5c11\u9700\u898110\u500b\u5b57' 
-        // Reason must be at least 10 characters
       });
     }
     
@@ -173,27 +164,24 @@ router.post('/approval/complete', async (req, res) => {
     if (!auth) {
       return res.status(404).json({ 
         error: '\u627e\u4e0d\u5230\u5be9\u6838\u8a18\u9304' 
-        // Authorization not found
       });
     }
     
-    // Check if already completed
+    // Check if already approved
     if (auth.is_active === 1) {
       return res.status(400).json({ 
-        error: '\u6b64\u5be9\u6838\u5df2\u5b8c\u6210' 
-        // Already completed
+        error: '\u6b64\u7533\u8acb\u5df2\u7d93\u6279\u51c6' 
       });
     }
     
-    // Check if current user is the designated second approver
-    if (currentUser.id !== auth.second_approver_id) {
+    // Check if current user is the designated approver
+    if (currentUser.id !== auth.first_approver_id) {
       return res.status(403).json({ 
-        error: '\u60a8\u4e0d\u662f\u6307\u5b9a\u7684\u7b2c\u4e8c\u5be9\u6838\u8005' 
-        // You are not the designated second approver
+        error: '\u60a8\u4e0d\u662f\u6307\u5b9a\u7684\u5be9\u6838\u8005' 
       });
     }
     
-    // Complete the authorization
+    // Approve and activate authorization for REQUESTER
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 minutes
     const sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -202,9 +190,9 @@ router.post('/approval/complete', async (req, res) => {
     await db.run(`
       UPDATE report_authorizations 
       SET 
-        second_approved_at = ?,
-        second_approval_reason = ?,
-        second_approval_ip = ?,
+        first_approved_at = ?,
+        first_approval_reason = ?,
+        first_approval_ip = ?,
         authorized_at = ?,
         expires_at = ?,
         is_active = 1,
@@ -212,90 +200,59 @@ router.post('/approval/complete', async (req, res) => {
       WHERE id = ?
     `, [now, reason, clientIp, now, expiresAt, sessionId, authorizationId]);
     
-    // Get updated authorization
-    const updatedAuth = await db.get(
-      'SELECT * FROM report_authorizations WHERE id = ?',
-      [authorizationId]
-    );
+    // Get requester info
+    const requester = await db.get('SELECT * FROM users WHERE id = ?', [auth.requester_id]);
     
     res.json({ 
       success: true,
-      authorization: {
-        id: updatedAuth.id,
-        firstApproverId: updatedAuth.first_approver_id,
-        firstApproverName: updatedAuth.first_approver_name,
-        firstApproverDept: updatedAuth.first_approver_dept,
-        firstApprovedAt: updatedAuth.first_approved_at,
-        firstApprovalReason: updatedAuth.first_approval_reason,
-        secondApproverId: updatedAuth.second_approver_id,
-        secondApproverName: updatedAuth.second_approver_name,
-        secondApproverDept: updatedAuth.second_approver_dept,
-        secondApprovedAt: updatedAuth.second_approved_at,
-        secondApprovalReason: updatedAuth.second_approval_reason,
-        authorizedAt: updatedAuth.authorized_at,
-        expiresAt: updatedAuth.expires_at,
-        isActive: updatedAuth.is_active === 1,
-        sessionId: updatedAuth.session_id
-      },
-      message: '\u5be9\u6838\u5b8c\u6210\uff0c\u6388\u6b0a\u6709\u670930\u5206\u9418' 
-      // Approval complete, authorization valid for 30 minutes
+      message: '\u5be9\u6838\u5b8c\u6210\uff0c' + requester.name + ' \u5df2\u7372\u5f97\u67e5\u770b\u6b0a\u96502030\u5206\u9418',
+      requesterName: requester.name
     });
     
   } catch (error) {
-    console.error('Complete approval error:', error);
-    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' }); // Server error
+    console.error('Approve error:', error);
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
   }
 });
 
 // GET /api/reports/approval/status
-// Check authorization status
+// Check if current user (requester) has active authorization
 router.get('/approval/status', async (req, res) => {
   try {
     const db = req.db;
     const currentUser = req.user;
-    const sessionId = req.headers['x-session-id'];
     
-    if (!sessionId) {
-      return res.json({ 
-        isAuthorized: false,
-        message: '\u672a\u627e\u5230\u6703\u8a71 ID' 
-        // Session ID not found
-      });
-    }
-    
-    // Get active authorization
+    // Find active authorization for current user as REQUESTER
     const auth = await db.get(`
       SELECT * FROM report_authorizations 
-      WHERE session_id = ? 
+      WHERE requester_id = ?
         AND is_active = 1 
         AND datetime(expires_at) > datetime('now')
-    `, [sessionId]);
+      ORDER BY authorized_at DESC
+      LIMIT 1
+    `, [currentUser.id]);
     
     if (!auth) {
       return res.json({ 
         isAuthorized: false,
-        message: '\u6388\u6b0a\u5df2\u904e\u671f\u6216\u4e0d\u5b58\u5728' 
-        // Authorization expired or not found
+        message: '\u672a\u627e\u5230\u6709\u6548\u6388\u6b0a' 
       });
     }
     
     // Calculate remaining time
     const expiresAt = new Date(auth.expires_at);
     const now = new Date();
-    const remainingTime = Math.floor((expiresAt - now) / 1000); // seconds
+    const remainingTime = Math.floor((expiresAt - now) / 1000);
     
     res.json({
       isAuthorized: true,
       authorization: {
         id: auth.id,
-        firstApproverId: auth.first_approver_id,
-        firstApproverName: auth.first_approver_name,
-        firstApproverDept: auth.first_approver_dept,
-        firstApprovedAt: auth.first_approved_at,
-        secondApproverId: auth.second_approver_id,
-        secondApproverName: auth.second_approver_name,
-        secondApproverDept: auth.second_approver_dept,
-        secondApprovedAt: auth.second_approved_at,
+        approverId: auth.first_approver_id,
+        approverName: auth.first_approver_name,
+        approverDept: auth.first_approver_dept,
+        approvedAt: auth.first_approved_at,
+        approvalReason: auth.first_approval_reason,
         authorizedAt: auth.authorized_at,
         expiresAt: auth.expires_at,
         isActive: true,
@@ -306,12 +263,12 @@ router.get('/approval/status', async (req, res) => {
     
   } catch (error) {
     console.error('Check status error:', error);
-    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' }); // Server error
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
   }
 });
 
 // GET /api/reports/approval/eligible-approvers
-// Get list of eligible approvers
+// Get list of eligible approvers for current user
 router.get('/approval/eligible-approvers', async (req, res) => {
   try {
     const db = req.db;
@@ -345,42 +302,42 @@ router.get('/approval/eligible-approvers', async (req, res) => {
     
   } catch (error) {
     console.error('Get eligible approvers error:', error);
-    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' }); // Server error
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
   }
 });
 
 // GET /api/reports/approval/pending
-// Get pending approvals for current user
+// Get pending approval requests for current user (as approver)
 router.get('/approval/pending', async (req, res) => {
   try {
     const db = req.db;
     const currentUser = req.user;
     
-    // Get pending authorizations where current user is second approver
+    // Get pending authorizations where current user is the approver
     const pending = await db.all(`
-      SELECT * FROM report_authorizations 
-      WHERE second_approver_id = ?
-        AND is_active = 0
-        AND second_approved_at = ''
-      ORDER BY created_at DESC
+      SELECT ra.*, u.name as requester_name, u.department as requester_dept
+      FROM report_authorizations ra
+      JOIN users u ON ra.requester_id = u.id
+      WHERE ra.first_approver_id = ?
+        AND ra.is_active = 0
+        AND ra.first_approved_at = ''
+      ORDER BY ra.created_at DESC
     `, [currentUser.id]);
     
     res.json({
       success: true,
       pending: pending.map(p => ({
         id: p.id,
-        firstApproverId: p.first_approver_id,
-        firstApproverName: p.first_approver_name,
-        firstApproverDept: p.first_approver_dept,
-        firstApprovedAt: p.first_approved_at,
-        firstApprovalReason: p.first_approval_reason,
+        requesterId: p.requester_id,
+        requesterName: p.requester_name,
+        requesterDept: p.requester_dept,
         createdAt: p.created_at
       }))
     });
     
   } catch (error) {
     console.error('Get pending approvals error:', error);
-    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' }); // Server error
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
   }
 });
 
@@ -393,31 +350,30 @@ router.post('/approval/revoke', async (req, res) => {
     const { authorizationId } = req.body;
     
     if (authorizationId) {
-      // Revoke specific authorization
+      // Revoke specific authorization (only if user is the requester)
       await db.run(`
         UPDATE report_authorizations 
         SET is_active = 0 
         WHERE id = ? 
-          AND (first_approver_id = ? OR second_approver_id = ?)
-      `, [authorizationId, currentUser.id, currentUser.id]);
+          AND requester_id = ?
+      `, [authorizationId, currentUser.id]);
     } else {
       // Revoke all user's authorizations
       await db.run(`
         UPDATE report_authorizations 
         SET is_active = 0 
-        WHERE first_approver_id = ? OR second_approver_id = ?
-      `, [currentUser.id, currentUser.id]);
+        WHERE requester_id = ?
+      `, [currentUser.id]);
     }
     
     res.json({ 
-      success: true,
+      success: true, 
       message: '\u6388\u6b0a\u5df2\u64a4\u92b7' 
-      // Authorization revoked
     });
     
   } catch (error) {
-    console.error('Revoke authorization error:', error);
-    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' }); // Server error
+    console.error('Revoke error:', error);
+    res.status(500).json({ error: '\u4f3a\u670d\u5668\u5167\u90e8\u932f\u8aa4' });
   }
 });
 
@@ -425,9 +381,9 @@ router.post('/approval/revoke', async (req, res) => {
 async function cleanupExpiredAuthorizations(db) {
   try {
     await db.run(`
-      UPDATE report_authorizations 
-      SET is_active = 0 
-      WHERE is_active = 1 
+      UPDATE report_authorizations
+      SET is_active = 0
+      WHERE is_active = 1
         AND datetime(expires_at) < datetime('now')
     `);
   } catch (error) {
@@ -436,7 +392,7 @@ async function cleanupExpiredAuthorizations(db) {
 }
 
 // Export router and cleanup function
-module.exports = { 
+module.exports = {
   reportApprovalRoutes: router,
   cleanupExpiredAuthorizations
 };

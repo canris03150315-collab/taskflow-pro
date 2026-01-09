@@ -53,8 +53,8 @@ export const AuthorizationStatus: React.FC<AuthorizationStatusProps> = ({
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">🔓 已授權查看</h3>
-            <p className="text-sm text-gray-600">雙重審核已完成</p>
+            <h3 className="text-lg font-semibold text-gray-900">🔓 授權已核准</h3>
+            <p className="text-sm text-gray-600">審核已完成</p>
           </div>
         </div>
         

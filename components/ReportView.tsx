@@ -238,15 +238,15 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                         </svg>
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="text-xl font-bold text-gray-900">🔒 團隊報表需要雙重審核授權</h3>
-                                        <p className="text-sm text-gray-600 mt-1">為確保資料安全，查看團隊報表需要兩位不同部門的主管/部門主管審核</p>
+                                        <h3 className="text-xl font-bold text-gray-900">🔒 團隊報表需要審核授權</h3>
+                                        <p className="text-sm text-gray-600 mt-1">為確保資料安全，查看團隊報表需要一位不同部門的主管審核</p>
                                     </div>
                                 </div>
 
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                                     <h4 className="font-semibold text-blue-900 mb-2">📋 審核要求</h4>
                                     <ul className="text-sm text-blue-800 space-y-1">
-                                        <li>✅ 兩位不同部門的主管審核（BOSS/MANAGER/SUPERVISOR）</li>
+                                        <li>✅ 一位不同部門的主管審核（BOSS/MANAGER/SUPERVISOR）</li>
                                         <li>✅ 授權有效期 30 分鐘</li>
                                         <li>✅ 關閉網頁後需重新審核</li>
                                     </ul>
@@ -264,7 +264,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                         </svg>
-                                        🔐 發起雙重審核
+                                        🔐 申請查看報表
                                     </button>
                                 </div>
 
@@ -487,7 +487,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
         {showApprovalModal && (
             <ApprovalModal
                 currentUser={currentUser}
-                mode={pendingApprovals.length > 0 ? 'complete' : 'initiate'}
+                mode={pendingApprovals.length > 0 ? 'approve' : 'request'}
                 pendingAuthId={pendingApprovals[0]?.id}
                 pendingAuthData={pendingApprovals[0]}
                 onClose={() => setShowApprovalModal(false)}

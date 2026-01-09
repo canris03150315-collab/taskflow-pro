@@ -7,7 +7,7 @@ import { useToast } from './Toast';
 
 interface ApprovalModalProps {
   currentUser: User;
-  mode: 'initiate' | 'complete';
+  mode: 'request' | 'approve';
   pendingAuthId?: string;
   pendingAuthData?: any;
   onClose: () => void;
@@ -29,7 +29,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
   const [reason, setReason] = useState('');
 
   useEffect(() => {
-    if (mode === 'initiate') {
+    if (mode === 'request') {
       loadEligibleApprovers();
     }
   }, [mode]);
@@ -56,33 +56,27 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
       return;
     }
 
-    if (mode === 'initiate' && !selectedApproverId) {
-      toast.error('請選擇第二審核者');
+    if (mode === 'request' && !selectedApproverId) {
+      toast.error('請選擇審核者');
       return;
     }
 
     setLoading(true);
 
     try {
-      if (mode === 'initiate') {
-        await api.reports.approval.initiate(selectedApproverId, reason);
-        toast.success('第一次審核完成，等待第二審核');
+      if (mode === 'request') {
+        await api.reports.approval.request(selectedApproverId, reason);
+        toast.success('申請已發送，等待審核者批准');
       } else {
-        const response = await api.reports.approval.complete(pendingAuthId!, reason);
-        toast.success('審核完成，授權有效 30 分鐘');
-        
-        // Save authorization to sessionStorage
-        if (response.authorization) {
-          const { saveAuthorization } = await import('../utils/authSession');
-          saveAuthorization(response.authorization);
-        }
+        const response = await api.reports.approval.approve(pendingAuthId!, reason);
+        toast.success(`審核完成，${response.requesterName} 已獲得查看權限 30 分鐘`);
       }
 
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error('Approval failed:', error);
-      toast.error(error.message || '審核失敗');
+      toast.error(error.message || '操作失敗');
     } finally {
       setLoading(false);
     }
@@ -93,7 +87,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
-            {mode === 'initiate' ? '🔐 發起報表查看審核' : '✅ 完成第二審核'}
+            {mode === 'request' ? '🔐 申請查看報表' : '✅ 批准查看申請'}
           </h2>
           <button
             onClick={onClose}
@@ -110,31 +104,28 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <h3 className="font-semibold text-blue-900 mb-2">📋 審核規則說明</h3>
             <ul className="text-sm text-blue-800 space-y-1">
-              <li>• 需要兩位不同部門的主管/BOSS 審核</li>
-              <li>• 第二審核者不能是您自己</li>
-              <li>• 審核通過後可查看所有報表 30 分鐘</li>
+              <li>• 需要一位不同部門的主管審核</li>
+              <li>• 審核者不能是您自己</li>
+              <li>• 審核通過後您可查看所有報表 30 分鐘</li>
               <li>• 關閉網頁後授權自動失效</li>
             </ul>
           </div>
 
-          {/* Pending Auth Info (for complete mode) */}
-          {mode === 'complete' && pendingAuthData && (
+          {/* Pending Auth Info (for approve mode) */}
+          {mode === 'approve' && pendingAuthData && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3">📋 審核請求資訊</h3>
+              <h3 className="font-semibold text-gray-900 mb-3">📋 申請資訊</h3>
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-green-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   <div className="flex-1">
                     <div className="text-sm font-medium text-gray-900">
-                      第一審核者：{pendingAuthData.firstApproverName} ({pendingAuthData.firstApproverDept})
+                      申請者：{pendingAuthData.requesterName} ({pendingAuthData.requesterDept})
                     </div>
                     <div className="text-xs text-gray-600">
-                      審核時間：{new Date(pendingAuthData.firstApprovedAt).toLocaleString('zh-TW')}
-                    </div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      審核原因：{pendingAuthData.firstApprovalReason}
+                      申請時間：{new Date(pendingAuthData.createdAt).toLocaleString('zh-TW')}
                     </div>
                   </div>
                 </div>
@@ -142,11 +133,11 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
             </div>
           )}
 
-          {/* Select Approver (for initiate mode) */}
-          {mode === 'initiate' && (
+          {/* Select Approver (for request mode) */}
+          {mode === 'request' && (
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                👤 選擇第二審核者 <span className="text-red-500">*</span>
+                👤 選擇審核者 <span className="text-red-500">*</span>
               </label>
               <select
                 value={selectedApproverId}
@@ -154,7 +145,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               >
-                <option value="">請選擇配對的審核主管</option>
+                <option value="">請選擇審核主管</option>
                 {approvers.map((approver) => (
                   <option key={approver.id} value={approver.id}>
                     👔 {approver.name} ({approver.department}) - {approver.role}
@@ -181,13 +172,13 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
           {/* Reason Input */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              📝 {mode === 'initiate' ? '審核原因' : '您的審核原因'} <span className="text-red-500">*</span>
+              📝 {mode === 'request' ? '申請原因' : '審核意見'} <span className="text-red-500">*</span>
               <span className="text-gray-500 font-normal ml-2">(至少 10 字)</span>
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder={mode === 'initiate' 
+              placeholder={mode === 'request' 
                 ? '例如：需要查看本月營運報表，進行季度績效評估和部門預算調整...'
                 : '例如：確認需求合理，同意授權查看報表進行績效評估和預算調整...'
               }
@@ -220,17 +211,17 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
               <div className="flex-1 text-sm text-yellow-800">
                 <div className="font-medium mb-1">⚠️ 重要提示</div>
                 <ul className="list-disc list-inside space-y-1 text-xs">
-                  {mode === 'initiate' ? (
+                  {mode === 'request' ? (
                     <>
                       <li>審核通過後，您可查看所有報表 30 分鐘</li>
-                      <li>您的審核操作將被完整記錄</li>
-                      <li>請確認審核原因合理後再提交</li>
+                      <li>您的申請操作將被完整記錄</li>
+                      <li>請確認申請原因合理後再提交</li>
                     </>
                   ) : (
                     <>
-                      <li>審核通過後，{pendingAuthData?.firstApproverName} 可查看所有報表 30 分鐘</li>
+                      <li>審核通過後，{pendingAuthData?.requesterName} 可查看所有報表 30 分鐘</li>
                       <li>您的審核操作將被完整記錄</li>
-                      <li>請確認審核原因合理後再批准</li>
+                      <li>請確認申請合理後再批准</li>
                     </>
                   )}
                 </ul>
@@ -251,7 +242,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
             <button
               type="submit"
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              disabled={loading || reason.length < 10 || (mode === 'initiate' && !selectedApproverId)}
+              disabled={loading || reason.length < 10 || (mode === 'request' && !selectedApproverId)}
             >
               {loading ? (
                 <>
@@ -263,19 +254,19 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
                 </>
               ) : (
                 <>
-                  {mode === 'initiate' ? (
+                  {mode === 'request' ? (
                     <>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
-                      確認發起審核
+                      📤 提交申請
                     </>
                   ) : (
                     <>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      ✅ 批准審核
+                      ✅ 批准申請
                     </>
                   )}
                 </>

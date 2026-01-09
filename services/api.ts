@@ -332,17 +332,17 @@ const RealApi = {
         
         // Approval APIs
         approval: {
-            initiate: async (approverId: string, reason: string) => {
+            request: async (approverId: string, reason: string) => {
                 return request<{ success: boolean; authorizationId: string; message: string }>(
                     'POST', 
-                    '/reports/approval/initiate', 
+                    '/reports/approval/request', 
                     { approverId, reason }
                 );
             },
-            complete: async (authorizationId: string, reason: string) => {
-                return request<{ success: boolean; authorization: any; message: string }>(
+            approve: async (authorizationId: string, reason: string) => {
+                return request<{ success: boolean; message: string; requesterName: string }>(
                     'POST', 
-                    '/reports/approval/complete', 
+                    '/reports/approval/approve', 
                     { authorizationId, reason }
                 );
             },
