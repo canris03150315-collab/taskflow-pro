@@ -26,11 +26,11 @@ router.post('/approval/initiate', async (req, res) => {
     const currentUser = req.user;
     const { approverId, reason } = req.body;
     
-    // Check role - must be BOSS or MANAGER
-    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
+    // Check role - must be BOSS, MANAGER, or SUPERVISOR
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER' && currentUser.role !== 'SUPERVISOR') {
       return res.status(403).json({ 
-        error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS \u6216 MANAGER \u53ef\u4ee5\u767c\u8d77\u5be9\u6838' 
-        // Permission denied, only BOSS or MANAGER can initiate
+        error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS\u3001MANAGER \u6216 SUPERVISOR \u53ef\u4ee5\u767c\u8d77\u5be9\u6838' 
+        // Permission denied, only BOSS, MANAGER, or SUPERVISOR can initiate
       });
     }
     
@@ -52,10 +52,10 @@ router.post('/approval/initiate', async (req, res) => {
     }
     
     // Check approver role
-    if (approver.role !== 'BOSS' && approver.role !== 'MANAGER') {
+    if (approver.role !== 'BOSS' && approver.role !== 'MANAGER' && approver.role !== 'SUPERVISOR') {
       return res.status(400).json({ 
-        error: '\u5be9\u6838\u8005\u5fc5\u9808\u662f BOSS \u6216 MANAGER' 
-        // Approver must be BOSS or MANAGER
+        error: '\u5be9\u6838\u8005\u5fc5\u9808\u662f BOSS\u3001MANAGER \u6216 SUPERVISOR' 
+        // Approver must be BOSS, MANAGER, or SUPERVISOR
       });
     }
     
@@ -315,14 +315,20 @@ router.get('/approval/eligible-approvers', async (req, res) => {
     const db = req.db;
     const currentUser = req.user;
     
-    // Get all BOSS and MANAGER users except current user and same department
+    // Get all BOSS, MANAGER, and SUPERVISOR users except current user and same department
     const approvers = await db.all(`
       SELECT id, name, role, department 
       FROM users 
-      WHERE (role = 'BOSS' OR role = 'MANAGER')
+      WHERE (role = 'BOSS' OR role = 'MANAGER' OR role = 'SUPERVISOR')
         AND id != ?
         AND department != ?
-      ORDER BY role DESC, name ASC
+      ORDER BY 
+        CASE role 
+          WHEN 'BOSS' THEN 1 
+          WHEN 'MANAGER' THEN 2 
+          WHEN 'SUPERVISOR' THEN 3 
+        END,
+        name ASC
     `, [currentUser.id, currentUser.department]);
     
     res.json({

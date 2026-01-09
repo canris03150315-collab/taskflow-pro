@@ -218,7 +218,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
         ) : (
             <div>
                 {/* Authorization Status or Request Approval */}
-                {currentUser.role === 'BOSS' || currentUser.role === 'MANAGER' ? (
+                {currentUser.role === 'BOSS' || currentUser.role === 'MANAGER' || currentUser.role === 'SUPERVISOR' ? (
                     <>
                         {/* Show Authorization Status if authorized */}
                         {isAuthorized && authorization ? (
@@ -239,14 +239,14 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                     </div>
                                     <div className="flex-1">
                                         <h3 className="text-xl font-bold text-gray-900">🔒 團隊報表需要雙重審核授權</h3>
-                                        <p className="text-sm text-gray-600 mt-1">為確保資料安全，查看團隊報表需要兩位不同部門的主管審核</p>
+                                        <p className="text-sm text-gray-600 mt-1">為確保資料安全，查看團隊報表需要兩位不同部門的主管/部門主管審核</p>
                                     </div>
                                 </div>
 
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                                     <h4 className="font-semibold text-blue-900 mb-2">📋 審核要求</h4>
                                     <ul className="text-sm text-blue-800 space-y-1">
-                                        <li>✅ 兩位不同部門的主管審核</li>
+                                        <li>✅ 兩位不同部門的主管審核（BOSS/MANAGER/SUPERVISOR）</li>
                                         <li>✅ 授權有效期 30 分鐘</li>
                                         <li>✅ 關閉網頁後需重新審核</li>
                                     </ul>
@@ -298,8 +298,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                     </>
                 ) : null}
 
-                {/* Only show reports if authorized (for BOSS/MANAGER) or always show for other roles */}
-                {(isAuthorized || currentUser.role === 'EMPLOYEE' || currentUser.role === 'SUPERVISOR') && (
+                {/* Only show reports if authorized (for BOSS/MANAGER/SUPERVISOR) or always show for EMPLOYEE */}
+                {(isAuthorized || currentUser.role === 'EMPLOYEE') && (
                     <>
                         {loading ? (
                             <div className="p-8 text-center text-slate-400">載入中...</div>
