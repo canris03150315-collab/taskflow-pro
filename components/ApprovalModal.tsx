@@ -36,10 +36,14 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
 
   const loadEligibleApprovers = async () => {
     try {
+      console.log('[ApprovalModal] Loading eligible approvers...');
       const response = await api.reports.approval.getEligibleApprovers();
+      console.log('[ApprovalModal] API Response:', response);
+      console.log('[ApprovalModal] Approvers:', response.approvers);
+      console.log('[ApprovalModal] Approvers length:', response.approvers?.length || 0);
       setApprovers(response.approvers || []);
     } catch (error) {
-      console.error('Failed to load approvers:', error);
+      console.error('[ApprovalModal] Failed to load approvers:', error);
       toast.error('載入審核者列表失敗');
     }
   };

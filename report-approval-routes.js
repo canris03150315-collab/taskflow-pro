@@ -146,11 +146,11 @@ router.post('/approval/complete', async (req, res) => {
     const currentUser = req.user;
     const { authorizationId, reason } = req.body;
     
-    // Check role
-    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
+    // Check role - must be BOSS, MANAGER, or SUPERVISOR
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER' && currentUser.role !== 'SUPERVISOR') {
       return res.status(403).json({ 
-        error: '\u6b0a\u9650\u4e0d\u8db3' 
-        // Permission denied
+        error: '\u6b0a\u9650\u4e0d\u8db3\uff0c\u53ea\u6709 BOSS\u3001MANAGER \u6216 SUPERVISOR \u53ef\u4ee5\u5be9\u6838' 
+        // Permission denied, only BOSS, MANAGER, or SUPERVISOR can approve
       });
     }
     
