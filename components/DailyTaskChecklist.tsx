@@ -14,26 +14,27 @@ export const DailyTaskChecklist: React.FC<DailyTaskChecklistProps> = ({ currentU
   const [todayRecord, setTodayRecord] = useState<RoutineRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState<number | null>(null);
+  const [selectedDept, setSelectedDept] = useState<string>(currentUser.department);
 
   const isBoss = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
 
   useEffect(() => {
     loadData();
-  }, [currentUser]);
+  }, [currentUser, selectedDept]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
       const allTemplates = await api.routines.getTemplates();
-      // 篩選有 isDaily 標記的模板（每日任務）
+      // 篩選有 isDaily 標記的模板（每日任務）- 顯示選擇的部門任務
       const dailyTemplates = allTemplates.filter(t => 
         (t as any).isDaily && 
-        (t.departmentId === currentUser.department || isBoss)
+        t.departmentId === selectedDept
       );
       setTemplates(dailyTemplates);
 
       // 取得今日紀錄
-      const record = await api.routines.getTodayRecord(currentUser.id, currentUser.department);
+      const record = await api.routines.getTodayRecord(currentUser.id, selectedDept);
       setTodayRecord(record);
     } catch (error) {
       console.error('Failed to load daily tasks:', error);
@@ -94,21 +95,8 @@ export const DailyTaskChecklist: React.FC<DailyTaskChecklistProps> = ({ currentU
   }
 
   if (!todayRecord || !todayRecord.items || todayRecord.items.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4">
-          <h3 className="text-white font-bold text-lg flex items-center gap-2">
-            ✅ 每日任務清單
-          </h3>
-          <p className="text-blue-100 text-sm">{today}</p>
-        </div>
-        <div className="p-8 text-center text-slate-400">
-          <div className="text-4xl mb-3">📋</div>
-          <p className="font-medium">目前沒有每日任務</p>
-          <p className="text-sm mt-1">請聯繫主管設定部門每日任務</p>
-        </div>
-      </div>
-    );
+    // 沒有任務時完全不顯示組件
+    return null;
   }
 
   const completedCount = todayRecord.items.filter(i => i.completed).length;
@@ -118,6 +106,24 @@ export const DailyTaskChecklist: React.FC<DailyTaskChecklistProps> = ({ currentU
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* 部門選擇器（管理階層） */}
+      {isBoss && (
+        <div className="p-4 bg-slate-50 border-b border-slate-200">
+          <label className="block text-sm font-bold text-slate-700 mb-2">
+            🏢 查看部門
+          </label>
+          <select
+            value={selectedDept}
+            onChange={(e) => setSelectedDept(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.id}>{dept.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      
       {/* 標題區 */}
       <div className={`p-4 ${allDone ? 'bg-gradient-to-r from-emerald-500 to-green-500' : 'bg-gradient-to-r from-blue-500 to-indigo-500'}`}>
         <div className="flex items-center justify-between">

@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { User, Role, Permission, DepartmentDef, hasPermission } from '../types';
 import { api } from '../services/api';
 import { compressAvatar, isImageFile } from '../utils/imageUtils';
 import { useToast } from './Toast';
+import { flattenDepartments } from '../utils/departmentUtils';
 
 interface UserModalProps {
   isOpen: boolean;
@@ -146,6 +147,9 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSubmit,
     { value: 'POST_ANNOUNCEMENT', label: '發布公告' },
     { value: 'MANAGE_FORUM', label: '管理論壇提案' },
     { value: 'MANAGE_USERS', label: '管理使用者帳號' },
+    { value: 'MANAGE_DEPARTMENTS', label: '管理部門' },
+    { value: 'APPROVE_LEAVES', label: '審核假期' },
+    { value: 'MANAGE_LEAVE_RULES', label: '設定排假規則' },
     { value: 'SYSTEM_RESET', label: '系統重置 (危險功能)', isDangerous: true },
   ];
 
@@ -158,13 +162,14 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSubmit,
   const canEditSensitive = hasAdminRights && !isSelf;
   
   // Can view password field?
+  // - Creating new user: always show (editingUser is null)
   // - BOSS/MANAGER: can see all users' passwords
   // - SUPERVISOR: can see passwords of users in their department
   // - Self: cannot see password field when editing self
-  const canViewPassword = !isSelf && (
+  const canViewPassword = !editingUser || (!isSelf && (
     isBossOrManager || 
     (currentUser.role === Role.SUPERVISOR && editingUser?.department === currentUser.department)
-  );
+  ));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
@@ -292,8 +297,8 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSubmit,
                 disabled={!canEditSensitive}
                 className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 disabled:bg-slate-100 disabled:text-slate-500"
               >
-                {departments.map(d => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                {flattenDepartments(departments).map(d => (
+                  <option key={d.id} value={d.id}>{d.fullPath}</option>
                 ))}
               </select>
             </div>

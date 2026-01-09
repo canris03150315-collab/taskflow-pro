@@ -1,4 +1,4 @@
-export const compressImage = async (base64: string, maxSizeKB: number = 500): Promise<string> => {
+﻿export const compressImage = async (base64: string, maxSizeKB: number = 500): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {

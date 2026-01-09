@@ -1,6 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User, Task, Role, TaskStatus, DepartmentDef } from '../types';
 import { Badge } from './Badge';
+import { api } from '../services/api';
+
+interface RoutineRecord {
+  id: string;
+  user_id: string;
+  department_id: string;
+  date: string;
+  items: Array<{ task: string; isCompleted: boolean }>;
+}
 
 interface SubordinateViewProps {
   currentUser: User;
@@ -10,6 +19,9 @@ interface SubordinateViewProps {
 }
 
 export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, users, tasks, departments }) => {
+  const [routineRecords, setRoutineRecords] = useState<Record<string, RoutineRecord>>({});
+  const [showRoutines, setShowRoutines] = useState(false);
+
   // View Modes:
   // 'DASHBOARD': Overview of all departments (Boss only)
   // 'DEPT_LIST': Grid of employees in a specific department

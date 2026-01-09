@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
-import { User, Role, DepartmentDef } from '../types';
+import { User, Role, DepartmentDef, hasPermission } from '../types';
 import { DepartmentManager } from './DepartmentManager';
+import { flattenDepartments, getDepartmentFullPath } from '../utils/departmentUtils';
 
 interface PersonnelViewProps {
   currentUser: User;
@@ -30,7 +31,8 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
   const [filterDept, setFilterDept] = useState<string>('ALL');
 
   // Dynamic Map
-  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
+  const getDeptName = (id: string) => getDepartmentFullPath(departments, id);
+  const flatDepts = useMemo(() => flattenDepartments(departments), [departments]);
   const getDeptColor = (id: string) => {
       const theme = departments.find(d => d.id === id)?.theme || 'slate';
       return `border-${theme}-200 bg-${theme}-50`;
@@ -40,7 +42,8 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
     let result = users;
 
     if (currentUser.role === Role.SUPERVISOR) {
-      result = result.filter(u => u.department === currentUser.department);
+      // SUPERVISOR 可以看到自己部門和待分配部門的人員
+      result = result.filter(u => u.department === currentUser.department || u.department === 'UNASSIGNED');
     }
 
     if (currentUser.role === Role.BOSS && filterDept !== 'ALL') {
@@ -265,7 +268,7 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
                 >
                    組織樹狀圖
                 </button>
-                {currentUser.role === Role.BOSS && (
+                {(currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER || hasPermission(currentUser, 'MANAGE_DEPARTMENTS')) && (
                   <button 
                     onClick={() => setViewMode('DEPT_MGMT')}
                     className={`px-3 py-1.5 rounded-md text-sm font-bold transition flex items-center gap-2 ${viewMode === 'DEPT_MGMT' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -282,8 +285,8 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
                 className="px-4 py-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
             >
                 <option value="ALL">🏢 所有部門</option>
-                {departments.map(d => (
-                   <option key={d.id} value={d.id}>{d.name}</option>
+                {flatDepts.map(d => (
+                   <option key={d.id} value={d.id}>{d.fullPath}</option>
                 ))}
             </select>
             )}

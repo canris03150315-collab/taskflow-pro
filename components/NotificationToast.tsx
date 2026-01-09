@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 // 動畫樣式
 const slideInStyle = {

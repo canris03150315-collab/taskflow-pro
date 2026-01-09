@@ -1,6 +1,6 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { DepartmentDef, Urgency, User, Role, Task } from '../types';
+import { flattenDepartments } from '../utils/departmentUtils';
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -244,8 +244,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
                     disabled={!isHighLevel}
                     className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 disabled:bg-slate-100 disabled:text-slate-500 text-base"
                   >
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                    {flattenDepartments(departments).map(d => (
+                      <option key={d.id} value={d.id}>{d.fullPath}</option>
                     ))}
                   </select>
                   {!isHighLevel && (

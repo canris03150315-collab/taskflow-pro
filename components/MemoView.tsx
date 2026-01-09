@@ -24,6 +24,11 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
   const [editingText, setEditingText] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
   
+  // 文字筆記編輯狀態
+  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
+  const [editingMemoContent, setEditingMemoContent] = useState('');
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  
   // 便條內新增項目的輸入狀態
   const [memoInputs, setMemoInputs] = useState<Record<string, string>>({});
 
@@ -37,6 +42,13 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
       editInputRef.current.select();
     }
   }, [editingTodo]);
+
+  useEffect(() => {
+    if (editingMemoId && editTextareaRef.current) {
+      editTextareaRef.current.focus();
+      editTextareaRef.current.select();
+    }
+  }, [editingMemoId]);
 
   const loadMemos = async () => {
     setIsLoading(true);
@@ -59,9 +71,14 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
       createdAt: new Date().toISOString()
     };
 
-    await api.memos.create(newMemo);
-    setMemos([newMemo, ...memos]);
-    setQuickTodoInput('');
+    try {
+      const createdMemo = await api.memos.create(newMemo);
+      setMemos([createdMemo, ...memos]);
+      setQuickTodoInput('');
+    } catch (error) {
+      console.error('新增備忘錄失敗:', error);
+      alert('新增失敗，請稍後再試');
+    }
   };
 
   // 建立文字筆記
@@ -77,9 +94,14 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
       createdAt: new Date().toISOString()
     };
 
-    await api.memos.create(newMemo);
-    setMemos([newMemo, ...memos]);
-    setTextContent('');
+    try {
+      const createdMemo = await api.memos.create(newMemo);
+      setMemos([createdMemo, ...memos]);
+      setTextContent('');
+    } catch (error) {
+      console.error('新增備忘錄失敗:', error);
+      alert('新增失敗，請稍後再試');
+    }
   };
 
   // 在現有便條上追加項目
@@ -107,8 +129,13 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('確定要刪除這張便條嗎？')) {
-      await api.memos.delete(id);
-      setMemos(memos.filter(m => m.id !== id));
+      try {
+        await api.memos.delete(id);
+        setMemos(memos.filter(m => m.id !== id));
+      } catch (error) {
+        console.error('刪除備忘錄失敗:', error);
+        alert('刪除失敗，請稍後再試');
+      }
     }
   };
 
@@ -189,6 +216,40 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
     if (targetMemo) {
       await api.memos.update(targetMemo);
     }
+  };
+
+  // 開始編輯文字筆記
+  const startEditMemo = (memoId: string, currentContent: string) => {
+    setEditingMemoId(memoId);
+    setEditingMemoContent(currentContent);
+  };
+
+  // 儲存文字筆記編輯
+  const saveEditMemo = async () => {
+    if (!editingMemoId || !editingMemoContent.trim()) {
+      setEditingMemoId(null);
+      return;
+    }
+
+    const updatedMemos = memos.map(m => {
+      if (m.id === editingMemoId) {
+        return { ...m, content: editingMemoContent.trim() };
+      }
+      return m;
+    });
+    setMemos(updatedMemos);
+    setEditingMemoId(null);
+
+    const targetMemo = updatedMemos.find(m => m.id === editingMemoId);
+    if (targetMemo) {
+      await api.memos.update(targetMemo);
+    }
+  };
+
+  // 取消編輯文字筆記
+  const cancelEditMemo = () => {
+    setEditingMemoId(null);
+    setEditingMemoContent('');
   };
 
   const colors: { id: Memo['color'], class: string, border: string, ring: string }[] = [
@@ -401,8 +462,36 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
                                 </form>
                             </div>
                         ) : (
-                            <div className="whitespace-pre-wrap leading-relaxed text-slate-800 font-medium">
-                                {memo.content}
+                            <div>
+                                {editingMemoId === memo.id ? (
+                                    <div className="space-y-2">
+                                        <textarea
+                                            ref={editTextareaRef}
+                                            value={editingMemoContent}
+                                            onChange={(e) => setEditingMemoContent(e.target.value)}
+                                            className="w-full p-3 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-400 resize-none min-h-[120px] text-sm font-medium"
+                                        />
+                                        <div className="flex gap-2 justify-end">
+                                            <button
+                                                onClick={cancelEditMemo}
+                                                className="text-xs px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition font-medium"
+                                            >
+                                                取消
+                                            </button>
+                                            <button
+                                                onClick={saveEditMemo}
+                                                disabled={!editingMemoContent.trim()}
+                                                className="text-xs px-3 py-1.5 bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 transition font-medium"
+                                            >
+                                                儲存
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="whitespace-pre-wrap leading-relaxed text-slate-800 font-medium">
+                                        {memo.content}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -411,13 +500,24 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
                        <span className="text-[10px] font-bold text-slate-500/70">
                           {new Date(memo.createdAt).toLocaleString()}
                        </span>
-                       <button 
-                         onClick={() => handleDelete(memo.id)}
-                         className="text-slate-400 hover:text-red-500 bg-white/50 p-1.5 rounded-lg hover:bg-white transition"
-                         title="刪除整張便條"
-                       >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                       </button>
+                       <div className="flex gap-2">
+                          {!isChecklist && (
+                            <button 
+                              onClick={() => startEditMemo(memo.id, memo.content || '')}
+                              className="text-slate-400 hover:text-blue-600 bg-white/50 p-1.5 rounded-lg hover:bg-white transition"
+                              title="編輯筆記"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleDelete(memo.id)}
+                            className="text-slate-400 hover:text-red-500 bg-white/50 p-1.5 rounded-lg hover:bg-white transition"
+                            title="刪除整張便條"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          </button>
+                       </div>
                     </div>
                  </div>
               );

@@ -22,11 +22,11 @@ router.get('/', authenticateToken, requireRole([Role.BOSS, Role.MANAGER, Role.SU
     let query = 'SELECT id, name, role, department, avatar, username, created_at, updated_at FROM users';
     let params: any[] = [];
 
-    // SUPERVISOR 只能看到自己部門的用戶
-    if (currentUser.role === Role.SUPERVISOR) {
-      query += ' WHERE department = ?';
-      params.push(currentUser.department);
-    }
+    // 移除部門限制 - 所有角色都可以看到所有用戶
+  // if (currentUser.role === Role.SUPERVISOR) {
+  //   query += ' WHERE department = ?'
+  //   params.push(currentUser.department)
+  // }  
 
     query += ' ORDER BY role DESC, name ASC';
 

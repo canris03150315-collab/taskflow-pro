@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useMemo, useEffect, useRef, Suspense, lazy } from 'react';
 import { Role, Task, TaskStatus, Urgency, User, DepartmentDef, Announcement, UNASSIGNED_DEPT_ID, Report, ReportType, DailyReportContent, TaskTimelineEntry, FinanceRecord, Suggestion, SuggestionStatus, SuggestionComment, hasPermission, MenuItemId, DEFAULT_MENU_GROUPS, MENU_LABELS, MenuGroup } from './types';
 import { CreateTaskModal } from './components/CreateTaskModal';
@@ -11,9 +11,11 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { api } from './services/api';
 import { NotificationToast, Notification } from './components/NotificationToast';
 import { ToastProvider, useToast } from './components/Toast';
+import { WebSocketClient, WebSocketMessage } from './utils/websocketClient';
 
 // 動態載入大型組件 - 程式碼分割優化
 const SubordinateView = lazy(() => import('./components/SubordinateView').then(m => ({ default: m.SubordinateView })));
+const SubordinateRoutineView = lazy(() => import('./components/SubordinateRoutineView').then(m => ({ default: m.SubordinateRoutineView })));
 const PersonnelView = lazy(() => import('./components/PersonnelView').then(m => ({ default: m.PersonnelView })));
 const BulletinView = lazy(() => import('./components/BulletinView').then(m => ({ default: m.BulletinView })));
 const ReportView = lazy(() => import('./components/ReportView').then(m => ({ default: m.ReportView })));
@@ -27,6 +29,7 @@ const SystemSettingsView = lazy(() => import('./components/SystemSettingsView').
 const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
 const PerformanceView = lazy(() => import('./components/PerformanceView').then(m => ({ default: m.PerformanceView })));
 const SOPView = lazy(() => import('./components/SOPView').then(m => ({ default: m.SOPView })));
+const LeaveManagementView = lazy(() => import('./components/LeaveManagementView').then(m => ({ default: m.LeaveManagementView })));
 const DepartmentDataView = lazy(() => import('./components/DepartmentDataView').then(m => ({ default: m.DepartmentDataView })));
 
 // 載入中骨架屏組件
@@ -43,6 +46,7 @@ const PageSkeleton = () => (
 );
 
 function AppContent() {
+  const toast = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSetupMode, setIsSetupMode] = useState(false);
@@ -56,7 +60,11 @@ function AppContent() {
   const [reports, setReports] = useState<Report[]>([]); 
   const [financeRecords, setFinanceRecords] = useState<FinanceRecord[]>([]); 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
   const [backendVersion, setBackendVersion] = useState<string>('載入中...'); 
+  
+  // WebSocket Client
+  const wsClientRef = useRef<WebSocketClient | null>(null); 
   
   // UI States
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -70,6 +78,7 @@ function AppContent() {
   const [boardTab, setBoardTab] = useState<'my_tasks' | 'available' | 'all' | 'archived'>('all');
   const [selectedTaskCategory, setSelectedTaskCategory] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [teamViewTab, setTeamViewTab] = useState<'tasks' | 'routines'>('tasks');
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -90,7 +99,7 @@ function AppContent() {
 
   const taskListRef = useRef<HTMLDivElement>(null);
 
-  const loadData = async () => {
+  const loadData = async (skipUserRestore = false) => {
         setIsLoading(true);
         try {
             // First check if setup is needed
@@ -101,10 +110,37 @@ function AppContent() {
                 return;
             }
 
-            // Try to restore login session from token
-            const user = await api.auth.verify();
-            if (user) {
-                setCurrentUser(user);
+            // Try to restore login session from token (only on initial load)
+            if (!skipUserRestore) {
+                const token = localStorage.getItem('auth_token');
+                if (token) {
+                    try {
+                        // Decode token to get user ID
+                        const payload = JSON.parse(atob(token.split('.')[1]));
+                        console.log('[App] Restoring session for user:', payload.id);
+                        
+                        // Fetch all users to find current user
+                        const users = await api.users.getAll();
+                        const currentUserData = users.find(u => u.id === payload.id);
+                        
+                        if (currentUserData) {
+                            console.log('[App] Session restored:', currentUserData.name);
+                            setCurrentUser(currentUserData);
+                        } else {
+                            console.warn('[App] User not found in database, clearing token');
+                            localStorage.removeItem('auth_token');
+                        }
+                    } catch (error) {
+                        // Only clear token if it's a 401 (unauthorized)
+                        if (error instanceof Error && error.message.includes('401')) {
+                            console.error('[App] Token invalid (401), clearing');
+                            localStorage.removeItem('auth_token');
+                        } else {
+                            // For other errors (network, etc), keep token and try again later
+                            console.warn('[App] Failed to restore session, but keeping token:', error);
+                        }
+                    }
+                }
             }
 
             // If setup is complete, load all data
@@ -117,6 +153,7 @@ function AppContent() {
                 api.reports.getAll(),
                 api.finance.getAll(),
                 api.forum.getAll(),
+                api.leaves.getAll(),
                 api.system.getSettings(),
                 fetch('/api/version').then(r => r.json())
             ]);
@@ -129,11 +166,12 @@ function AppContent() {
             if (results[4].status === 'fulfilled') setReports(Array.isArray(results[4].value) ? results[4].value : []);
             if (results[5].status === 'fulfilled') setFinanceRecords(Array.isArray(results[5].value) ? results[5].value : []);
             if (results[6].status === 'fulfilled') setSuggestions(Array.isArray(results[6].value) ? results[6].value : []);
-            if (results[7].status === 'fulfilled' && results[7].value.menuGroups) {
-                setMenuGroups(results[7].value.menuGroups);
+            if (results[7].status === 'fulfilled') setLeaves(Array.isArray(results[7].value) ? results[7].value : []);
+            if (results[8].status === 'fulfilled' && results[8].value.menuGroups) {
+                setMenuGroups(results[8].value.menuGroups);
             }
-            if (results[8].status === 'fulfilled') {
-                setBackendVersion(results[8].value.version || '未知');
+            if (results[9].status === 'fulfilled') {
+                setBackendVersion(results[9].value.version || '未知');
             }
         } catch (err) {
             console.error("Failed to load initial data", err);
@@ -145,6 +183,121 @@ function AppContent() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // WebSocket 即時更新監聽
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // 初始化 WebSocket 連接
+    // 使用 Cloudflare Tunnel 提供有效的 HTTPS/WSS
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://mechanics-copy-sheer-vendors.trycloudflare.com/ws';
+    console.log('[WebSocket] 連接到:', wsUrl);
+    const wsClient = new WebSocketClient(wsUrl);
+    wsClientRef.current = wsClient;
+
+    const token = localStorage.getItem('auth_token');
+    
+    wsClient.connect(token || undefined).then(() => {
+      console.log('[WebSocket] 已連接');
+      
+      // 發送認證訊息
+      wsClient.sendMessage('AUTH', { userId: currentUser.id });
+      
+      // 添加訊息處理器
+      const handleMessage = async (msg: WebSocketMessage) => {
+        console.log('[WebSocket] 收到事件:', msg.type);
+        
+        // 人員管理事件
+        if (msg.type === 'USER_CREATED' || msg.type === 'USER_UPDATED' || msg.type === 'USER_DELETED') {
+          try {
+            const updatedUsers = await api.users.getAll();
+            setUsers(Array.isArray(updatedUsers) ? updatedUsers : []);
+            toast.success('人員資料已更新');
+          } catch (error) {
+            console.error('更新人員資料失敗:', error);
+          }
+        }
+        
+        // 任務管理事件
+        if (msg.type === 'TASK_CREATED' || msg.type === 'TASK_UPDATED' || msg.type === 'TASK_DELETED') {
+          try {
+            const updatedTasks = await api.tasks.getAll();
+            setTasks(Array.isArray(updatedTasks) ? updatedTasks : []);
+            toast.success('任務資料已更新');
+          } catch (error) {
+            console.error('更新任務資料失敗:', error);
+          }
+        }
+        
+        // 財務管理事件
+        if (msg.type === 'FINANCE_CREATED' || msg.type === 'FINANCE_UPDATED' || msg.type === 'FINANCE_DELETED') {
+          try {
+            const updatedFinance = await api.finance.getAll();
+            setFinanceRecords(Array.isArray(updatedFinance) ? updatedFinance : []);
+            toast.success('財務資料已更新');
+          } catch (error) {
+            console.error('更新財務資料失敗:', error);
+          }
+        }
+        
+        // 部門管理事件
+        if (msg.type === 'DEPARTMENT_CREATED' || msg.type === 'DEPARTMENT_UPDATED' || msg.type === 'DEPARTMENT_DELETED') {
+          try {
+            const updatedDepts = await api.departments.getAll();
+            setDepartments(Array.isArray(updatedDepts) ? updatedDepts : []);
+            toast.success('部門資料已更新');
+          } catch (error) {
+            console.error('更新部門資料失敗:', error);
+          }
+        }
+        
+        // 公告系統事件
+        if (msg.type === 'ANNOUNCEMENT_CREATED' || msg.type === 'ANNOUNCEMENT_UPDATED' || msg.type === 'ANNOUNCEMENT_DELETED') {
+          try {
+            const updatedAnnouncements = await api.announcements.getAll();
+            setAnnouncements(Array.isArray(updatedAnnouncements) ? updatedAnnouncements : []);
+            toast.success('公告資料已更新');
+          } catch (error) {
+            console.error('更新公告資料失敗:', error);
+          }
+        }
+        
+        // 報表系統事件
+        if (msg.type === 'REPORT_CREATED' || msg.type === 'REPORT_UPDATED' || msg.type === 'REPORT_DELETED') {
+          try {
+            const updatedReports = await api.reports.getAll();
+            setReports(Array.isArray(updatedReports) ? updatedReports : []);
+            toast.success('報表資料已更新');
+          } catch (error) {
+            console.error('更新報表資料失敗:', error);
+          }
+        }
+        
+        // 建議系統事件
+        if (msg.type === 'SUGGESTION_CREATED' || msg.type === 'SUGGESTION_UPDATED' || msg.type === 'SUGGESTION_DELETED') {
+          try {
+            const updatedSuggestions = await api.forum.getAll();
+            setSuggestions(Array.isArray(updatedSuggestions) ? updatedSuggestions : []);
+            toast.success('建議資料已更新');
+          } catch (error) {
+            console.error('更新建議資料失敗:', error);
+          }
+        }
+      };
+      
+      wsClient.addMessageHandler(handleMessage);
+    }).catch(error => {
+      console.error('[WebSocket] 連接失敗:', error);
+    });
+
+    // 清理函數
+    return () => {
+      if (wsClientRef.current) {
+        wsClientRef.current.disconnect();
+        wsClientRef.current = null;
+      }
+    };
+  }, [currentUser, toast]);
 
   useEffect(() => {
     if (currentUser) {
@@ -197,10 +350,11 @@ function AppContent() {
       });
     }
     
-    // 檢查公開的可接取任務
+    // 檢查公開的可接取任務（排除已指定特定人員的任務）
     const openTasks = tasks.filter(t => 
       !t.isArchived && 
-      t.status === TaskStatus.OPEN
+      t.status === TaskStatus.OPEN &&
+      !t.assignedToUserId  // 只通知真正公開的任務，不包含已指定人員的任務
     );
     
     if (openTasks.length > 0) {
@@ -411,17 +565,46 @@ function AppContent() {
         completionNotes: isComplete ? note : task.completionNotes,
         progress: progress,
         timeline: [newEntry, ...(task.timeline || [])],
-        unreadUpdatesForUserIds: Array.from(unreadList)
+        unreadUpdatesForUserIds: Array.from(unreadList),
+        note: note
     };
 
+    console.log('[App] 更新進度 - 發送數據:', {
+        taskId,
+        progress,
+        note,
+        isComplete,
+        updatedTask
+    });
+    
     await api.tasks.update(updatedTask);
-    setTasks(tasks.map(t => t.id === taskId ? updatedTask : t));
+    
+    // 重新從後端獲取完整的任務數據（包含 timeline）
+    try {
+        console.log('[App] 重新獲取任務數據:', taskId);
+        const refreshedTask = await api.tasks.getById(taskId);
+        console.log('[App] 獲取到的任務數據:', {
+            taskId: refreshedTask.id,
+            hasTimeline: !!refreshedTask.timeline,
+            timelineLength: refreshedTask.timeline?.length || 0,
+            timeline: refreshedTask.timeline
+        });
+        setTasks(tasks.map(t => t.id === taskId ? refreshedTask : t));
+    } catch (error) {
+        console.error('[App] 重新獲取任務失敗:', error);
+        // 如果獲取失敗，使用本地更新的數據
+        setTasks(tasks.map(t => t.id === taskId ? updatedTask : t));
+    }
   };
 
   const handleArchiveTask = async (taskId: string) => {
       try {
-          // 使用 snake_case 格式傳遞給後端
-          await api.tasks.updateProgress(taskId, { isArchived: true });
+          const task = tasks.find(t => t.id === taskId);
+          if (!task) return;
+          
+          // 使用 PUT 路由更新任務
+          const updatedTask = { ...task, isArchived: true, is_archived: true };
+          await api.tasks.update(updatedTask);
           setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: true } : t));
           console.log('✅ 任務封存成功:', taskId);
       } catch (error) {
@@ -489,9 +672,16 @@ function AppContent() {
       ? { id: editingUser.id, name: userData.name, avatar: userData.avatar }
       : { ...editingUser, ...userData };
     
-    await api.users.update(dataToSend);
+    console.log('[DEBUG] Sending to API:', dataToSend);
+    console.log('[DEBUG] Permissions in dataToSend:', dataToSend.permissions);
     
-    const updatedUser = { ...editingUser, ...userData };
+    // 使用後端返回的完整用戶數據（包含 permissions）
+    const response = await api.users.update(dataToSend);
+    const updatedUser = response.user || response;
+    
+    console.log('[DEBUG] Received from API:', updatedUser);
+    console.log('[DEBUG] Permissions in updatedUser:', updatedUser.permissions);
+    
     setUsers(users.map(u => u.id === editingUser.id ? updatedUser : u));
     if (isSelf) {
         setCurrentUser(updatedUser);
@@ -540,6 +730,8 @@ function AppContent() {
 
   const handleCreateAnnouncement = async (data: any) => {
       if(!currentUser) return;
+      console.log('[App] Creating announcement with data:', data);
+      console.log('[App] Images from modal:', data.images);
       const newAnn: Announcement = {
           id: `ann-${Date.now()}`,
           ...data,
@@ -547,16 +739,49 @@ function AppContent() {
           createdBy: currentUser.id,
           readBy: []
       };
+      console.log('[App] Final announcement object:', newAnn);
+      console.log('[App] Images in final object:', newAnn.images);
       await api.announcements.create(newAnn);
       setAnnouncements([newAnn, ...announcements]);
   };
 
   const handleConfirmRead = async (annId: string) => {
       if(!currentUser) return;
-      await api.announcements.markRead(annId, currentUser.id);
-      setAnnouncements(announcements.map(a => 
-          a.id === annId ? { ...a, readBy: [...a.readBy, currentUser.id] } : a
-      ));
+      try {
+          await api.announcements.markRead(annId, currentUser.id);
+          // 重新加載公告列表以確保前後端狀態同步
+          const updatedAnnouncements = await api.announcements.getAll();
+          setAnnouncements(Array.isArray(updatedAnnouncements) ? updatedAnnouncements : []);
+          toast.success('已確認閱讀');
+      } catch (error) {
+          console.error('標記已讀失敗:', error);
+          toast.error('標記已讀失敗');
+      }
+  };
+
+  const handleUpdateAnnouncement = async (id: string, data: Partial<Announcement>) => {
+      if(!currentUser) return;
+      try {
+          const updated = await api.announcements.update(id, data);
+          setAnnouncements(announcements.map(a => a.id === id ? updated : a));
+          toast.success('公告已更新');
+      } catch (error) {
+          console.error('Update announcement error:', error);
+          toast.error('更新公告失敗');
+      }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+      if(!currentUser) return;
+      if(!window.confirm('確定要刪除此公告嗎？')) return;
+      try {
+          await api.announcements.delete(id);
+          setAnnouncements(announcements.filter(a => a.id !== id));
+          toast.success('公告已刪除');
+      } catch (error) {
+          console.error('Delete announcement error:', error);
+          toast.error('刪除公告失敗');
+      }
   };
 
   const handleCreateReport = async (content: DailyReportContent, type: ReportType) => {
@@ -569,8 +794,9 @@ function AppContent() {
           createdAt: new Date().toISOString().split('T')[0],
           content
       };
-      await api.reports.create(newReport);
-      setReports([newReport, ...reports]);
+      const savedReport = await api.reports.create(newReport);
+      // 使用後端返回的完整報表對象（已在 api.ts 中處理）
+      setReports([savedReport, ...reports]);
       setReportProcessing(false);
       setIsCreatingReport(false);
   };
@@ -698,9 +924,29 @@ function AppContent() {
     if (!Array.isArray(tasks)) return [];
     let filtered = tasks;
 
+    console.log('[App] displayedTasks 計算:', {
+        boardTab,
+        totalTasks: tasks.length,
+        tasksWithArchiveStatus: tasks.map(t => ({
+            id: t.id,
+            title: t.title,
+            isArchived: t.isArchived,
+            status: t.status
+        }))
+    });
+
     if (boardTab === 'archived') {
         // 已封存或已取消的任務都顯示在此分頁
         filtered = filtered.filter(t => t.isArchived || t.status === TaskStatus.CANCELLED);
+        console.log('[App] 封存頁篩選結果:', {
+            filteredCount: filtered.length,
+            filtered: filtered.map(t => ({
+                id: t.id,
+                title: t.title,
+                isArchived: t.isArchived,
+                status: t.status
+            }))
+        });
     } else {
         // 排除已封存和已取消的任務
         filtered = filtered.filter(t => !t.isArchived && t.status !== TaskStatus.CANCELLED);
@@ -752,8 +998,8 @@ function AppContent() {
       !t.isArchived && (
         // 新分配給我的任務（ASSIGNED 狀態且尚未接受）
         (t.status === TaskStatus.ASSIGNED && t.assignedToUserId === currentUser.id) ||
-        // 公開任務（OPEN 狀態，任何人都可以接取）
-        (t.status === TaskStatus.OPEN) ||
+        // 公開任務（OPEN 狀態且未指定特定人員，任何人都可以接取）
+        (t.status === TaskStatus.OPEN && !t.assignedToUserId) ||
         // 有未讀更新的任務
         (t.unreadUpdatesForUserIds?.includes(currentUser.id))
       )
@@ -814,7 +1060,22 @@ function AppContent() {
             <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-xl">🏢</div>
             <h1 className="text-lg font-black text-slate-800 tracking-tight leading-none">企業管理系統</h1>
           </div>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                loadData(true);
+                toast.success('資料已更新');
+              }} 
+              className="hidden md:flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition active:scale-95"
+              title="手動更新所有資料"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="text-sm font-bold">更新資料</span>
+            </button>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+          </div>
         </div>
 
         <div className="p-6">
@@ -850,23 +1111,65 @@ function AppContent() {
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-white md:bg-slate-50">
-        <header className="bg-white border-b border-slate-200 py-4 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
-           <div className="flex items-center gap-4">
-              <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-slate-500"><svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight">{MENU_LABELS[currentPage]?.label}</h2>
+        <header className="bg-white border-b border-slate-200 py-3 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
+           <div className="flex items-center gap-3">
+              <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-slate-500 active:scale-95 transition"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+              <h2 className="text-lg md:text-xl font-black text-slate-800 tracking-tight truncate">{MENU_LABELS[currentPage]?.label}</h2>
            </div>
            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs font-bold text-slate-400">已連線</span>
+              <button 
+                onClick={() => {
+                  loadData(true);
+                  toast.success('資料已更新');
+                }} 
+                className="md:hidden p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition active:scale-95"
+                title="更新資料"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <div className="hidden md:flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="text-xs font-bold text-slate-400">已連線</span>
+              </div>
            </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-8 pb-20 md:pb-8">
            <Suspense fallback={<PageSkeleton />}>
              {currentPage === 'dashboard' && <DashboardView currentUser={currentUser} tasks={tasks} announcements={announcements} reports={reports} departments={departments} onChangePage={setCurrentPage} />}
-             {currentPage === 'bulletin' && <BulletinView currentUser={currentUser} announcements={announcements} users={users} departments={departments} onCreateAnnouncement={handleCreateAnnouncement} onConfirmRead={handleConfirmRead} />}
+             {currentPage === 'bulletin' && <BulletinView currentUser={currentUser} announcements={announcements} users={users} departments={departments} onCreateAnnouncement={handleCreateAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onConfirmRead={handleConfirmRead} />}
+             {currentPage === 'leaves' && <LeaveManagementView currentUser={currentUser} users={users} departments={departments} leaves={leaves} onRefresh={() => loadData(true)} />}
              {currentPage === 'personnel' && <PersonnelView currentUser={currentUser} users={users} departments={departments} onAddUser={() => { setEditingUser(null); setUserModalOpen(true); }} onEditUser={(u) => { setEditingUser(u); setUserModalOpen(true); }} onDeleteUser={handleDeleteUser} onAddDepartment={handleAddDepartment} onUpdateDepartment={handleUpdateDepartment} onDeleteDepartment={handleDeleteDepartment} />}
-             {currentPage === 'team' && <SubordinateView currentUser={currentUser} users={users} tasks={tasks} departments={departments} />}
+             {currentPage === 'team' && (
+               <div className="space-y-4">
+                 <div className="flex gap-2 border-b border-slate-200 pb-2">
+                   <button
+                     onClick={() => setTeamViewTab('tasks')}
+                     className={`px-4 py-2 rounded-lg font-bold transition ${
+                       teamViewTab === 'tasks'
+                         ? 'bg-blue-600 text-white'
+                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                     }`}
+                   >
+                     📋 任務狀況
+                   </button>
+                   <button
+                     onClick={() => setTeamViewTab('routines')}
+                     className={`px-4 py-2 rounded-lg font-bold transition ${
+                       teamViewTab === 'routines'
+                         ? 'bg-blue-600 text-white'
+                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                     }`}
+                   >
+                     ✓ 每日任務執行狀況
+                   </button>
+                 </div>
+                 {teamViewTab === 'tasks' && <SubordinateView currentUser={currentUser} users={users} tasks={tasks} departments={departments} />}
+                 {teamViewTab === 'routines' && <SubordinateRoutineView currentUser={currentUser} users={users} departments={departments} />}
+               </div>
+             )}
              {currentPage === 'reports' && (isCreatingReport ? <CreateReportView onCancel={() => setIsCreatingReport(false)} onSubmit={handleCreateReport} isProcessing={isReportProcessing} /> : <ReportView currentUser={currentUser} users={users} reports={reports} departments={departments} onCreateClick={() => setIsCreatingReport(true)} onOpenReportModal={() => setIsCreatingReport(true)} />)}
              {currentPage === 'finance' && <FinanceView currentUser={currentUser} users={users} departments={departments} records={financeRecords} onAddRecord={handleAddFinanceRecord} onConfirmRecord={handleConfirmFinanceRecord} onDeleteRecord={handleDeleteFinanceRecord} />}
              {currentPage === 'data_center' && <DepartmentDataView currentUser={currentUser} users={users} departments={departments} tasks={tasks} reports={reports} financeRecords={financeRecords} />}
@@ -938,8 +1241,54 @@ function AppContent() {
       {/* 任務通知 */}
       <NotificationToast notifications={notifications} onDismiss={dismissNotification} />
       
+      {/* 手機底部導航欄 */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 safe-area-pb">
+        <div className="flex items-center justify-around px-2 py-2">
+          <button
+            onClick={() => { setCurrentPage('dashboard'); setIsMobileMenuOpen(false); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition active:scale-95 ${currentPage === 'dashboard' ? 'text-blue-600' : 'text-slate-400'}`}
+          >
+            <span className="text-xl">{MENU_LABELS['dashboard']?.icon}</span>
+            <span className="text-[10px] font-bold">首頁</span>
+          </button>
+          <button
+            onClick={() => { setCurrentPage('tasks'); setIsMobileMenuOpen(false); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition active:scale-95 ${currentPage === 'tasks' ? 'text-blue-600' : 'text-slate-400'}`}
+          >
+            <span className="text-xl">{MENU_LABELS['tasks']?.icon}</span>
+            <span className="text-[10px] font-bold">任務</span>
+          </button>
+          <button
+            onClick={() => { setCurrentPage('chat'); setIsMobileMenuOpen(false); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition active:scale-95 relative ${currentPage === 'chat' ? 'text-blue-600' : 'text-slate-400'}`}
+          >
+            <span className="text-xl">{MENU_LABELS['chat']?.icon}</span>
+            {unreadChatCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {unreadChatCount > 9 ? '9+' : unreadChatCount}
+              </span>
+            )}
+            <span className="text-[10px] font-bold">聊天</span>
+          </button>
+          <button
+            onClick={() => { setCurrentPage('data_center'); setIsMobileMenuOpen(false); }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition active:scale-95 ${currentPage === 'data_center' ? 'text-blue-600' : 'text-slate-400'}`}
+          >
+            <span className="text-xl">{MENU_LABELS['data_center']?.icon}</span>
+            <span className="text-[10px] font-bold">數據</span>
+          </button>
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition active:scale-95 text-slate-400"
+          >
+            <span className="text-xl">☰</span>
+            <span className="text-[10px] font-bold">更多</span>
+          </button>
+        </div>
+      </nav>
+
       {/* 版本號顯示 */}
-      <div className="fixed bottom-2 right-2 text-xs text-slate-400 bg-white/80 px-2 py-1 rounded shadow-sm">
+      <div className="hidden md:block fixed bottom-2 right-2 text-xs text-slate-400 bg-white/80 px-2 py-1 rounded shadow-sm">
         後端版本: {backendVersion}
       </div>
     </div>

@@ -3,6 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, Task, Report, FinanceRecord, AttendanceRecord, PerformanceReview, DepartmentDef, Role } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import { flattenDepartments, getDepartmentFullPath } from '../utils/departmentUtils';
+import { ManualAttendanceModal } from './ManualAttendanceModal';
 
 declare global {
   interface Window {
@@ -48,8 +50,17 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([]);
   const [performanceData, setPerformanceData] = useState<PerformanceReview[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isManualAttendanceModalOpen, setIsManualAttendanceModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [editClockIn, setEditClockIn] = useState('');
+  const [editClockOut, setEditClockOut] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [summaryUserId, setSummaryUserId] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
 
   const isBoss = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
+  const canManualAttendance = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER || currentUser.role === Role.SUPERVISOR;
 
   // Initialize Data
   useEffect(() => {
@@ -69,8 +80,56 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
     fetchAsyncData();
   }, [startDate]); // Refetch if month changes for performance reviews (simplified logic)
 
+  // Handle manual attendance success
+  const handleManualAttendanceSuccess = async () => {
+    try {
+      const att = await api.attendance.getHistory();
+      setAttendanceData(att);
+      toast.success('出勤記錄已更新');
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Handle edit manual attendance
+  const handleEditClick = (record: AttendanceRecord) => {
+    setEditingRecord(record);
+    setEditClockIn(new Date(record.clockIn).toTimeString().slice(0, 5));
+    setEditClockOut(record.clockOut ? new Date(record.clockOut).toTimeString().slice(0, 5) : '');
+    setEditReason((record as any).manualReason || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingRecord) return;
+    try {
+      await api.attendance.updateManualEntry(editingRecord.id, editClockIn, editClockOut, editReason);
+      const att = await api.attendance.getHistory();
+      setAttendanceData(att);
+      setIsEditModalOpen(false);
+      setEditingRecord(null);
+      toast.success('補登記錄已更新');
+    } catch (e: any) {
+      toast.error(e.message || '更新失敗');
+    }
+  };
+
+  // Handle delete attendance record
+  const handleDeleteAttendance = async (id: string) => {
+    if (!confirm('確定要刪除此打卡記錄嗎？此操作無法復原。')) return;
+    try {
+      await api.attendance.delete(id);
+      const att = await api.attendance.getHistory();
+      setAttendanceData(att);
+      toast.success('打卡記錄已刪除');
+    } catch (e: any) {
+      toast.error(e.message || '刪除失敗');
+    }
+  };
+
   // --- Helpers ---
-  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
+  const getDeptName = (id: string) => getDepartmentFullPath(departments, id);
+  const flatDepts = useMemo(() => flattenDepartments(departments), [departments]);
   const getUserName = (id?: string) => users.find(u => u.id === id)?.name || 'Unknown';
   const getUserDept = (userId: string) => {
       const u = users.find(user => user.id === userId);
@@ -86,15 +145,43 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
   const targetUserIds = filteredUsers.map(u => u.id);
 
   const filterByDate = (dateStr: string) => {
-      if (!dateStr) return false;
       const d = dateStr.split('T')[0];
       return d >= startDate && d <= endDate;
   };
 
   // 1. Attendance Data
-  const displayAttendance = attendanceData.filter(r => 
-      targetUserIds.includes(r.userId) && filterByDate(r.date)
-  ).sort((a,b) => b.date.localeCompare(a.date));
+  const displayAttendance = attendanceData.filter(r => {
+      const inDateRange = filterByDate(r.date);
+      const matchesDept = filterDept === 'ALL' || getUserDept(r.userId) === filterDept;
+      const matchesStatus = filterStatus === 'ALL' || r.status === filterStatus;
+      return inDateRange && matchesDept && matchesStatus;
+  }).sort((a,b) => b.date.localeCompare(a.date));
+
+  // Attendance Summary Statistics (filtered by selected user)
+  const summaryAttendance = useMemo(() => {
+    if (summaryUserId === 'ALL') return displayAttendance;
+    return displayAttendance.filter(r => r.userId === summaryUserId);
+  }, [displayAttendance, summaryUserId]);
+
+  const attendanceSummary = useMemo(() => {
+    const totalMinutes = summaryAttendance.reduce((sum, r) => sum + (r.durationMinutes || 0), 0);
+    const totalDays = summaryAttendance.length;
+    const manualCount = summaryAttendance.filter(r => r.isManual).length;
+    const avgMinutes = totalDays > 0 ? Math.round(totalMinutes / totalDays) : 0;
+    const onlineCount = summaryAttendance.filter(r => r.status === 'ONLINE').length;
+    const offlineCount = summaryAttendance.filter(r => r.status === 'OFFLINE').length;
+    
+    return {
+      totalHours: Math.floor(totalMinutes / 60),
+      totalMins: totalMinutes % 60,
+      totalDays,
+      avgHours: Math.floor(avgMinutes / 60),
+      avgMins: avgMinutes % 60,
+      manualCount,
+      onlineCount,
+      offlineCount
+    };
+  }, [summaryAttendance]);
 
   // 2. Reports Data
   const displayReports = reports.filter(r => 
@@ -219,13 +306,24 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                 </h2>
                 <p className="text-sm text-slate-500 font-bold mt-1">匯出部門各項營運數據與報表</p>
             </div>
-            <button 
-                onClick={handleExport}
-                className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg shadow-emerald-200 transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
-            >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                匯出 Excel 報表
-            </button>
+            <div className="flex gap-3">
+                {canManualAttendance && (
+                    <button 
+                        onClick={() => setIsManualAttendanceModalOpen(true)}
+                        className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg shadow-blue-200 transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        補登打卡
+                    </button>
+                )}
+                <button 
+                    onClick={handleExport}
+                    className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-lg shadow-emerald-200 transition transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    匯出 Excel 報表
+                </button>
+            </div>
         </div>
 
         {/* Filters - Stack on mobile, Row on Desktop */}
@@ -250,7 +348,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                         className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="ALL">🏢 全公司</option>
-                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        {flatDepts.map(d => <option key={d.id} value={d.id}>{d.fullPath}</option>)}
                     </select>
                 ) : (
                     <div className="w-full sm:w-auto px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm font-bold text-slate-500 cursor-not-allowed">
@@ -258,6 +356,24 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                     </div>
                 )}
             </div>
+
+            {activeTab === 'ATTENDANCE' && (
+                <>
+                    <div className="w-full h-px bg-slate-200 md:w-px md:h-6"></div>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full md:w-auto">
+                        <span className="text-xs font-bold text-slate-400 uppercase whitespace-nowrap">狀態</span>
+                        <select 
+                            value={filterStatus} 
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="w-full sm:w-auto px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="ALL">全部</option>
+                            <option value="ONLINE">🟢 上班中</option>
+                            <option value="OFFLINE">⚫ 已下班</option>
+                        </select>
+                    </div>
+                </>
+            )}
         </div>
 
         {/* Tabs - Scrollable on mobile */}
@@ -285,12 +401,68 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
             
             {!isLoading && (
                 <>
+                    {/* Attendance Summary */}
+                    {activeTab === 'ATTENDANCE' && displayAttendance.length > 0 && (
+                        <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg">📊</span>
+                                    <h3 className="font-bold text-slate-700">出勤統計總覽</h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-sm text-slate-600">選擇員工：</label>
+                                    <select 
+                                        value={summaryUserId} 
+                                        onChange={e => setSummaryUserId(e.target.value)}
+                                        className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-white"
+                                    >
+                                        <option value="ALL">全部員工</option>
+                                        {filteredUsers.map(u => (
+                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                    {summaryUserId !== 'ALL' && (
+                                        <span className="text-xs text-blue-600 font-medium">
+                                            {getUserName(summaryUserId)} 的統計
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
+                                    <div className="text-xs text-slate-500 mb-1">出勤天數</div>
+                                    <div className="text-xl font-bold text-blue-600">{attendanceSummary.totalDays} <span className="text-sm font-normal">天</span></div>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
+                                    <div className="text-xs text-slate-500 mb-1">總工時</div>
+                                    <div className="text-xl font-bold text-emerald-600">{attendanceSummary.totalHours}h {attendanceSummary.totalMins}m</div>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
+                                    <div className="text-xs text-slate-500 mb-1">平均工時</div>
+                                    <div className="text-xl font-bold text-indigo-600">{attendanceSummary.avgHours}h {attendanceSummary.avgMins}m</div>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
+                                    <div className="text-xs text-slate-500 mb-1">線上打卡</div>
+                                    <div className="text-xl font-bold text-emerald-500">{attendanceSummary.onlineCount} <span className="text-sm font-normal">次</span></div>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
+                                    <div className="text-xs text-slate-500 mb-1">離線打卡</div>
+                                    <div className="text-xl font-bold text-slate-500">{attendanceSummary.offlineCount} <span className="text-sm font-normal">次</span></div>
+                                </div>
+                                <div className="bg-white rounded-lg p-3 shadow-sm border border-slate-100">
+                                    <div className="text-xs text-slate-500 mb-1">補登次數</div>
+                                    <div className="text-xl font-bold text-orange-500">{attendanceSummary.manualCount} <span className="text-sm font-normal">次</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Desktop View: Table */}
                     <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase whitespace-nowrap">
                                 {activeTab === 'ATTENDANCE' && (
-                                    <tr><th className="p-4">日期</th><th className="p-4">姓名</th><th className="p-4">部門</th><th className="p-4">上班</th><th className="p-4">下班</th><th className="p-4">工時</th><th className="p-4">狀態</th></tr>
+                                    <tr><th className="p-4">日期</th><th className="p-4">姓名</th><th className="p-4">部門</th><th className="p-4">上班</th><th className="p-4">下班</th><th className="p-4">工時</th><th className="p-4">狀態</th><th className="p-4">備註</th></tr>
                                 )}
                                 {activeTab === 'REPORTS' && (
                                     <tr><th className="p-4">日期</th><th className="p-4">姓名</th><th className="p-4 text-right">充值</th><th className="p-4 text-right">提現</th><th className="p-4 text-right">淨入</th><th className="p-4 text-right">註冊</th><th className="p-4">備註</th></tr>
@@ -315,6 +487,15 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                                         <td className="p-4 font-mono">{r.clockOut ? new Date(r.clockOut).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '-'}</td>
                                         <td className="p-4">{r.durationMinutes ? `${Math.floor(r.durationMinutes / 60)}h ${r.durationMinutes % 60}m` : '0h'}</td>
                                         <td className="p-4"><span className={`px-2 py-0.5 rounded text-xs font-bold ${r.status === 'ONLINE' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{r.status}</span></td>
+                                        <td className="p-4 flex gap-1 items-center">
+                                            {r.isManual && <span className="px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-600">補登</span>}
+                                            {r.isManual && canManualAttendance && (
+                                                <button onClick={() => handleEditClick(r)} className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-600 hover:bg-blue-200">編輯</button>
+                                            )}
+                                            {canManualAttendance && (
+                                                <button onClick={() => handleDeleteAttendance(r.id)} className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600 hover:bg-red-200">刪除</button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                                 {activeTab === 'REPORTS' && displayReports.map(r => (
@@ -368,7 +549,10 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                             <div key={r.id} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                                 <div className="flex justify-between items-center mb-2">
                                     <span className="text-slate-500 text-sm font-mono">{r.date}</span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${r.status === 'ONLINE' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{r.status}</span>
+                                    <div className="flex gap-1">
+                                        {r.isManual && <span className="px-2 py-0.5 rounded text-xs font-bold bg-orange-100 text-orange-600">補登</span>}
+                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${r.status === 'ONLINE' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{r.status}</span>
+                                    </div>
                                 </div>
                                 <div className="font-bold text-slate-800 text-lg mb-1">{getUserName(r.userId)}</div>
                                 <div className="text-xs text-slate-400 mb-3">{getDeptName(getUserDept(r.userId))}</div>
@@ -467,8 +651,54 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                     {activeTab === 'FINANCE' && displayFinance.length === 0 && <div className="p-8 text-center text-slate-400">無財務資料</div>}
                     {activeTab === 'PERFORMANCE' && displayPerformance.length === 0 && <div className="p-8 text-center text-slate-400">無績效資料</div>}
                 </>
-            )}
+                )}
         </div>
+
+        {/* Manual Attendance Modal */}
+        <ManualAttendanceModal
+          isOpen={isManualAttendanceModalOpen}
+          onClose={() => setIsManualAttendanceModalOpen(false)}
+          users={users}
+          currentUser={currentUser}
+          onSuccess={handleManualAttendanceSuccess}
+        />
+
+        {/* Edit Manual Attendance Modal */}
+        {isEditModalOpen && editingRecord && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">編輯補登記錄</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">員工</label>
+                  <input type="text" value={getUserName(editingRecord.userId)} disabled className="w-full px-3 py-2 border rounded-lg bg-slate-100 text-slate-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">日期</label>
+                  <input type="text" value={editingRecord.date} disabled className="w-full px-3 py-2 border rounded-lg bg-slate-100 text-slate-500" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">上班時間</label>
+                    <input type="time" value={editClockIn} onChange={e => setEditClockIn(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">下班時間</label>
+                    <input type="time" value={editClockOut} onChange={e => setEditClockOut(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1">補登原因</label>
+                  <textarea value={editReason} onChange={e => setEditReason(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" rows={2} />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setIsEditModalOpen(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50">取消</button>
+                <button onClick={handleEditSubmit} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">儲存</button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 };

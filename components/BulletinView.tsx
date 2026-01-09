@@ -10,6 +10,8 @@ interface BulletinViewProps {
   users: User[];
   departments: DepartmentDef[];
   onCreateAnnouncement: (data: any) => void;
+  onUpdateAnnouncement: (id: string, data: Partial<Announcement>) => void;
+  onDeleteAnnouncement: (id: string) => void;
   onConfirmRead: (id: string) => void;
 }
 
@@ -18,11 +20,15 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
   announcements, 
   users, 
   departments,
-  onCreateAnnouncement, 
+  onCreateAnnouncement,
+  onUpdateAnnouncement,
+  onDeleteAnnouncement, 
   onConfirmRead 
 }) => {
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [viewStatusId, setViewStatusId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Check custom permission
   const canManage = hasPermission(currentUser, 'POST_ANNOUNCEMENT');
@@ -80,6 +86,18 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
          {sortedAnnouncements.map(ann => {
              const isRead = ann.readBy.includes(currentUser.id);
              const isImportant = ann.priority === 'IMPORTANT';
+             const isCreator = ann.createdBy === currentUser.id;
+             
+             // Parse images if it's a JSON string
+             const images = (() => {
+               if (!ann.images) return [];
+               if (Array.isArray(ann.images)) return ann.images;
+               try {
+                 return JSON.parse(ann.images);
+               } catch {
+                 return [];
+               }
+             })();
              
              return (
                <div 
@@ -127,6 +145,32 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                      {ann.content}
                   </div>
 
+                  {/* 圖片顯示 */}
+                  {images && images.length > 0 && (
+                     <div className="pl-1 md:pl-16 mb-6">
+                        <div className="flex flex-wrap gap-3">
+                           {images.map((img: string, index: number) => (
+                              <div 
+                                 key={index} 
+                                 className="relative group inline-block cursor-pointer"
+                                 onClick={() => setPreviewImage(img)}
+                              >
+                                 <img 
+                                    src={img} 
+                                    alt={`公告圖片 ${index + 1}`}
+                                    className="max-w-xs h-auto rounded-lg border border-slate-200 shadow-sm hover:shadow-lg transition"
+                                 />
+                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center pointer-events-none">
+                                    <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                                    </svg>
+                                 </div>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+                  )}
+
                   <div className="flex items-center justify-between border-t border-slate-200/60 pt-4 pl-1 md:pl-16">
                       <div className="flex items-center gap-2">
                           {isRead ? (
@@ -145,15 +189,35 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                           )}
                       </div>
 
-                      {canManage && (
-                         <button 
-                           onClick={() => setViewStatusId(ann.id)}
-                           className="text-slate-400 hover:text-blue-600 text-xs font-bold flex items-center gap-1 transition px-2 py-1 hover:bg-blue-50 rounded-lg"
-                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                            查看已讀狀況 ({ann.readBy.length}/{users.length})
-                         </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                         {isCreator && (
+                            <>
+                               <button 
+                                 onClick={() => setEditingAnnouncement(ann)}
+                                 className="text-slate-400 hover:text-blue-600 text-xs font-bold flex items-center gap-1 transition px-2 py-1 hover:bg-blue-50 rounded-lg"
+                               >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                  編輯
+                               </button>
+                               <button 
+                                 onClick={() => onDeleteAnnouncement(ann.id)}
+                                 className="text-slate-400 hover:text-red-600 text-xs font-bold flex items-center gap-1 transition px-2 py-1 hover:bg-red-50 rounded-lg"
+                               >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                  刪除
+                               </button>
+                            </>
+                         )}
+                         {canManage && (
+                            <button 
+                              onClick={() => setViewStatusId(ann.id)}
+                              className="text-slate-400 hover:text-blue-600 text-xs font-bold flex items-center gap-1 transition px-2 py-1 hover:bg-blue-50 rounded-lg"
+                            >
+                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                               查看已讀狀況 ({Array.isArray(ann.readBy) ? ann.readBy.length : 0}/{users.length})
+                            </button>
+                         )}
+                      </div>
                   </div>
                </div>
              );
@@ -166,6 +230,18 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
          onSubmit={onCreateAnnouncement}
       />
 
+      {editingAnnouncement && (
+         <CreateAnnouncementModal 
+            isOpen={!!editingAnnouncement}
+            onClose={() => setEditingAnnouncement(null)}
+            onSubmit={(data) => {
+               onUpdateAnnouncement(editingAnnouncement.id, data);
+               setEditingAnnouncement(null);
+            }}
+            initialData={editingAnnouncement}
+         />
+      )}
+
       {viewStatusId && (
          <ReadStatusModal 
            isOpen={!!viewStatusId}
@@ -174,6 +250,31 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
            users={users}
            departments={departments}
          />
+      )}
+
+      {/* 圖片預覽模態框 */}
+      {previewImage && (
+         <div 
+            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+            onClick={() => setPreviewImage(null)}
+         >
+            <div className="relative max-w-7xl max-h-full">
+               <button
+                  onClick={() => setPreviewImage(null)}
+                  className="absolute -top-12 right-0 text-white hover:text-gray-300 transition"
+               >
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+               </button>
+               <img 
+                  src={previewImage} 
+                  alt="預覽圖片"
+                  className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                  onClick={(e) => e.stopPropagation()}
+               />
+            </div>
+         </div>
       )}
     </div>
   );

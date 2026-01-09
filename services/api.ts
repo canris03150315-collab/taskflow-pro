@@ -151,7 +151,10 @@ const RealApi = {
             const response = await request<{ user: User, message: string }>('POST', '/users', user);
             return response.user;
         },
-        update: (user: User) => request<User>('PUT', `/users/${user.id}`, user),
+        update: async (user: User) => {
+            const response = await request<{ user: User, message: string }>('PUT', `/users/${user.id}`, user);
+            return response.user;
+        },
         delete: (id: string) => request<void>('DELETE', `/users/${id}`),
         updateAvatar: async (userId: string, avatar: string) => {
             return await request<{ avatar: string, message: string }>('POST', `/users/${userId}/avatar`, { avatar });
@@ -179,7 +182,21 @@ const RealApi = {
     },
     tasks: {
         getAll: async (): Promise<Task[]> => {
-            const response = await request<{ tasks: any[], pagination?: any }>('GET', '/tasks');
+            // 獲取所有任務（包含封存的），前端自己篩選
+            const [normalResponse, archivedResponse] = await Promise.all([
+                request<{ tasks: any[], pagination?: any }>('GET', '/tasks?is_archived=false'),
+                request<{ tasks: any[], pagination?: any }>('GET', '/tasks?is_archived=true')
+            ]);
+            
+            const allTasks = [...(normalResponse.tasks || []), ...(archivedResponse.tasks || [])];
+            
+            console.log('[API] getAll 原始後端數據:', {
+                normalTasksLength: normalResponse.tasks?.length || 0,
+                archivedTasksLength: archivedResponse.tasks?.length || 0,
+                totalTasks: allTasks.length
+            });
+            
+            const response = { tasks: allTasks };
             return (response.tasks || []).map((task: any) => ({
                 id: task.id,
                 title: task.title,
@@ -196,9 +213,63 @@ const RealApi = {
                 progress: task.progress || 0,
                 createdBy: task.created_by,
                 isArchived: task.is_archived === 1 || task.is_archived === true,
-                timeline: task.timeline || [],
+                timeline: (task.timeline || []).map((entry: any) => ({
+                    userId: entry.user_id,
+                    content: entry.content,
+                    timestamp: entry.timestamp,
+                    progress: entry.progress
+                })),
                 unreadUpdatesForUserIds: task.unread_updates_for_user_ids || []
             }));
+        },
+        getById: async (id: string): Promise<Task> => {
+            const task = await request<any>('GET', `/tasks/${id}`);
+            console.log('[API] getById 原始後端數據:', {
+                taskId: task.id,
+                hasTimeline: !!task.timeline,
+                timelineLength: task.timeline?.length || 0,
+                timelineRaw: task.timeline
+            });
+            
+            const transformedTimeline = (task.timeline || []).map((entry: any) => {
+                console.log('[API] 轉換 timeline entry:', {
+                    原始: entry,
+                    轉換後: {
+                        userId: entry.user_id,
+                        content: entry.content,
+                        timestamp: entry.timestamp,
+                        progress: entry.progress
+                    }
+                });
+                return {
+                    userId: entry.user_id,
+                    content: entry.content,
+                    timestamp: entry.timestamp,
+                    progress: entry.progress
+                };
+            });
+            
+            console.log('[API] getById 轉換後 timeline:', transformedTimeline);
+            
+            return {
+                id: task.id,
+                title: task.title,
+                description: task.description,
+                urgency: task.urgency,
+                deadline: task.deadline,
+                createdAt: task.created_at,
+                status: task.status,
+                targetDepartment: task.target_department,
+                assignedToUserId: task.assigned_to_user_id,
+                assignedToDepartment: task.assigned_to_department,
+                acceptedByUserId: task.accepted_by_user_id,
+                completionNotes: task.completion_notes,
+                progress: task.progress || 0,
+                createdBy: task.created_by,
+                isArchived: task.is_archived === 1 || task.is_archived === true,
+                timeline: transformedTimeline,
+                unreadUpdatesForUserIds: task.unread_updates_for_user_ids || []
+            };
         },
         create: (task: Task) => request<Task>('POST', '/tasks', task),
         update: (task: Task) => request<Task>('PUT', `/tasks/${task.id}`, task),
@@ -213,14 +284,29 @@ const RealApi = {
                 return (response.announcements || []).map((a: any) => ({
                     ...a,
                     readBy: a.read_by || a.readBy || [],
-                    createdAt: a.created_at || a.createdAt
+                    createdAt: a.created_at || a.createdAt,
+                    createdBy: a.createdBy || a.created_by
                 }));
             } catch (error) {
                 console.error('Failed to get announcements', error);
                 return [];
             }
         },
-        create: (ann: Announcement) => request<Announcement>('POST', '/announcements', ann),
+        create: (ann: Announcement) => {
+            console.log('[API] Creating announcement with data:', ann);
+            console.log('[API] Images in request:', ann.images);
+            return request<Announcement>('POST', '/announcements', ann);
+        },
+        update: async (id: string, data: Partial<Announcement>): Promise<Announcement> => {
+            const response = await request<any>('PUT', `/announcements/${id}`, data);
+            return {
+                ...response,
+                readBy: response.read_by || response.readBy || [],
+                createdAt: response.created_at || response.createdAt,
+                createdBy: response.createdBy || response.created_by
+            };
+        },
+        delete: (id: string) => request<void>('DELETE', `/announcements/${id}`),
         markRead: (id: string, userId: string) => request<void>('POST', `/announcements/${id}/read`, { userId })
     },
     reports: {
@@ -237,7 +323,10 @@ const RealApi = {
                 return [];
             }
         },
-        create: (report: Report) => request<Report>('POST', '/reports', report),
+        create: async (report: Report): Promise<Report> => {
+            const response = await request<{ report: Report }>('POST', '/reports', report);
+            return response.report || response as any;
+        },
         update: (id: string, content: any) => request<Report>('PUT', `/reports/${id}`, { content }),
         delete: (id: string) => request<void>('DELETE', `/reports/${id}`)
     },
@@ -304,47 +393,50 @@ const RealApi = {
     },
     routines: {
         getTemplates: async (): Promise<RoutineTemplate[]> => {
-            await delay();
-            return [...MOCK_DB.routineTemplates];
+            try {
+                const response = await request<{ templates: any[] }>('GET', '/routines/templates');
+                return (response.templates || []).map((t: any) => ({
+                    ...t,
+                    departmentId: t.departmentId || t.department_id,
+                    lastUpdated: t.lastUpdated || t.last_updated,
+                    isDaily: t.isDaily || t.is_daily,
+                    readBy: t.readBy || t.read_by || []
+                }));
+            } catch (error) {
+                console.error('Failed to get routine templates', error);
+                return [];
+            }
         },
         saveTemplate: async (tpl: RoutineTemplate): Promise<RoutineTemplate> => {
-            await delay();
-            const idx = MOCK_DB.routineTemplates.findIndex(t => t.id === tpl.id);
-            if (idx !== -1) {
-                MOCK_DB.routineTemplates[idx] = tpl;
-            } else {
-                MOCK_DB.routineTemplates.push(tpl);
-            }
-            saveToStorage();
-            return tpl;
+            const response = await request<RoutineTemplate>('POST', '/routines/templates', tpl);
+            return response;
         },
         deleteTemplate: async (id: string): Promise<void> => {
-            await delay();
-            MOCK_DB.routineTemplates = MOCK_DB.routineTemplates.filter(t => t.id !== id);
-            saveToStorage();
+            await request<void>('DELETE', `/routines/templates/${id}`);
         },
         markAsRead: async (userId: string, templateId: string): Promise<void> => {
-            await delay();
-            const tpl = MOCK_DB.routineTemplates.find(t => t.id === templateId);
-            if (tpl) {
-                if (!tpl.readBy) tpl.readBy = [];
-                if (!tpl.readBy.includes(userId)) {
-                    tpl.readBy.push(userId);
-                    saveToStorage();
-                }
-            }
+            await request<void>('POST', `/routines/templates/${templateId}/read`, { userId });
         },
         getTodayRecord: async (userId: string, deptId: string): Promise<RoutineRecord | null> => {
-            await delay();
-            // Simplified mock
-            return null; 
+            try {
+                const response = await request<RoutineRecord | null>('GET', '/routines/today');
+                return response;
+            } catch (error) {
+                console.error('Failed to get today record', error);
+                return null;
+            }
         },
         getHistory: async (): Promise<RoutineRecord[]> => {
-            await delay();
-            return [];
+            try {
+                const response = await request<{ records: RoutineRecord[] }>('GET', '/routines/history');
+                return response.records || [];
+            } catch (error) {
+                console.error('Failed to get routine history', error);
+                return [];
+            }
         },
         toggleItem: async (recordId: string, index: number, isCompleted: boolean): Promise<void> => {
-            await delay();
+            await request<void>('POST', `/routines/records/${recordId}/toggle`, { index, isCompleted });
         }
     },
     attendance: {
@@ -367,6 +459,25 @@ const RealApi = {
                 return null;
             }
         },
+        manualEntry: async (userId: string, date: string, clockIn: string, clockOut: string, reason: string): Promise<void> => {
+            await request<{ success: boolean }>('POST', '/attendance/manual', {
+                userId,
+                date,
+                clockIn,
+                clockOut,
+                reason
+            });
+        },
+        updateManualEntry: async (id: string, clockIn: string, clockOut: string, reason: string): Promise<void> => {
+            await request<{ success: boolean }>('PUT', `/attendance/manual/${id}`, {
+                clockIn,
+                clockOut,
+                reason
+            });
+        },
+        delete: async (id: string): Promise<void> => {
+            await request<{ success: boolean }>('DELETE', `/attendance/${id}`);
+        },
         getHistory: async (): Promise<AttendanceRecord[]> => {
             const response = await request<{ records: any[] }>('GET', `/attendance`);
             return (response.records || []).map((r: any) => ({
@@ -376,7 +487,10 @@ const RealApi = {
                 clockIn: r.clock_in,
                 clockOut: r.clock_out,
                 durationMinutes: r.duration_minutes,
-                status: r.status
+                status: r.status,
+                isManual: Boolean(r.is_manual),
+                manualBy: r.manual_by,
+                manualReason: r.manual_reason
             }));
         },
         clockIn: async (userId: string): Promise<AttendanceRecord> => {
@@ -564,11 +678,7 @@ const RealApi = {
     },
     system: {
         resetFactoryDefault: async (): Promise<void> => {
-            await delay(1000);
-            localStorage.removeItem(STORAGE_KEY);
-            // Reset in-memory
-            MOCK_DB.users = [];
-            // ... reset others
+            return request<void>('POST', '/system/reset-factory');
         },
         exportData: async (): Promise<string> => {
             await delay();
@@ -594,6 +704,73 @@ const RealApi = {
             await delay();
             if (settings.menuGroups) MOCK_DB.settings.menuGroups = settings.menuGroups;
             saveToStorage();
+        },
+        downloadBackup: async (): Promise<void> => {
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                throw new Error('Not authenticated');
+            }
+            
+            const response = await fetch(`${API_BASE_URL}/backup/download`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                let errorMessage = 'Failed to download backup';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.error || errorMessage;
+                } catch (e) {
+                    console.error('Failed to parse error response:', e);
+                }
+                throw new Error(errorMessage);
+            }
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `taskflow-backup-${new Date().toISOString().split('T')[0]}.db`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        },
+        uploadBackup: async (file: File): Promise<void> => {
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                throw new Error('Not authenticated');
+            }
+            
+            const formData = new FormData();
+            formData.append('backup', file);
+            
+            const response = await fetch(`${API_BASE_URL}/backup/upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            
+            if (!response.ok) {
+                let errorMessage = 'Failed to upload backup';
+                try {
+                    const error = await response.json();
+                    errorMessage = error.error || errorMessage;
+                } catch (e) {
+                    console.error('Failed to parse error response:', e);
+                }
+                throw new Error(errorMessage);
+            }
+            
+            const result = await response.json();
+            return result;
         }
     },
     logs: {
@@ -601,7 +778,218 @@ const RealApi = {
             await delay();
             return [...MOCK_DB.logs];
         }
-    }
+    },
+    leaves: {
+        getAll: async (): Promise<any[]> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/leaves`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch leaves');
+            return response.json();
+        },
+        create: async (data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/leaves`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error('Failed to create leave');
+            return response.json();
+        },
+        approve: async (id: string, data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/leaves/${id}/approve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to approve leave' }));
+                throw new Error(error.error || 'Failed to approve leave');
+            }
+            return response.json();
+        },
+        reject: async (id: string, data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/leaves/${id}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to reject leave' }));
+                throw new Error(error.error || 'Failed to reject leave');
+            }
+            return response.json();
+        },
+        delete: async (id: string): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/leaves/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to delete leave' }));
+                throw new Error(error.error || 'Failed to delete leave');
+            }
+            return response.json();
+        },
+        getRules: async (departmentId: string): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/leaves/rules/${departmentId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch rules');
+            return response.json();
+        },
+        updateRules: async (departmentId: string, data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/leaves/rules/${departmentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error('Failed to update rules');
+            return response.json();
+        }
+    },
+    schedules: {
+        getAll: async (): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch schedules');
+            return response.json();
+        },
+        submit: async (data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to submit schedule' }));
+                throw new Error(error.error || 'Failed to submit schedule');
+            }
+            return response.json();
+        },
+        approve: async (id: string, data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules/${id}/approve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to approve schedule' }));
+                throw new Error(error.error || 'Failed to approve schedule');
+            }
+            return response.json();
+        },
+        reject: async (id: string, data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules/${id}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to reject schedule' }));
+                throw new Error(error.error || 'Failed to reject schedule');
+            }
+            return response.json();
+        },
+        getRules: async (departmentId: string): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules/rules/${departmentId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed to fetch rules');
+            return response.json();
+        },
+        updateRules: async (departmentId: string, data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules/rules/${departmentId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error('Failed to update rules');
+            return response.json();
+        },
+        update: async (id: string, data: any): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to update schedule' }));
+                throw new Error(error.error || 'Failed to update schedule');
+            }
+            return response.json();
+        }
+    },
 };
 
 const MockApi = RealApi;

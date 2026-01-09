@@ -1,4 +1,4 @@
-
+﻿
 export enum Role {
   BOSS = 'BOSS',
   MANAGER = 'MANAGER', // 新增總經理/大主管層級
@@ -13,6 +13,9 @@ export type Permission =
   | 'POST_ANNOUNCEMENT' // 發布公告
   | 'MANAGE_FORUM'      // 管理論壇提案
   | 'MANAGE_USERS'      // 管理使用者帳號 (新增/修改員工)
+  | 'MANAGE_DEPARTMENTS' // 管理部門 (新增/修改/刪除部門)
+  | 'APPROVE_LEAVES'    // 審核假期 (主管權限)
+  | 'MANAGE_LEAVE_RULES' // 設定部門排假規則 (主管權限)
   | 'SYSTEM_RESET';     // 系統重置/格式化 (危險權限)
 
 export interface DepartmentDef {
@@ -20,6 +23,8 @@ export interface DepartmentDef {
   name: string;
   theme: 'slate' | 'blue' | 'purple' | 'rose' | 'emerald' | 'orange' | 'cyan';
   icon: string;
+  parent_department_id?: string | null;
+  subdepartments?: DepartmentDef[];
 }
 
 export const UNASSIGNED_DEPT_ID = 'UNASSIGNED';
@@ -117,6 +122,7 @@ export interface Announcement {
   createdAt: string;
   createdBy: string; // User ID
   readBy: string[]; // List of User IDs who have read this
+  images?: string[]; // Base64 encoded images
 }
 
 // --- Chat / Messenger Types ---
@@ -355,6 +361,7 @@ export type MenuItemId =
   | 'dashboard' 
   | 'bulletin' 
   | 'tasks' 
+  | 'leaves'
   | 'sop' 
   | 'performance' 
   | 'team' 
@@ -383,7 +390,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
   {
     id: 'work',
     label: '工作執行',
-    items: ['tasks', 'chat', 'reports', 'memo']
+    items: ['tasks', 'leaves', 'chat', 'reports', 'memo']
   },
   {
     id: 'admin',
@@ -399,7 +406,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
 
 // Fallback for old compatibility (Flat list to Groups)
 export const DEFAULT_MENU_ORDER: MenuItemId[] = [
-  'dashboard', 'chat', 'bulletin', 'tasks', 'sop', 
+  'dashboard', 'chat', 'bulletin', 'tasks', 'leaves', 'sop', 
   'performance', 'team', 'reports', 'finance', 'data_center', 
   'forum', 'memo', 'personnel', 'settings'
 ];
@@ -408,6 +415,7 @@ export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = 
   dashboard: { label: '儀表板', icon: '📊' },
   bulletin: { label: '企業公告欄', icon: '📢' },
   tasks: { label: '任務列表', icon: '📋' },
+  leaves: { label: '假表管理', icon: '📅' },
   sop: { label: '部門文件與規範', icon: '📑' },
   performance: { label: '績效考核 (KPI)', icon: '🏆' },
   team: { label: '團隊工作概況', icon: '📉' },

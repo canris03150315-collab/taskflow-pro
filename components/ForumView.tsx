@@ -220,6 +220,31 @@ export const ForumView: React.FC<ForumViewProps> = ({
                   <div className="text-slate-700 leading-relaxed whitespace-pre-line font-medium">
                      {suggestion.content}
                   </div>
+                  
+                  {/* Status Change Record */}
+                  {suggestion.statusChangedBy && suggestion.statusChangedAt && (
+                     <div className="mt-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                           <span>📝</span>
+                           <span>狀態變更記錄：</span>
+                           <span className="font-bold text-slate-600">
+                              {getUser(suggestion.statusChangedBy)?.name || '未知管理員'}
+                           </span>
+                           <span>於</span>
+                           <span className="font-bold text-slate-600">
+                              {new Date(suggestion.statusChangedAt).toLocaleString('zh-TW', { 
+                                 year: 'numeric', 
+                                 month: '2-digit', 
+                                 day: '2-digit',
+                                 hour: '2-digit',
+                                 minute: '2-digit'
+                              })}
+                           </span>
+                           <span>變更為</span>
+                           <span className="font-bold">{getStatusBadge(suggestion.status)}</span>
+                        </div>
+                     </div>
+                  )}
                </div>
 
                {/* Actions Bar */}

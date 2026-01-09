@@ -385,7 +385,13 @@ router.post('/channels/:channelId/messages', authenticateToken, async (req, res)
 
         res.json({ message });
 
-        // TODO: 通過 WebSocket 廣播新訊息給其他參與者
+        // 通過 WebSocket 廣播新訊息給其他參與者
+        try {
+            const { broadcastMessage } = require('../websocket');
+            broadcastMessage(channelId, message);
+        } catch (wsError) {
+            console.error('WebSocket 廣播失敗:', wsError);
+        }
     } catch (error) {
         console.error('發送訊息失敗:', error);
         res.status(500).json({ error: '發送訊息失敗' });
@@ -449,7 +455,17 @@ router.post('/channels/:channelId/read', authenticateToken, async (req, res) => 
 
         res.json({ success: true, markedCount: unreadMessages.length });
 
-        // TODO: 通過 WebSocket 通知其他用戶已讀狀態更新
+        // 通過 WebSocket 通知其他用戶已讀狀態更新
+        try {
+            const { broadcastReadStatus } = require('../websocket');
+            broadcastReadStatus(channelId, {
+                channelId,
+                userId: currentUser.id,
+                messageIds: unreadMessages.map(m => m.id)
+            });
+        } catch (wsError) {
+            console.error('WebSocket 廣播已讀狀態失敗:', wsError);
+        }
     } catch (error) {
         console.error('標記已讀失敗:', error);
         res.status(500).json({ error: '標記已讀失敗' });
@@ -497,7 +513,13 @@ router.post('/channels/:channelId/messages/:messageId/recall', authenticateToken
 
         res.json({ success: true });
 
-        // TODO: 通過 WebSocket 通知其他用戶訊息已收回
+        // 通過 WebSocket 通知其他用戶訊息已收回
+        try {
+            const { broadcastMessageRecall } = require('../websocket');
+            broadcastMessageRecall(message.channel_id, messageId);
+        } catch (wsError) {
+            console.error('WebSocket 廣播訊息收回失敗:', wsError);
+        }
     } catch (error) {
         console.error('收回訊息失敗:', error);
         res.status(500).json({ error: '收回訊息失敗' });
@@ -605,6 +627,18 @@ router.put('/channels/:channelId', authenticateToken, async (req, res) => {
                 participants: JSON.parse(updatedChannel.participants)
             }
         });
+
+        // 通過 WebSocket 通知頻道更新
+        try {
+            const { broadcastChannelUpdate } = require('../websocket');
+            broadcastChannelUpdate(channelId, {
+                channelId,
+                name: newName,
+                participants: newParticipants
+            });
+        } catch (wsError) {
+            console.error('WebSocket 廣播頻道更新失敗:', wsError);
+        }
     } catch (error) {
         console.error('編輯群組錯誤:', error);
         res.status(500).json({ error: '伺服器內部錯誤' });

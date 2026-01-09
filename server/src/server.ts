@@ -325,6 +325,11 @@ IP.2 = ::1
         console.log('');
       });
 
+      // 初始化 WebSocket 伺服器
+      const { initializeWebSocket } = require('./websocket');
+      initializeWebSocket(this.server);
+      console.log('🔌 WebSocket 伺服器已啟動（Socket.IO）');
+
       // 優雅關閉處理
       process.on('SIGTERM', () => this.shutdown());
       process.on('SIGINT', () => this.shutdown());

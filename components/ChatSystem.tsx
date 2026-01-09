@@ -2,7 +2,7 @@
 import { User, DepartmentDef, ChatChannel, ChatMessage, Role } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
-import { WebSocketClient, WebSocketMessage } from '../utils/websocketClient';
+import { WebSocketClient } from '../utils/websocketClient';
 import { ChatMessageReadStatusModal } from './ChatMessageReadStatusModal';
 import { CreateGroupModal } from './CreateGroupModal';
 import { GroupInfoModal } from './GroupInfoModal';
@@ -32,6 +32,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
   const [sidebarMode, setSidebarMode] = useState<'CHAT' | 'CONTACTS'>('CHAT');
   const [searchQuery, setSearchQuery] = useState('');
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -41,17 +42,46 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
   // Sound
   const notificationSound = useMemo(() => new Audio('/notification.mp3'), []);
 
-  // Initialize WebSocket (with fallback to polling for HTTPS)
+  // Polling for new messages (temporary solution until WebSocket is fully integrated)
+  useEffect(() => {
+    if (!activeChannelId) return;
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await api.chat.getMessages(activeChannelId, { limit: 50 });
+        const newMessages = res.messages;
+        
+        // Only update if there are new messages
+        if (newMessages.length > messages.length || 
+            (newMessages.length > 0 && messages.length > 0 && 
+             newMessages[newMessages.length - 1].id !== messages[messages.length - 1].id)) {
+          setMessages(newMessages);
+          
+          // Play notification sound for new messages from others
+          const lastNewMsg = newMessages[newMessages.length - 1];
+          if (lastNewMsg && lastNewMsg.userId !== currentUser.id) {
+            notificationSound.play().catch(() => {});
+          }
+        }
+      } catch (error) {
+        console.error('輪詢訊息失敗:', error);
+      }
+    }, 2000); // Poll every 2 seconds for better real-time experience
+    
+    return () => clearInterval(pollInterval);
+  }, [activeChannelId, messages.length, currentUser.id]);
+
+  // Initialize WebSocket
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
-    // Skip WebSocket in production (HTTPS) due to mixed content restrictions
+    // WebSocket is now enabled with backend support
     const isProduction = window.location.protocol === 'https:';
     
-    if (!isProduction) {
-      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'ws://165.227.147.40:3001';
+    if (!isProduction) { // Enable WebSocket for HTTP connections
+      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'ws://165.227.147.40:3000/ws';
       wsClientRef.current = new WebSocketClient(wsUrl);
       
-      const handleMessage = (event: WebSocketMessage) => {
+      const handleMessage = (event: any) => {
         if (event.type === 'chat_message') {
           const newMsg = event.payload as ChatMessage;
           
@@ -106,9 +136,16 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
     }
   }, [currentUser.id, activeChannelId, notificationSound]);
 
-  // Load Channels
+  // Load Channels with polling for real-time updates
   useEffect(() => {
       loadChannels();
+      
+      // Poll channels every 5 seconds to get new messages and unread counts
+      const channelPollInterval = setInterval(() => {
+          loadChannels();
+      }, 5000);
+      
+      return () => clearInterval(channelPollInterval);
   }, [currentUser.id]);
 
   const loadChannels = async () => {
@@ -140,8 +177,11 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
       setIsLoading(true);
       try {
           const res = await api.chat.getMessages(channelId, { limit: 50 });
-          setMessages(res.messages.reverse()); 
+          // 後端已經返回正確順序（最舊在前，最新在後）
+          setMessages(res.messages); 
           setHasMoreMessages(res.hasMore);
+          // 載入完成後自動滾動到最下方
+          scrollToBottom();
       } catch (error) {
           console.error("Failed to load messages", error);
           toast.error("載入訊息失敗");
@@ -158,10 +198,55 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
       }, 100);
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!messageInput.trim() || !activeChannelId) return;
+  // 檔案上傳處理
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChannelId || isUploading) return;
+    
+    // 檢查檔案大小（限制 5MB）
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warning('檔案大小不能超過 5MB');
+      return;
+    }
+    
+    setIsUploading(true);
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const isImage = file.type.startsWith('image/');
+        
+        // 圖片和檔案都發送 Base64，但格式不同
+        const content = isImage 
+          ? `[IMG]${base64}`
+          : `[FILE]${file.name}|${base64}`;  // 檔案格式：檔名|Base64
+        
+        await api.chat.sendMessage(activeChannelId, currentUser.id, content, currentUser);
+        loadMessages(activeChannelId);
+        setIsUploading(false);
+      };
+      reader.onerror = () => {
+        toast.error('檔案讀取失敗');
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error('Failed to upload file:', error);
+      toast.error('檔案上傳失敗，請重試');
+      setIsUploading(false);
+    }
+    
+    // 清除 input
+    e.target.value = '';
+  };
 
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageInput.trim() || !activeChannelId) return;
+
+      console.log('[DEBUG] 發送訊息 - 當前用戶:', currentUser.id, currentUser.name, currentUser.role);
+      
       const tempId = `temp-${Date.now()}`;
       const content = messageInput;
       setMessageInput('');
@@ -183,6 +268,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
 
       try {
           const newMsg = await api.chat.sendMessage(activeChannelId, currentUser.id, content, currentUser);
+          console.log('[DEBUG] 收到後端回應 - 訊息:', newMsg.id, 'userId:', newMsg.userId, 'userName:', newMsg.userName);
           // Replace temp message
           setMessages(prev => prev.map(m => m.id === tempId ? newMsg : m));
           
@@ -265,6 +351,21 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
 
   const handleStartDirectChat = async (userId: string) => {
       try {
+          // Check if a direct chat with this user already exists
+          const existingChannel = channels.find(ch => 
+              ch.type === 'DIRECT' && 
+              ch.participants.includes(userId) && 
+              ch.participants.includes(currentUser.id)
+          );
+
+          if (existingChannel) {
+              // If channel exists, just switch to it
+              setActiveChannelId(existingChannel.id);
+              setSidebarMode('CHAT');
+              return;
+          }
+
+          // If no existing channel, create a new one
           const newChannel = await api.chat.createDirectChannel(currentUser.id, userId);
           setChannels(prev => [newChannel, ...prev]);
           setActiveChannelId(newChannel.id);
@@ -297,7 +398,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
   return (
     <div className="flex h-[calc(100vh-100px)] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-80 border-r border-slate-200 flex flex-col bg-white">
+        <div className={`${activeChannelId ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-slate-200 flex-col bg-white`}>
             {/* Search Bar */}
             <div className="p-3 border-b border-slate-200">
                 <div className="relative">
@@ -367,9 +468,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
                                         <img src={getChannelAvatar(channel)} alt="" className="w-full h-full object-cover" />
                                     ) : (
                                         <span className="text-slate-500 font-bold text-lg">{getChannelName(channel).charAt(0)}</span>
-                                    )}
-                                    {channel.type === 'DIRECT' && (
-                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                                     )}
                                 </div>
                                 <div className="min-w-0 flex-1">
@@ -447,48 +545,72 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
                             </div>
                         )}
                         
-                        {/* 聯絡人列表 */}
-                        {departments.map(dept => {
-                            const deptUsers = users.filter(u => u.department === dept.id && u.id !== currentUser.id);
-                            if (deptUsers.length === 0) return null;
-                            return (
-                                <div key={dept.id}>
-                                    <div className="text-xs font-bold text-slate-400 uppercase mb-2 px-2">{dept.name}</div>
-                                    <div className="space-y-1">
-                                        {deptUsers.map(user => (
-                                            <button 
-                                                key={user.id}
-                                                onClick={() => handleStartDirectChat(user.id)}
-                                                className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 transition"
-                                            >
-                                                <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden">
-                                                    {user.avatar ? (
-                                                        <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-slate-500 font-bold">{user.name.charAt(0)}</span>
-                                                    )}
-                                                </div>
-                                                <div className="text-left flex-1">
-                                                    <div className="text-sm font-bold text-slate-700">{user.name}</div>
-                                                    <div className="text-xs text-slate-500">{user.role}</div>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {/* 聯絡人列表 - 按部門分組顯示 */}
+                        <div className="space-y-4">
+                            {departments
+                                .filter(dept => users.some(u => u.department === dept.id && u.id !== currentUser.id))
+                                .map(dept => {
+                                    const deptUsers = users.filter(u => u.department === dept.id && u.id !== currentUser.id);
+                                    if (deptUsers.length === 0) return null;
+                                    
+                                    return (
+                                        <div key={dept.id}>
+                                            <div className="text-xs font-bold text-slate-400 uppercase mb-2 px-2 flex items-center gap-2">
+                                                <span>{dept.name}</span>
+                                                <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">{deptUsers.length}</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                {deptUsers
+                                                    .filter(user => 
+                                                        searchQuery === '' || 
+                                                        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                        user.role.toLowerCase().includes(searchQuery.toLowerCase())
+                                                    )
+                                                    .map(user => (
+                                                        <button 
+                                                            key={user.id}
+                                                            onClick={() => handleStartDirectChat(user.id)}
+                                                            className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-slate-100 transition"
+                                                        >
+                                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0 overflow-hidden">
+                                                                {user.avatar ? (
+                                                                    <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center">
+                                                                        <span className="text-slate-500 font-bold">{user.name.charAt(0)}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-left flex-1 min-w-0">
+                                                                <div className="text-sm font-bold text-slate-700 truncate">{user.name}</div>
+                                                                <div className="text-xs text-slate-500 truncate">{user.role}</div>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
                     </div>
                 )}
             </div>
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div className={`${activeChannelId ? 'flex' : 'hidden md:flex'} flex-1 flex-col`}>
             {activeChannel ? (
                 <>
                     <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm">
                         <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setActiveChannelId(null)}
+                                className="md:hidden p-2 -ml-2 text-slate-500 hover:text-slate-700 active:scale-95 transition"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold">
                                 {activeChannel.type === 'GROUP' ? '群' : getChannelName(activeChannel).charAt(0)}
                             </div>
@@ -498,12 +620,6 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
                                     <span className="text-xs text-slate-500">
                                         {activeChannel.participants.length} 位成員
                                     </span>
-                                )}
-                                {activeChannel.type === 'DIRECT' && (
-                                    <div className="flex items-center gap-1 text-xs text-green-600">
-                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                        <span>在線</span>
-                                    </div>
                                 )}
                             </div>
                         </div>
@@ -525,6 +641,9 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-slate-50 to-white" ref={messagesContainerRef}>
                         {messages.map((msg, index) => {
                             const isMe = msg.userId === currentUser.id;
+                            if (index === 0) {
+                                console.log('[DEBUG] 顯示訊息 - msg.userId:', msg.userId, 'msg.userName:', msg.userName, 'currentUser.id:', currentUser.id, 'isMe:', isMe);
+                            }
                             const showAvatar = !isMe && (index === 0 || messages[index - 1].userId !== msg.userId);
                             const showName = !isMe && (index === 0 || messages[index - 1].userId !== msg.userId);
                             
@@ -543,14 +662,67 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
                                         {showName && <span className="text-xs text-slate-600 mb-1 font-medium px-1">{msg.userName}</span>}
                                         <div className="relative group/msg">
                                             <div 
-                                                className={`px-4 py-2.5 rounded-2xl text-sm break-words shadow-sm ${
-                                                    isMe 
-                                                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-br-md' 
-                                                        : 'bg-white border border-slate-200 text-slate-800 rounded-bl-md hover:shadow-md transition-shadow'
+                                                className={`${
+                                                    msg.content.startsWith('[IMG]') || msg.content.startsWith('[FILE]')
+                                                        ? '' 
+                                                        : `px-4 py-2.5 rounded-2xl shadow-sm max-w-md break-words ${
+                                                            isMe 
+                                                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' 
+                                                                : 'bg-white text-slate-800 border border-slate-100'
+                                                        }`
                                                 }`}
-                                                onClick={() => isMe && setReadStatusMsg(msg)}
+                                                onClick={() => isMe && !msg.content.startsWith('[IMG]') && !msg.content.startsWith('[FILE]') && setReadStatusMsg(msg)}
                                             >
-                                                {msg.content}
+                                                {msg.content.startsWith('[IMG]') ? (
+                                                    // 圖片訊息
+                                                    <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200">
+                                                        <img 
+                                                            src={msg.content.replace('[IMG]', '')} 
+                                                            alt="圖片" 
+                                                            className="max-w-[250px] md:max-w-[300px] max-h-[300px] object-contain cursor-pointer hover:opacity-90 transition"
+                                                        />
+                                                    </div>
+                                                ) : msg.content.startsWith('[FILE]') ? (
+                                                    // 檔案訊息
+                                                    (() => {
+                                                        const fileContent = msg.content.replace('[FILE]', '');
+                                                        const [fileName, fileData] = fileContent.includes('|') 
+                                                            ? fileContent.split('|') 
+                                                            : [fileContent, null];
+                                                        
+                                                        const handleDownload = () => {
+                                                            if (fileData) {
+                                                                const link = document.createElement('a');
+                                                                link.href = fileData;
+                                                                link.download = fileName;
+                                                                link.click();
+                                                            }
+                                                        };
+                                                        
+                                                        return (
+                                                            <div 
+                                                                onClick={fileData ? handleDownload : undefined}
+                                                                className={`px-3.5 py-2 text-[14px] leading-relaxed break-words shadow-sm rounded-2xl flex items-center gap-2 transition
+                                                                    ${fileData ? 'cursor-pointer hover:opacity-80' : ''}
+                                                                    ${isMe ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white' : 'bg-white border border-slate-100 text-slate-800'}`}
+                                                                title={fileData ? '點擊下載' : ''}
+                                                            >
+                                                                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                                                </svg>
+                                                                <span>{fileName}</span>
+                                                                {fileData && (
+                                                                    <svg className="w-4 h-4 flex-shrink-0 ml-1" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()
+                                                ) : (
+                                                    // 一般文字訊息
+                                                    msg.content
+                                                )}
                                             </div>
                                             {/* Quick Actions */}
                                             <div className={`absolute top-0 ${isMe ? 'right-full mr-2' : 'left-full ml-2'} opacity-0 group-hover/msg:opacity-100 transition-opacity flex gap-1`}>
@@ -583,7 +755,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
                         <div ref={messagesEndRef} />
                     </div>
 
-                    <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-200 bg-white">
+                    <form onSubmit={handleSendMessage} className="p-4 pb-20 md:pb-4 border-t border-slate-200 bg-white">
                         {replyToMessage && (
                             <div className="mb-2 p-2 bg-blue-50 border-l-4 border-blue-500 rounded flex justify-between items-start">
                                 <div className="flex-1">
@@ -602,6 +774,30 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
                             </div>
                         )}
                         <div className="flex gap-2 items-end">
+                            {/* 檔案上傳按鈕 */}
+                            <input 
+                                type="file" 
+                                id="file-upload" 
+                                className="hidden" 
+                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+                                onChange={handleFileUpload}
+                            />
+                            <label 
+                                htmlFor="file-upload"
+                                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all flex-shrink-0 active:scale-95
+                                    ${isUploading 
+                                        ? 'bg-blue-100 text-blue-500 cursor-wait' 
+                                        : 'bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-500 hover:text-slate-700 cursor-pointer'}`}
+                            >
+                                {isUploading ? (
+                                    <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                                    </svg>
+                                )}
+                            </label>
+                            
                             <div className="flex-1 relative">
                                 <textarea
                                     value={messageInput}

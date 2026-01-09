@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState } from 'react';
 import { Task, User, Role, TaskStatus, Urgency, DepartmentDef } from '../types';
 import { Badge } from './Badge';
@@ -91,10 +91,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     currentUser.role === Role.BOSS ||
     currentUser.role === Role.MANAGER;
 
-  // 判斷是否可以刪除任務 (建立者、BOSS 或 MANAGER，且任務尚未開始)
+  // 判斷是否可以刪除任務 (建立者、BOSS 或 MANAGER 可刪除任何狀態的任務)
   const canDelete = 
-    (task.createdBy === currentUser.id || currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER) &&
-    (task.status === TaskStatus.OPEN || task.status === TaskStatus.ASSIGNED);
+    task.createdBy === currentUser.id || currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
 
   // 判斷是否可以撤銷任務 (建立者，且任務尚未完成或取消)
   const canCancel = 
@@ -281,21 +280,39 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   </div>
 
                   {/* Timeline (History) */}
-                  {task.timeline && task.timeline.length > 0 && (
+                  {(() => {
+                      console.log('[TaskCard] Timeline 檢查:', {
+                          taskId: task.id,
+                          hasTimeline: !!task.timeline,
+                          timelineLength: task.timeline?.length || 0,
+                          timeline: task.timeline
+                      });
+                      return task.timeline && task.timeline.length > 0;
+                  })() && (
                       <div className="border-t border-slate-100 pt-4">
                           <h5 className="text-xs font-bold text-slate-400 uppercase mb-3">進度歷程</h5>
                           <div className="space-y-3 pl-2 border-l-2 border-slate-100 ml-1">
-                              {task.timeline.map((entry, idx) => (
-                                  <div key={idx} className="relative pl-4">
-                                      <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-slate-300"></div>
-                                      <div className="flex justify-between items-start text-xs mb-1">
-                                          <span className="font-bold text-slate-700">{getTimelineUserName(entry.userId)}</span>
-                                          <span className="text-slate-400">{new Date(entry.timestamp).toLocaleString()}</span>
+                              {task.timeline.map((entry, idx) => {
+                                  const userName = getTimelineUserName(entry.userId);
+                                  console.log('[TaskCard] 渲染 timeline entry:', {
+                                      idx,
+                                      entry,
+                                      userId: entry.userId,
+                                      userName,
+                                      content: entry.content
+                                  });
+                                  return (
+                                      <div key={idx} className="relative pl-4">
+                                          <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-slate-300"></div>
+                                          <div className="flex justify-between items-start text-xs mb-1">
+                                              <span className="font-bold text-slate-700">{userName}</span>
+                                              <span className="text-slate-400">{new Date(entry.timestamp).toLocaleString()}</span>
+                                          </div>
+                                          <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">{entry.content}</p>
+                                          <div className="text-[10px] text-blue-500 font-bold mt-1">進度更新至: {entry.progress}%</div>
                                       </div>
-                                      <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">{entry.content}</p>
-                                      <div className="text-[10px] text-blue-500 font-bold mt-1">進度更新至: {entry.progress}%</div>
-                                  </div>
-                              ))}
+                                  );
+                              })}
                           </div>
                       </div>
                   )}

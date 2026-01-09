@@ -54,9 +54,7 @@ export const SOPView: React.FC<SOPViewProps> = ({ currentUser, users, department
   const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
 
   const visibleDocs = templates.filter(t => {
-      // Boss sees all
-      if (currentUser.role === Role.BOSS) return true;
-      // Users see own dept
+      // Only own department documents are visible (no exceptions)
       return t.departmentId === currentUser.department;
   });
 

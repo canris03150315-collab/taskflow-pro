@@ -1,0 +1,9 @@
+tunnel: taskflow-websocket
+credentials-file: /root/.cloudflared/cert.json
+
+ingress:
+  - hostname: "*.trycloudflare.com"
+    service: https://localhost:3000
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404

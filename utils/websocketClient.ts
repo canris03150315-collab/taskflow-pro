@@ -1,7 +1,7 @@
-﻿export type WebSocketMessage = {
+﻿export interface WebSocketMessage {
     type: string;
     payload: any;
-};
+}
 
 export class WebSocketClient {
     private url: string;
