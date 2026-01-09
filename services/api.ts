@@ -328,7 +328,56 @@ const RealApi = {
             return response.report || response as any;
         },
         update: (id: string, content: any) => request<Report>('PUT', `/reports/${id}`, { content }),
-        delete: (id: string) => request<void>('DELETE', `/reports/${id}`)
+        delete: (id: string) => request<void>('DELETE', `/reports/${id}`),
+        
+        // Approval APIs
+        approval: {
+            initiate: async (approverId: string, reason: string) => {
+                return request<{ success: boolean; authorizationId: string; message: string }>(
+                    'POST', 
+                    '/reports/approval/initiate', 
+                    { approverId, reason }
+                );
+            },
+            complete: async (authorizationId: string, reason: string) => {
+                return request<{ success: boolean; authorization: any; message: string }>(
+                    'POST', 
+                    '/reports/approval/complete', 
+                    { authorizationId, reason }
+                );
+            },
+            checkStatus: async (sessionId: string) => {
+                const headers = {
+                    ...getAuthHeaders(),
+                    'x-session-id': sessionId
+                };
+                const response = await fetch(`${API_BASE_URL}/reports/approval/status`, {
+                    method: 'GET',
+                    headers
+                });
+                const data = await response.json();
+                return data;
+            },
+            getEligibleApprovers: async () => {
+                return request<{ success: boolean; approvers: any[] }>(
+                    'GET', 
+                    '/reports/approval/eligible-approvers'
+                );
+            },
+            getPending: async () => {
+                return request<{ success: boolean; pending: any[] }>(
+                    'GET', 
+                    '/reports/approval/pending'
+                );
+            },
+            revoke: async (authorizationId?: string) => {
+                return request<{ success: boolean; message: string }>(
+                    'POST', 
+                    '/reports/approval/revoke', 
+                    { authorizationId }
+                );
+            }
+        }
     },
     finance: {
         getAll: async (): Promise<FinanceRecord[]> => {
