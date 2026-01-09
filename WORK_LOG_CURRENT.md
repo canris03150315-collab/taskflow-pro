@@ -65,6 +65,18 @@
 - 創建改進版快照腳本
 - **結果**: 備份流程更安全
 
+### 7. 根絕 PowerShell 語法錯誤 ⭐
+- **問題**: `check-system-status.ps1` 存在語法錯誤（使用 `&&` 運算符、中文編碼問題）
+- **解決**: 
+  - 修復所有 `&&` 改為 `;`
+  - 創建 `check-system-status-fixed.ps1`（純英文版本）
+  - 創建 `POWERSHELL-BEST-PRACTICES.md` 完整防錯指南
+- **結果**: 
+  - 腳本可正常運行
+  - 建立完整的 PowerShell 最佳實踐規範
+  - 防止未來出現類似錯誤
+- **Git Commit**: `663cc14` - Fix PowerShell syntax errors and add best practices guide
+
 ---
 
 ## 📁 重要文件清單
@@ -80,13 +92,23 @@
 6. **`deploy-test.ps1`** - 測試環境部署
 7. **`deploy-prod.ps1`** - 生產環境部署
 
+### 系統檢查
+8. **`check-system-status-fixed.ps1`** - 系統狀態檢查腳本（無語法錯誤版本）
+
 ### 文檔
-8. **`WORK_LOG_CURRENT.md`** - 當前工作日誌（本文件）
-9. **`PROJECT-KNOWLEDGE-BASE.md`** - 項目知識庫
+9. **`WORK_LOG_CURRENT.md`** - 當前工作日誌（本文件）
+10. **`PROJECT-KNOWLEDGE-BASE.md`** - 項目知識庫
+11. **`POWERSHELL-BEST-PRACTICES.md`** - PowerShell 最佳實踐指南（防止語法錯誤）
 
 ---
 
 ## 🔧 常用命令
+
+### 系統檢查
+```powershell
+# 檢查系統狀態
+.\check-system-status-fixed.ps1
+```
 
 ### 備份
 ```powershell
@@ -219,6 +241,12 @@ git log --oneline -10
 - Netlify 部署包含 source maps
 - 可以從 source map 恢復源代碼
 
+### 6. PowerShell 語法規範很重要
+- 不能使用 `&&` 運算符（改用 `;`）
+- 避免中文字符導致編碼問題
+- 創建腳本前參考最佳實踐指南
+- 建立防錯機制可以避免重複問題
+
 ---
 
 ## 🔗 相關資源
@@ -263,6 +291,6 @@ ssh root@165.227.147.40 "cd /root/taskflow-snapshots && ls -lt *.tar.gz | head -
 
 ---
 
-**最後更新**: 2026-01-09 12:35  
+**最後更新**: 2026-01-09 12:56  
 **維護者**: AI Assistant  
 **狀態**: ✅ 系統穩定運行
