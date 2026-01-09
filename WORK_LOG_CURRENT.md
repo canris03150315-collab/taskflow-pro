@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
 **最後更新**: 2026-01-09  
-**版本**: v8.9.86-websocket-fixed  
+**版本**: v8.9.98-report-edit-complete  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -9,7 +9,7 @@
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `696084895a9a07801e57fc81`
+- **生產環境 Deploy ID**: `6960bcbc5bb7dddf3edbb70e`
 - **測試環境 Deploy ID**: `6960843ec9bc3c7b0f2eb32d`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -17,10 +17,10 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.86-manual-edit-status-fix-clean`
+- **Docker 映像**: `taskflow-pro:v8.9.98-report-edit-logs-table`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 12 個用戶，假表資料已清空
+- **資料庫**: 12 個用戶，包含 report_edit_logs 表
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
@@ -76,6 +76,43 @@
   - 建立完整的 PowerShell 最佳實踐規範
   - 防止未來出現類似錯誤
 - **Git Commit**: `663cc14` - Fix PowerShell syntax errors and add best practices guide
+
+### 8. 報表編輯和刪除功能完善 ⭐
+- **需求**: 報表要能夠編輯調整以及刪除
+- **問題發現**:
+  1. 刪除報表時出現 500 錯誤（缺少 `report_edit_logs` 表）
+  2. 編輯和刪除按鈕不顯示（權限邏輯問題）
+  3. 編輯報表後計算錯誤（未重新計算 netIncome）
+  4. 標籤名稱不清晰（「新增報表」應為「營運報表」）
+- **解決方案**:
+  1. 創建 `report_edit_logs` 表存儲編輯歷史
+  2. 修復按鈕顯示邏輯（BOSS/MANAGER 可見所有報表）
+  3. 編輯時自動重算 netIncome、conversionRate、firstDepositRate
+  4. 優化標籤名稱為「營運報表」
+- **結果**:
+  - 報表編輯和刪除功能完全正常
+  - 編輯歷史被完整記錄
+  - 權限控制清晰明確
+  - UI 更加直觀
+- **版本**: v8.9.98-report-edit-complete
+- **快照**: `taskflow-snapshot-v8.9.98-report-edit-complete-20260109_083434.tar.gz` (213MB)
+- **詳細文檔**: `WORK_LOG_20260109_REPORT_EDIT_DELETE.md`
+
+### 9. 審核歷史查看功能 ⭐
+- **需求**: 前端查看報表審核歷史記錄
+- **實現**:
+  1. 後端 API: `GET /api/reports/approval/audit-log`
+  2. 前端組件: `AuditLogView.tsx`
+  3. 集成到報表頁面作為新標籤「📋 審核歷史」
+- **功能**:
+  - 查看所有審核操作記錄（申請、批准、拒絕）
+  - 篩選功能（操作類型、日期範圍）
+  - 分頁顯示
+  - 權限控制（BOSS/MANAGER 看全部，SUPERVISOR 看部門）
+- **結果**: 審核流程透明化，可追溯
+- **Git Commits**: 
+  - `ae65bf6` - Deploy complete audit log viewing feature to production
+  - `9d29fa5` - Fix report delete error by creating report_edit_logs table
 
 ---
 
