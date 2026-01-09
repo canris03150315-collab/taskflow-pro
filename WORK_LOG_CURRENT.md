@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
 **最後更新**: 2026-01-10  
-**版本**: v8.9.99-employee-refresh-fix  
+**版本**: v8.9.100-module-loading-fix  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -9,8 +9,8 @@
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `69615b9646e5c91962756af4`
-- **測試環境 Deploy ID**: `69615b3d1a459f1a853695d3`
+- **生產環境 Deploy ID**: `69615d347e40182151706d40`
+- **測試環境 Deploy ID**: `69615c7ba721851e2675aac8`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
 - **WebSocket URL**: `wss://robust-managing-stay-largely.trycloudflare.com/ws`
@@ -146,6 +146,30 @@
 - **版本**: v8.9.99-employee-refresh-fix
 - **Git Commit**: `42d4e56` - Fix: Employee logout on refresh
 - **詳細文檔**: `fix-employee-refresh-logout.md`
+
+### 12. 動態模組載入錯誤修復 ⭐ (2026-01-10)
+- **問題**: 有時會出現 "Failed to load module script: Expected JavaScript but server responded with MIME type text/html"
+- **根本原因**:
+  - `netlify.toml` 的萬用路由 `/* → /index.html` 攔截所有請求
+  - 包括 `/assets/*.js` 靜態資源
+  - Netlify 返回 HTML 而非 JavaScript → 模組載入失敗
+- **解決方案**:
+  - 優化 `netlify.toml` 配置
+  - 移除不當的 no-cache 設定
+  - 簡化 SPA fallback（Netlify 會自動先檢查文件存在性）
+- **修改內容**:
+  1. `/assets/*` → 永久緩存（`max-age=31536000, immutable`）
+  2. `/*.html` → 不緩存（確保最新版本）
+  3. SPA fallback 自然排除靜態資源
+- **結果**:
+  - ✅ 動態模組正確載入（正確 MIME type）
+  - ✅ 改善頁面載入速度
+  - ✅ 減少不必要的網路請求
+  - ✅ 優化緩存策略
+- **影響組件**: 所有 lazy loading 組件（17 個）
+- **版本**: v8.9.100-module-loading-fix
+- **Git Commit**: `待提交` - Fix: Dynamic module loading error
+- **詳細文檔**: `fix-dynamic-module-loading.md`
 
 ---
 
