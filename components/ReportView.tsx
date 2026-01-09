@@ -257,7 +257,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                 >
-                    新增報表
+                    營運報表
                 </button>
                 {(currentUser.role === 'BOSS' || currentUser.role === 'MANAGER' || currentUser.role === 'SUPERVISOR') && (
                     <button
