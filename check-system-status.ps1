@@ -120,10 +120,10 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "📝 建議操作:" -ForegroundColor Yellow
 if ($gitStatus) {
-    Write-Host "  - 提交未提交的變更: git add . && git commit -m '描述'" -ForegroundColor White
+    Write-Host "  - 提交未提交的變更: git add . ; git commit -m '描述'" -ForegroundColor White
 }
 if ($snapshotCount -gt 15) {
-    Write-Host "  - 清理舊快照: ssh root@165.227.147.40 'cd /root/taskflow-snapshots && ls -t *.tar.gz | tail -n +11 | xargs rm -f'" -ForegroundColor White
+    Write-Host "  - 清理舊快照: ssh root@165.227.147.40 'cd /root/taskflow-snapshots ; ls -t *.tar.gz | tail -n +11 | xargs rm -f'" -ForegroundColor White
 }
 if ($backupAge.TotalHours -gt 24) {
     Write-Host "  - 創建新備份: .\backup-database.ps1" -ForegroundColor White
