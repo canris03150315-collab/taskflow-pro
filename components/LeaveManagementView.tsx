@@ -697,7 +697,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                 const hasConflict = onDuty.length < minOnDuty;
 
                 return (
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-lg max-h-[70vh] overflow-y-auto">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-lg min-h-[400px]">
                     {/* Header */}
                     <div className="text-center mb-4">
                       <div className="text-3xl font-bold text-blue-600 mb-1">
