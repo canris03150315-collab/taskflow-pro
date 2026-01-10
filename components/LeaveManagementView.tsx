@@ -73,6 +73,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
   const [showEditScheduleModal, setShowEditScheduleModal] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const [editSelectedDays, setEditSelectedDays] = useState<number[]>([]);
+  const [showFullCalendar, setShowFullCalendar] = useState(false); // 手機版月曆展開狀態
   
   // Apply form state
   const [applyForm, setApplyForm] = useState({
@@ -645,26 +646,26 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
         {/* Schedule Tab Content */}
         {activeTab === 'schedule' && scheduleViewMode === 'calendar' && (
-          <div className="bg-white rounded-lg border border-slate-200 p-6">
+          <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-6">
             {/* Rules Info Banner */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-blue-700 font-bold">📋 部門規則：</span>
+                    <span className="text-blue-700 font-bold text-sm sm:text-base">📋 部門規則：</span>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                     <span className="text-blue-800">
-                      每月最多 <span className="font-bold text-lg">{rulesForm.max_days_per_month}</span> 天休息
+                      每月最多 <span className="font-bold text-base sm:text-lg">{rulesForm.max_days_per_month}</span> 天休息
                     </span>
-                    <span className="text-slate-400">|</span>
+                    <span className="text-slate-400 hidden sm:inline">|</span>
                     <span className="text-blue-800">
                       每月 <span className="font-bold">{rulesForm.submission_deadline}</span> 號前提交
                     </span>
-                    <span className="text-slate-400">|</span>
+                    <span className="text-slate-400 hidden sm:inline">|</span>
                     <span className="text-blue-800">
                       最少 <span className="font-bold">{rulesForm.min_on_duty_staff}</span> 人在職
                     </span>
@@ -676,7 +677,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                       setShowRulesModal(true);
                       loadScheduleRules();
                     }}
-                    className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                    className="text-xs sm:text-sm px-3 py-1.5 sm:py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-full sm:w-auto"
                   >
                     修改規則
                   </button>
@@ -684,21 +685,116 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
               </div>
             </div>
 
-            {/* Month Selector */}
-            <div className="flex items-center justify-between mb-6">
+            {/* Today Card View - All screen sizes */}
+            <div className="mb-4">
+              {(() => {
+                const today = new Date();
+                const todayDay = today.getDate();
+                const onDuty = getUsersOnDuty(todayDay);
+                const offDuty = getUsersOffDuty(todayDay);
+                const deptUsers = users.filter(u => u.department === selectedDepartment);
+                const minOnDuty = rulesForm.min_on_duty_staff;
+                const hasConflict = onDuty.length < minOnDuty;
+
+                return (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-lg">
+                    {/* Header */}
+                    <div className="text-center mb-4">
+                      <div className="text-3xl font-bold text-blue-600 mb-1">
+                        {today.getDate()}
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        {today.getFullYear()} 年 {today.getMonth() + 1} 月 {['日', '一', '二', '三', '四', '五', '六'][today.getDay()]}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">今日排班狀態</div>
+                    </div>
+
+                    {/* Status Cards */}
+                    <div className="space-y-3">
+                      {/* Conflict Warning */}
+                      {hasConflict && (
+                        <div className="bg-orange-100 border-2 border-orange-400 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">⚠️</span>
+                            <span className="font-bold text-orange-800 text-lg">人力不足警告</span>
+                          </div>
+                          <div className="text-orange-700 text-sm">
+                            需要 <span className="font-bold text-lg">{minOnDuty}</span> 人，目前僅 <span className="font-bold text-lg">{onDuty.length}</span> 人上班
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Off Duty */}
+                      {offDuty.length > 0 && (
+                        <div className="bg-red-50 border-2 border-red-300 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">🏖️</span>
+                            <span className="font-bold text-red-800 text-lg">休息人員 ({offDuty.length})</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {offDuty.map(user => (
+                              <span key={user.id} className="bg-red-200 text-red-800 px-3 py-1 rounded-full text-sm font-medium">
+                                {user.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* On Duty */}
+                      {onDuty.length > 0 && (
+                        <div className={`border-2 rounded-lg p-3 ${
+                          hasConflict ? 'bg-orange-50 border-orange-300' : 'bg-green-50 border-green-300'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-2xl">✓</span>
+                            <span className={`font-bold text-lg ${hasConflict ? 'text-orange-800' : 'text-green-800'}`}>
+                              上班人員 ({onDuty.length})
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {onDuty.map(user => (
+                              <span key={user.id} className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                hasConflict ? 'bg-orange-200 text-orange-800' : 'bg-green-200 text-green-800'
+                              }`}>
+                                {user.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* View Full Calendar Button */}
+                    <button
+                      onClick={() => setShowFullCalendar(!showFullCalendar)}
+                      className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
+                    >
+                      <span>{showFullCalendar ? '收起' : '查看'}完整月曆</span>
+                      <span>{showFullCalendar ? '▲' : '▼'}</span>
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Month Selector - Only visible when calendar is expanded */}
+            <div className={`flex items-center justify-between mb-4 sm:mb-6 gap-2 ${showFullCalendar ? '' : 'hidden'}`}>
               <button
                 onClick={() => {
                   const newMonth = selectedMonth.month === 1 ? 12 : selectedMonth.month - 1;
                   const newYear = selectedMonth.month === 1 ? selectedMonth.year - 1 : selectedMonth.year;
                   setSelectedMonth({ year: newYear, month: newMonth });
                 }}
-                className="px-4 py-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition"
+                className="px-2 sm:px-4 py-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition text-sm sm:text-base flex-shrink-0"
               >
-                ← 上個月
+                <span className="hidden sm:inline">← 上個月</span>
+                <span className="sm:hidden">←</span>
               </button>
-              <h2 className="text-xl font-bold text-slate-800">
-                {selectedMonth.year} 年 {selectedMonth.month} 月排班表
-                {!canApprove && <span className="text-sm text-slate-500 ml-2">（我的排班）</span>}
+              <h2 className="text-base sm:text-xl font-bold text-slate-800 text-center">
+                {selectedMonth.year} 年 {selectedMonth.month} 月
+                <span className="hidden sm:inline">排班表</span>
+                {!canApprove && <span className="text-xs sm:text-sm text-slate-500 block sm:inline sm:ml-2">（我的排班）</span>}
               </h2>
               <button
                 onClick={() => {
@@ -706,25 +802,26 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                   const newYear = selectedMonth.month === 12 ? selectedMonth.year + 1 : selectedMonth.year;
                   setSelectedMonth({ year: newYear, month: newMonth });
                 }}
-                className="px-4 py-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition"
+                className="px-2 sm:px-4 py-2 bg-slate-100 rounded-lg hover:bg-slate-200 transition text-sm sm:text-base flex-shrink-0"
               >
-                下個月 →
+                <span className="hidden sm:inline">下個月 →</span>
+                <span className="sm:hidden">→</span>
               </button>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="space-y-2">
+            {/* Calendar Grid - Only visible when expanded */}
+            <div className={`space-y-2 ${showFullCalendar ? '' : 'hidden'}`}>
               {/* Weekday Headers */}
-              <div className="grid grid-cols-7 gap-2 mb-2">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
                 {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-                  <div key={day} className="text-center font-bold text-slate-600 py-2">
+                  <div key={day} className="text-center font-bold text-slate-600 py-1 sm:py-2 text-sm sm:text-base">
                     {day}
                   </div>
                 ))}
               </div>
 
               {/* Calendar Days */}
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {(() => {
                   const daysInMonth = getDaysInMonth(selectedMonth.year, selectedMonth.month);
                   const firstDay = getFirstDayOfMonth(selectedMonth.year, selectedMonth.month);
@@ -748,19 +845,19 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                     days.push(
                       <div
                         key={day}
-                        className={`border rounded-lg p-2 min-h-[120px] ${
+                        className={`border rounded-lg p-1 sm:p-2 min-h-[80px] sm:min-h-[120px] ${
                           isToday ? 'border-blue-500 border-2 bg-blue-50' :
                           isWeekend ? 'bg-slate-50' : 'bg-white'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className={`font-bold ${isToday ? 'text-blue-600' : 'text-slate-700'}`}>
+                          <span className={`font-bold text-sm sm:text-base ${isToday ? 'text-blue-600' : 'text-slate-700'}`}>
                             {day}
                           </span>
-                          {isToday && <span className="text-xs text-blue-600">今天</span>}
+                          {isToday && <span className="text-[10px] sm:text-xs text-blue-600">今天</span>}
                         </div>
                         
-                        <div className="space-y-1 text-xs">
+                        <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs">
                           {(() => {
                             const deptUsers = users.filter(u => u.department === selectedDepartment);
                             const totalStaff = deptUsers.length;
@@ -771,24 +868,29 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                               <>
                                 {hasConflict && (
                                   <div className="bg-orange-50 border border-orange-300 rounded px-1 py-0.5">
-                                    <p className="text-orange-700 font-bold">⚠️ 人力不足</p>
-                                    <p className="text-orange-600 text-[10px]">需{minOnDuty}人，僅{onDuty.length}人</p>
+                                    <p className="text-orange-700 font-bold text-[10px] sm:text-xs">
+                                      <span className="hidden sm:inline">⚠️ 人力不足</span>
+                                      <span className="sm:hidden">⚠️ {onDuty.length}/{minOnDuty}</span>
+                                    </p>
+                                    <p className="text-orange-600 text-[9px] sm:text-[10px] hidden sm:block">需{minOnDuty}人，僅{onDuty.length}人</p>
                                   </div>
                                 )}
                                 {offDuty.length > 0 && (
                                   <div className="bg-red-50 border border-red-200 rounded px-1 py-0.5">
-                                    <p className="text-red-700 font-bold">休息 {offDuty.length}人</p>
-                                    <p className="text-red-600 truncate">{offDuty.map(u => u.name).join(', ')}</p>
+                                    <p className="text-red-700 font-bold text-[10px] sm:text-xs">
+                                      <span className="hidden sm:inline">休息 {offDuty.length}人</span>
+                                      <span className="sm:hidden">🏖️ {offDuty.length}</span>
+                                    </p>
+                                    <p className="text-red-600 truncate text-[9px] sm:text-xs hidden sm:block">{offDuty.map(u => u.name).join(', ')}</p>
                                   </div>
                                 )}
-                                {onDuty.length > 0 && (
-                                  <div className={`border rounded px-1 py-0.5 ${
-                                    hasConflict ? 'bg-orange-50 border-orange-200' : 'bg-green-50 border-green-200'
-                                  }`}>
-                                    <p className={`font-bold ${hasConflict ? 'text-orange-700' : 'text-green-700'}`}>
-                                      上班 {onDuty.length}人
+                                {onDuty.length > 0 && !hasConflict && (
+                                  <div className="bg-green-50 border border-green-200 rounded px-1 py-0.5">
+                                    <p className="text-green-700 font-bold text-[10px] sm:text-xs">
+                                      <span className="hidden sm:inline">上班 {onDuty.length}人</span>
+                                      <span className="sm:hidden">✓ {onDuty.length}</span>
                                     </p>
-                                    <p className={`truncate ${hasConflict ? 'text-orange-600' : 'text-green-600'}`}>
+                                    <p className="text-green-600 truncate text-[9px] sm:text-xs hidden sm:block">
                                       {onDuty.map(u => u.name).join(', ')}
                                     </p>
                                   </div>
@@ -807,17 +909,22 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
             </div>
 
             {/* Legend */}
-            <div className="flex gap-4 mt-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-red-50 border border-red-200 rounded"></div>
+            <div className="flex flex-wrap gap-3 sm:gap-4 mt-4 sm:mt-6 text-xs sm:text-sm">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-50 border border-red-200 rounded"></div>
                 <span>休息</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-green-50 border border-green-200 rounded"></div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-50 border border-green-200 rounded"></div>
                 <span>上班</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-blue-500 rounded"></div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-orange-50 border border-orange-300 rounded"></div>
+                <span className="hidden sm:inline">人力不足</span>
+                <span className="sm:hidden">不足</span>
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-blue-500 rounded"></div>
                 <span>今天</span>
               </div>
             </div>
