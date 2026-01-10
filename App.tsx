@@ -1074,11 +1074,99 @@ function AppContent() {
         <div className="p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+                className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 shadow-md font-bold text-sm"
+                title={isSidebarCollapsed ? '展開選單' : '收起選單'}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  {isSidebarCollapsed ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  )}
+                </svg>
+                {!isSidebarCollapsed && <span>{isSidebarCollapsed ? '展開' : '收起'}</span>}
+              </button>
+              {!isSidebarCollapsed && (
+                <button 
+                  onClick={() => {
+                    loadData(true);
+                    toast.success('資料已更新');
+                  }} 
+                  className="hidden md:flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition active:scale-95 font-bold text-sm"
+                  title="手動更新所有資料"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>更新</span>
+                </button>
+              )}
+              <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 p-2 hover:bg-slate-100 rounded-lg transition"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <div className={`p-6 ${isSidebarCollapsed ? 'px-2' : ''}`}>
+          <button onClick={() => { setEditingUser(currentUser); setUserModalOpen(true); }} className={`w-full text-left bg-slate-50 rounded-2xl border border-slate-200 shadow-sm group hover:border-blue-300 transition ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
+            <div className="flex items-center gap-3 justify-center">
+               <img src={currentUser.avatar} className="w-12 h-12 rounded-full border border-slate-200 flex-shrink-0" />
+               {!isSidebarCollapsed && (
+                 <div className="min-w-0">
+                    <h2 className="font-bold text-slate-800 truncate">{currentUser.name}</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">{getDeptName(currentUser.department)}</p>
+                 </div>
+               )}
+            </div>
+          </button>
+        </div>
+
+        <nav className="flex-1 px-4 overflow-y-auto pb-4 space-y-4">
+          {Array.isArray(menuGroups) && menuGroups.map(group => {
+              if (!group || !Array.isArray(group.items)) return null;
+              const items = group.items.map(id => renderSidebarItem(id)).filter(Boolean);
+              if (items.length === 0) return null;
+              return (
+                  <div key={group.id} className="space-y-1">
+                      {!isSidebarCollapsed && <h3 className="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1 mt-2">{group.label}</h3>}
+                      {items}
+                  </div>
+              );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-slate-100 space-y-2">
+           <button onClick={() => setChangePasswordOpen(true)} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-600 transition flex items-center justify-center gap-2" title="修改密碼">{isSidebarCollapsed ? '🔐' : <>🔐 修改密碼</>}</button>
+           <button onClick={handleLogout} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition flex items-center justify-center gap-2" title="登出系統">{isSidebarCollapsed ? '🚪' : <>登出系統</>}</button>
+        </div>
+      </aside>
+
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-white md:bg-slate-50">
+        <header className="bg-white border-b border-slate-200 py-3 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
+           <div className="flex items-center gap-3">
+              <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-slate-500 active:scale-95 transition"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
+              <h2 className="text-lg md:text-xl font-black text-slate-800 tracking-tight truncate">{MENU_LABELS[currentPage]?.label}</h2>
+           </div>
+           <div className="flex items-center gap-3">
+              <button 
+                onClick={() => {
+                  loadData(true);
+                  toast.success('資料已更新');
+                }} 
+                className="md:hidden p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition active:scale-95"
+                title="更新資料"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              
               {/* 通知鈴鐺 */}
               <div className="relative hidden md:block">
                 <button 
                   onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)} 
-                  className="relative flex items-center justify-center w-10 h-10 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-all active:scale-95"
+                  className="relative flex items-center justify-center w-9 h-9 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-all active:scale-95"
                   title={`${totalNotificationCount} 個待處理通知`}
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -1197,93 +1285,7 @@ function AppContent() {
                   </>
                 )}
               </div>
-              <button 
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-                className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 shadow-md font-bold text-sm"
-                title={isSidebarCollapsed ? '展開選單' : '收起選單'}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                  {isSidebarCollapsed ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                  )}
-                </svg>
-                {!isSidebarCollapsed && <span>{isSidebarCollapsed ? '展開' : '收起'}</span>}
-              </button>
-              {!isSidebarCollapsed && (
-                <button 
-                  onClick={() => {
-                    loadData(true);
-                    toast.success('資料已更新');
-                  }} 
-                  className="hidden md:flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition active:scale-95 font-bold text-sm"
-                  title="手動更新所有資料"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>更新</span>
-                </button>
-              )}
-              <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 p-2 hover:bg-slate-100 rounded-lg transition"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-            </div>
-          </div>
-        </div>
 
-        <div className={`p-6 ${isSidebarCollapsed ? 'px-2' : ''}`}>
-          <button onClick={() => { setEditingUser(currentUser); setUserModalOpen(true); }} className={`w-full text-left bg-slate-50 rounded-2xl border border-slate-200 shadow-sm group hover:border-blue-300 transition ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
-            <div className="flex items-center gap-3 justify-center">
-               <img src={currentUser.avatar} className="w-12 h-12 rounded-full border border-slate-200 flex-shrink-0" />
-               {!isSidebarCollapsed && (
-                 <div className="min-w-0">
-                    <h2 className="font-bold text-slate-800 truncate">{currentUser.name}</h2>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">{getDeptName(currentUser.department)}</p>
-                 </div>
-               )}
-            </div>
-          </button>
-        </div>
-
-        <nav className="flex-1 px-4 overflow-y-auto pb-4 space-y-4">
-          {Array.isArray(menuGroups) && menuGroups.map(group => {
-              if (!group || !Array.isArray(group.items)) return null;
-              const items = group.items.map(id => renderSidebarItem(id)).filter(Boolean);
-              if (items.length === 0) return null;
-              return (
-                  <div key={group.id} className="space-y-1">
-                      {!isSidebarCollapsed && <h3 className="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1 mt-2">{group.label}</h3>}
-                      {items}
-                  </div>
-              );
-          })}
-        </nav>
-
-        <div className="p-4 border-t border-slate-100 space-y-2">
-           <button onClick={() => setChangePasswordOpen(true)} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-600 transition flex items-center justify-center gap-2" title="修改密碼">{isSidebarCollapsed ? '🔐' : <>🔐 修改密碼</>}</button>
-           <button onClick={handleLogout} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition flex items-center justify-center gap-2" title="登出系統">{isSidebarCollapsed ? '🚪' : <>登出系統</>}</button>
-        </div>
-      </aside>
-
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-white md:bg-slate-50">
-        <header className="bg-white border-b border-slate-200 py-3 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
-           <div className="flex items-center gap-3">
-              <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-slate-500 active:scale-95 transition"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button>
-              <h2 className="text-lg md:text-xl font-black text-slate-800 tracking-tight truncate">{MENU_LABELS[currentPage]?.label}</h2>
-           </div>
-           <div className="flex items-center gap-2">
-              <button 
-                onClick={() => {
-                  loadData(true);
-                  toast.success('資料已更新');
-                }} 
-                className="md:hidden p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition active:scale-95"
-                title="更新資料"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
               <div className="hidden md:flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span className="text-xs font-bold text-slate-400">已連線</span>
