@@ -44,6 +44,9 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
   // 過濾文件
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
+      // 強制過濾：絕對不顯示每日任務
+      if (doc.isDaily === true) return false;
+      
       // 部門過濾
       if (doc.departmentId !== selectedDept) return false;
       
