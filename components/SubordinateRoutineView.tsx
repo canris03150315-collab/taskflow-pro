@@ -7,7 +7,7 @@ interface RoutineRecord {
   user_id: string;
   department_id: string;
   date: string;
-  items: Array<{ task: string; isCompleted: boolean }>;
+  items: Array<{ text: string; completed: boolean }>;
 }
 
 interface SubordinateRoutineViewProps {
@@ -55,9 +55,15 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
       setLoading(true);
       try {
         const records = await api.routines.getHistory();
+        console.log('[SubordinateRoutineView] Raw API response:', records);
+        console.log('[SubordinateRoutineView] Selected date:', selectedDate);
         // 按選定日期過濾
         const filteredRecords = records.filter(r => r.date === selectedDate);
-        setRoutineRecords(filteredRecords);
+        console.log('[SubordinateRoutineView] Filtered records:', filteredRecords);
+        if (filteredRecords.length > 0) {
+          console.log('[SubordinateRoutineView] First record structure:', JSON.stringify(filteredRecords[0], null, 2));
+        }
+        setRoutineRecords(filteredRecords as any);
       } catch (error) {
         console.error('載入每日任務記錄失敗:', error);
       } finally {
@@ -71,12 +77,19 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
   // 計算用戶的每日任務完成狀況
   const getUserRoutineStats = (userId: string) => {
     const userRecord = routineRecords.find(r => r.user_id === userId);
+    
+    // DEBUG: 檢查 Se7en 的數據
+    if (userId === 'user-1767451212149-7rxqt4f6d') {
+      console.log('[DEBUG] Se7en record:', userRecord);
+      console.log('[DEBUG] Se7en items:', userRecord?.items);
+    }
+    
     if (!userRecord || !userRecord.items) {
       return { total: 0, completed: 0, percentage: 0, hasRecord: false };
     }
 
     const total = userRecord.items.length;
-    const completed = userRecord.items.filter(item => item.isCompleted).length;
+    const completed = userRecord.items.filter(item => item.completed).length;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return { total, completed, percentage, hasRecord: true };
@@ -323,16 +336,16 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
                       <div 
                         key={index}
                         className={`flex items-start gap-2 p-2 rounded text-sm ${
-                          item.isCompleted 
+                          item.completed 
                             ? 'bg-emerald-50 text-emerald-700' 
                             : 'bg-slate-50 text-slate-600'
                         }`}
                       >
                         <span className="flex-shrink-0 mt-0.5">
-                          {item.isCompleted ? '✓' : '○'}
+                          {item.completed ? '✓' : '○'}
                         </span>
-                        <span className={item.isCompleted ? 'line-through' : ''}>
-                          {item.task}
+                        <span className={item.completed ? 'line-through' : ''}>
+                          {item.text}
                         </span>
                       </div>
                     ))}

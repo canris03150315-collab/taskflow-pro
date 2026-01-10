@@ -508,9 +508,10 @@ const RealApi = {
                 return null;
             }
         },
-        getHistory: async (): Promise<RoutineRecord[]> => {
+        getHistory: async (): Promise<any[]> => {
             try {
-                const response = await request<{ records: RoutineRecord[] }>('GET', '/routines/history');
+                const response = await request<{ records: any[] }>('GET', '/routines/history');
+                console.log('[API] getHistory response:', response);
                 return response.records || [];
             } catch (error) {
                 console.error('Failed to get routine history', error);

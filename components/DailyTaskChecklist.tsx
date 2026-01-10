@@ -25,19 +25,28 @@ export const DailyTaskChecklist: React.FC<DailyTaskChecklistProps> = ({ currentU
   const loadData = async () => {
     setIsLoading(true);
     try {
+      console.log('[DailyTaskChecklist] Loading data for user:', currentUser.id, 'dept:', selectedDept);
+      
       const allTemplates = await api.routines.getTemplates();
       // 篩選有 isDaily 標記的模板（每日任務）- 顯示選擇的部門任務
       const dailyTemplates = allTemplates.filter(t => 
         (t as any).isDaily && 
         t.departmentId === selectedDept
       );
+      console.log('[DailyTaskChecklist] Daily templates found:', dailyTemplates.length);
       setTemplates(dailyTemplates);
 
       // 取得今日紀錄
       const record = await api.routines.getTodayRecord(currentUser.id, selectedDept);
+      console.log('[DailyTaskChecklist] Today record received:', record);
+      if (record) {
+        console.log('[DailyTaskChecklist] Record items:', record.items);
+        console.log('[DailyTaskChecklist] Items is array:', Array.isArray(record.items));
+        console.log('[DailyTaskChecklist] Items length:', record.items?.length);
+      }
       setTodayRecord(record);
     } catch (error) {
-      console.error('Failed to load daily tasks:', error);
+      console.error('[DailyTaskChecklist] Failed to load daily tasks:', error);
     } finally {
       setIsLoading(false);
     }
@@ -49,14 +58,24 @@ export const DailyTaskChecklist: React.FC<DailyTaskChecklistProps> = ({ currentU
     setIsSaving(index);
     const newStatus = !todayRecord.items[index].completed;
     
+    console.log('[Toggle] Starting toggle operation:', {
+      recordId: todayRecord.id,
+      index,
+      newStatus,
+      currentItem: todayRecord.items[index]
+    });
+    
     try {
+      console.log('[Toggle] Calling API...');
       await api.routines.toggleItem(todayRecord.id, index, newStatus);
+      console.log('[Toggle] API call successful');
       
       // 更新本地狀態
       setTodayRecord(prev => {
         if (!prev) return prev;
         const newItems = [...prev.items];
         newItems[index] = { ...newItems[index], completed: newStatus };
+        console.log('[Toggle] Local state updated:', newItems[index]);
         return { ...prev, items: newItems };
       });
 
@@ -64,6 +83,7 @@ export const DailyTaskChecklist: React.FC<DailyTaskChecklistProps> = ({ currentU
         toast.success('已完成 ✓');
       }
     } catch (error) {
+      console.error('[Toggle] API call failed:', error);
       toast.error('更新失敗，請重試');
     } finally {
       setIsSaving(null);
