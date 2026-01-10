@@ -697,7 +697,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                 const hasConflict = onDuty.length < minOnDuty;
 
                 return (
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-lg">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-4 shadow-lg max-h-[70vh] overflow-y-auto">
                     {/* Header */}
                     <div className="text-center mb-4">
                       <div className="text-3xl font-bold text-blue-600 mb-1">
@@ -710,7 +710,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                     </div>
 
                     {/* Status Cards */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 mb-4">
                       {/* Conflict Warning */}
                       {hasConflict && (
                         <div className="bg-orange-100 border-2 border-orange-400 rounded-lg p-3">
@@ -766,13 +766,15 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                     </div>
 
                     {/* View Full Calendar Button */}
-                    <button
-                      onClick={() => setShowFullCalendar(!showFullCalendar)}
-                      className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"
-                    >
-                      <span>{showFullCalendar ? '收起' : '查看'}完整月曆</span>
-                      <span>{showFullCalendar ? '▲' : '▼'}</span>
-                    </button>
+                    <div className="sticky bottom-0 bg-gradient-to-t from-indigo-50 pt-3 -mx-4 px-4 -mb-4 pb-4">
+                      <button
+                        onClick={() => setShowFullCalendar(!showFullCalendar)}
+                        className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 shadow-lg"
+                      >
+                        <span>{showFullCalendar ? '收起' : '查看'}完整月曆</span>
+                        <span>{showFullCalendar ? '▲' : '▼'}</span>
+                      </button>
+                    </div>
                   </div>
                 );
               })()}
