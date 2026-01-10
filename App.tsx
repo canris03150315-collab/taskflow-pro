@@ -82,6 +82,7 @@ function AppContent() {
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchStartDate, setSearchStartDate] = useState('');
@@ -1017,19 +1018,18 @@ function AppContent() {
       if (!config) return null;
       if (id === 'team' && !(hasPermission(currentUser!, 'CREATE_TASK') || currentUser!.role === Role.BOSS || currentUser!.role === Role.MANAGER || currentUser!.role === Role.SUPERVISOR)) return null;
       if (id === 'personnel' && !(hasPermission(currentUser!, 'MANAGE_USERS') || currentUser!.role === Role.BOSS || currentUser!.role === Role.MANAGER || currentUser!.role === Role.SUPERVISOR)) return null;
-      if (id === 'settings' && !(currentUser!.role === Role.BOSS || hasPermission(currentUser!, 'SYSTEM_RESET'))) return null;
-      if (id === 'data_center' && !(currentUser!.role === Role.BOSS || currentUser!.role === Role.MANAGER || currentUser!.role === Role.SUPERVISOR)) return null;
-
+      if (id === 'chat') {
+        const badge = unreadChatCount > 0 ? <Badge count={unreadChatCount} /> : null;
+        return <button key={id} onClick={() => { setCurrentPage(id); setIsCreatingReport(false); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><span className="text-lg">{config.icon}</span>{!isSidebarCollapsed && <span>{config.label}</span>}{!isSidebarCollapsed && badge}</button>;
+      }
       return (
         <button 
             key={id}
             onClick={() => { setCurrentPage(id); setIsCreatingReport(false); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${currentPage === id ? (id === 'settings' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700 shadow-sm') : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? (id === 'settings' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700 shadow-sm') : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
         >
             <span className="text-lg">{config.icon}</span>
-            {config.label}
-            {id === 'tasks' && taskNotificationCount > 0 && <span className="ml-auto bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[10px] font-black">{taskNotificationCount}</span>}
-            {id === 'chat' && unreadChatCount > 0 && <span className="ml-auto bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[10px] font-black">{unreadChatCount}</span>}
+            {!isSidebarCollapsed && <span>{config.label}</span>}
         </button>
       );
   };
@@ -1058,38 +1058,42 @@ function AppContent() {
           <div className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>
       )}
 
-      <aside className={`w-72 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-50 fixed inset-y-0 left-0 transform transition-transform duration-300 md:translate-x-0 md:static ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+      <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-50 fixed inset-y-0 left-0 transform transition-all duration-300 md:translate-x-0 md:static ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-xl">🏢</div>
-            <h1 className="text-lg font-black text-slate-800 tracking-tight leading-none">企業管理系統</h1>
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-xl flex-shrink-0">🏢</div>
+            <h1 className={`text-lg font-black text-slate-800 tracking-tight leading-none transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>企業管理系統</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => {
-                loadData(true);
-                toast.success('資料已更新');
-              }} 
-              className="hidden md:flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition active:scale-95"
-              title="手動更新所有資料"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span className="text-sm font-bold">更新資料</span>
-            </button>
+            {!isSidebarCollapsed && (
+              <button 
+                onClick={() => {
+                  loadData(true);
+                  toast.success('資料已更新');
+                }} 
+                className="hidden md:flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition active:scale-95"
+                title="手動更新所有資料"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="text-sm font-bold">更新資料</span>
+              </button>
+            )}
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
           </div>
         </div>
 
-        <div className="p-6">
-          <button onClick={() => { setEditingUser(currentUser); setUserModalOpen(true); }} className="w-full text-left bg-slate-50 rounded-2xl border border-slate-200 p-4 shadow-sm group hover:border-blue-300 transition">
-            <div className="flex items-center gap-3">
-               <img src={currentUser.avatar} className="w-12 h-12 rounded-full border border-slate-200" />
-               <div className="min-w-0">
-                  <h2 className="font-bold text-slate-800 truncate">{currentUser.name}</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">{getDeptName(currentUser.department)}</p>
-               </div>
+        <div className={`p-6 ${isSidebarCollapsed ? 'px-2' : ''}`}>
+          <button onClick={() => { setEditingUser(currentUser); setUserModalOpen(true); }} className={`w-full text-left bg-slate-50 rounded-2xl border border-slate-200 shadow-sm group hover:border-blue-300 transition ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
+            <div className="flex items-center gap-3 justify-center">
+               <img src={currentUser.avatar} className="w-12 h-12 rounded-full border border-slate-200 flex-shrink-0" />
+               {!isSidebarCollapsed && (
+                 <div className="min-w-0">
+                    <h2 className="font-bold text-slate-800 truncate">{currentUser.name}</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">{getDeptName(currentUser.department)}</p>
+                 </div>
+               )}
             </div>
           </button>
         </div>
@@ -1101,7 +1105,7 @@ function AppContent() {
               if (items.length === 0) return null;
               return (
                   <div key={group.id} className="space-y-1">
-                      <h3 className="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1 mt-2">{group.label}</h3>
+                      {!isSidebarCollapsed && <h3 className="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1 mt-2">{group.label}</h3>}
                       {items}
                   </div>
               );
@@ -1109,8 +1113,16 @@ function AppContent() {
         </nav>
 
         <div className="p-4 border-t border-slate-100 space-y-2">
-           <button onClick={() => setChangePasswordOpen(true)} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-600 transition flex items-center justify-center gap-2">🔐 修改密碼</button>
-           <button onClick={handleLogout} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition flex items-center justify-center gap-2">登出系統</button>
+           <button 
+             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+             className="hidden md:flex w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition items-center justify-center gap-2"
+             title={isSidebarCollapsed ? '展開選單' : '收起選單'}
+           >
+             {isSidebarCollapsed ? '▶' : '◀'}
+             {!isSidebarCollapsed && <span>收起選單</span>}
+           </button>
+           <button onClick={() => setChangePasswordOpen(true)} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-600 transition flex items-center justify-center gap-2" title="修改密碼">{isSidebarCollapsed ? '🔐' : <>🔐 修改密碼</>}</button>
+           <button onClick={handleLogout} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition flex items-center justify-center gap-2" title="登出系統">{isSidebarCollapsed ? '🚪' : <>登出系統</>}</button>
         </div>
       </aside>
 
