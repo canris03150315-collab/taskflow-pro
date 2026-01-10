@@ -646,7 +646,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+      <div className="flex-1 p-3 sm:p-6">
         {/* Schedule Tab Content */}
         {activeTab === 'schedule' && scheduleViewMode === 'calendar' && (
           <div className="bg-white rounded-lg border border-slate-200 p-3 sm:p-6">
