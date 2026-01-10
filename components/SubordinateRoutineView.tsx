@@ -26,6 +26,12 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
   const [selectedDept, setSelectedDept] = useState<string>(
     currentUser.role === Role.SUPERVISOR ? currentUser.department : 'ALL'
   );
+  
+  // 日期篩選狀態
+  const today = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState<string>(today);
+  const [endDate, setEndDate] = useState<string>(today);
+  const [selectedDate, setSelectedDate] = useState<string>(today);
 
   // 獲取下屬列表
   const subordinates = useMemo(() => {
@@ -49,9 +55,9 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
       setLoading(true);
       try {
         const records = await api.routines.getHistory();
-        const today = new Date().toISOString().split('T')[0];
-        const todayRecords = records.filter(r => r.date === today);
-        setRoutineRecords(todayRecords);
+        // 按選定日期過濾
+        const filteredRecords = records.filter(r => r.date === selectedDate);
+        setRoutineRecords(filteredRecords);
       } catch (error) {
         console.error('載入每日任務記錄失敗:', error);
       } finally {
@@ -60,7 +66,7 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
     };
 
     loadRoutineRecords();
-  }, []);
+  }, [selectedDate]);
 
   // 計算用戶的每日任務完成狀況
   const getUserRoutineStats = (userId: string) => {
@@ -78,6 +84,47 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
 
   const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
 
+  // 計算整體統計
+  const overallStats = useMemo(() => {
+    const subordinateIds = subordinates.map(u => u.id);
+    const relevantRecords = routineRecords.filter(r => subordinateIds.includes(r.user_id));
+    
+    let totalTasks = 0;
+    let completedTasks = 0;
+    const incompleteUsers: { user: User; stats: any }[] = [];
+    
+    subordinates.forEach(user => {
+      const stats = getUserRoutineStats(user.id);
+      if (stats.hasRecord) {
+        totalTasks += stats.total;
+        completedTasks += stats.completed;
+        if (stats.percentage < 100) {
+          incompleteUsers.push({ user, stats });
+        }
+      }
+    });
+    
+    const overallPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const usersWithRecords = subordinates.filter(u => getUserRoutineStats(u.id).hasRecord).length;
+    const usersWithoutRecords = subordinates.length - usersWithRecords;
+    
+    return {
+      totalTasks,
+      completedTasks,
+      overallPercentage,
+      incompleteUsers,
+      usersWithRecords,
+      usersWithoutRecords
+    };
+  }, [subordinates, routineRecords]);
+
+  // 快速日期選擇
+  const setQuickDate = (days: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    setSelectedDate(date.toISOString().split('T')[0]);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -89,28 +136,137 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-            <span>📋</span> 下屬每日任務執行狀況
-          </h2>
-          <p className="text-sm text-slate-500 font-bold mt-1">
-            查看團隊成員今日的每日任務完成進度
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <span>📋</span> 下屬每日任務執行狀況
+            </h2>
+            <p className="text-sm text-slate-500 font-bold mt-1">
+              查看團隊成員的每日任務完成進度
+            </p>
+          </div>
+
+          {/* Department Filter */}
+          {currentUser.role === Role.BOSS && (
+            <select 
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="px-4 py-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="ALL">所有部門</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
-        {/* Department Filter */}
-        {currentUser.role === Role.BOSS && (
-          <select 
-            value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
-            className="px-4 py-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="ALL">所有部門</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+        {/* Date Filter */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-700">📅 查看日期：</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                max={today}
+                className="px-3 py-2 bg-white border-2 border-blue-300 rounded-lg font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-slate-500 font-bold">快速選擇：</span>
+              <button
+                onClick={() => setQuickDate(0)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                  selectedDate === today
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white text-slate-600 hover:bg-blue-100 border border-slate-300'
+                }`}
+              >
+                今天
+              </button>
+              <button
+                onClick={() => setQuickDate(-1)}
+                className="px-3 py-1 bg-white text-slate-600 hover:bg-blue-100 border border-slate-300 rounded-lg text-xs font-bold transition"
+              >
+                昨天
+              </button>
+              <button
+                onClick={() => setQuickDate(-7)}
+                className="px-3 py-1 bg-white text-slate-600 hover:bg-blue-100 border border-slate-300 rounded-lg text-xs font-bold transition"
+              >
+                7天前
+              </button>
+              <button
+                onClick={() => setQuickDate(-30)}
+                className="px-3 py-1 bg-white text-slate-600 hover:bg-blue-100 border border-slate-300 rounded-lg text-xs font-bold transition"
+              >
+                30天前
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Overall Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white shadow-lg">
+            <div className="text-sm font-bold opacity-90 mb-1">整體完成率</div>
+            <div className="text-3xl font-black">{overallStats.overallPercentage}%</div>
+            <div className="text-xs opacity-75 mt-1">
+              {overallStats.completedTasks} / {overallStats.totalTasks} 項任務
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white shadow-lg">
+            <div className="text-sm font-bold opacity-90 mb-1">已完成人數</div>
+            <div className="text-3xl font-black">
+              {subordinates.filter(u => getUserRoutineStats(u.id).percentage === 100).length}
+            </div>
+            <div className="text-xs opacity-75 mt-1">
+              / {overallStats.usersWithRecords} 人有記錄
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 text-white shadow-lg">
+            <div className="text-sm font-bold opacity-90 mb-1">未完成人數</div>
+            <div className="text-3xl font-black">{overallStats.incompleteUsers.length}</div>
+            <div className="text-xs opacity-75 mt-1">需要關注</div>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-500 to-slate-600 rounded-xl p-4 text-white shadow-lg">
+            <div className="text-sm font-bold opacity-90 mb-1">未開始人數</div>
+            <div className="text-3xl font-black">{overallStats.usersWithoutRecords}</div>
+            <div className="text-xs opacity-75 mt-1">尚未開始任務</div>
+          </div>
+        </div>
+
+        {/* Incomplete Users Alert */}
+        {overallStats.incompleteUsers.length > 0 && (
+          <div className="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div className="flex-1">
+                <h3 className="font-bold text-orange-800 mb-2">未完成每日任務的員工</h3>
+                <div className="flex flex-wrap gap-2">
+                  {overallStats.incompleteUsers.map(({ user, stats }) => (
+                    <div
+                      key={user.id}
+                      className="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-orange-200"
+                    >
+                      <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full" />
+                      <span className="text-sm font-bold text-slate-700">{user.name}</span>
+                      <span className="text-xs font-bold text-orange-600">
+                        {stats.completed}/{stats.total}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
