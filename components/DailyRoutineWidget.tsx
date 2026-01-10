@@ -19,8 +19,11 @@ export const DailyRoutineWidget: React.FC<DailyRoutineWidgetProps> = ({ currentU
   const loadStatus = async () => {
     setIsLoading(true);
     const allTemplates = await api.routines.getTemplates();
-    // Filter docs relevant to this user
-    const myDocs = allTemplates.filter(t => t.departmentId === currentUser.department);
+    // Filter docs relevant to this user (排除每日任務)
+    const myDocs = allTemplates.filter(t => 
+      t.departmentId === currentUser.department && 
+      !t.isDaily
+    );
     
     setTotalDocs(myDocs.length);
     const unread = myDocs.filter(t => !t.readBy?.includes(currentUser.id)).length;
