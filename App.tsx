@@ -83,6 +83,7 @@ function AppContent() {
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchStartDate, setSearchStartDate] = useState('');
@@ -1011,6 +1012,17 @@ function AppContent() {
     ).length;
   }, [tasks, currentUser]);
 
+  // 計算未讀公告數量
+  const unreadAnnouncementCount = useMemo(() => {
+    if (!currentUser) return 0;
+    return announcements.filter(a => !a.readBy?.includes(currentUser.id)).length;
+  }, [announcements, currentUser]);
+
+  // 計算總通知數量
+  const totalNotificationCount = useMemo(() => {
+    return taskNotificationCount + unreadChatCount + unreadAnnouncementCount;
+  }, [taskNotificationCount, unreadChatCount, unreadAnnouncementCount]);
+
   const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
 
   const renderSidebarItem = (id: MenuItemId) => {
@@ -1063,24 +1075,128 @@ function AppContent() {
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
               {/* 通知鈴鐺 */}
-              <button 
-                onClick={() => {
-                  setCurrentPage('tasks');
-                  setBoardTab('available');
-                  setIsMobileMenuOpen(false);
-                }} 
-                className="relative hidden md:flex items-center justify-center w-10 h-10 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-all active:scale-95"
-                title={`${taskNotificationCount} 個待處理通知`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {taskNotificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                    {taskNotificationCount > 9 ? '9+' : taskNotificationCount}
-                  </span>
+              <div className="relative hidden md:block">
+                <button 
+                  onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)} 
+                  className="relative flex items-center justify-center w-10 h-10 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-all active:scale-95"
+                  title={`${totalNotificationCount} 個待處理通知`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {totalNotificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                      {totalNotificationCount > 9 ? '9+' : totalNotificationCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* 通知下拉選單 */}
+                {isNotificationMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsNotificationMenuOpen(false)}></div>
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                      <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <h3 className="font-bold text-slate-800 text-lg">通知中心</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">{totalNotificationCount} 個未讀通知</p>
+                      </div>
+                      <div className="max-h-96 overflow-y-auto">
+                        {/* 任務通知 */}
+                        {taskNotificationCount > 0 && (
+                          <button
+                            onClick={() => {
+                              setCurrentPage('tasks');
+                              setBoardTab('available');
+                              setIsNotificationMenuOpen(false);
+                            }}
+                            className="w-full p-4 hover:bg-blue-50 transition text-left border-b border-slate-100 group"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition">
+                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                </svg>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-slate-800 text-sm">待接取任務</p>
+                                <p className="text-xs text-slate-500 mt-1">有 {taskNotificationCount} 個任務等待處理</p>
+                              </div>
+                              <span className="w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                                {taskNotificationCount}
+                              </span>
+                            </div>
+                          </button>
+                        )}
+
+                        {/* 聊天訊息通知 */}
+                        {unreadChatCount > 0 && (
+                          <button
+                            onClick={() => {
+                              setCurrentPage('chat');
+                              setIsNotificationMenuOpen(false);
+                            }}
+                            className="w-full p-4 hover:bg-green-50 transition text-left border-b border-slate-100 group"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-green-200 transition">
+                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-slate-800 text-sm">新訊息</p>
+                                <p className="text-xs text-slate-500 mt-1">有 {unreadChatCount} 則未讀訊息</p>
+                              </div>
+                              <span className="w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                                {unreadChatCount}
+                              </span>
+                            </div>
+                          </button>
+                        )}
+
+                        {/* 公告通知 */}
+                        {unreadAnnouncementCount > 0 && (
+                          <button
+                            onClick={() => {
+                              setCurrentPage('bulletin');
+                              setIsNotificationMenuOpen(false);
+                            }}
+                            className="w-full p-4 hover:bg-amber-50 transition text-left border-b border-slate-100 group"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition">
+                                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                                </svg>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-slate-800 text-sm">新公告</p>
+                                <p className="text-xs text-slate-500 mt-1">有 {unreadAnnouncementCount} 則未讀公告</p>
+                              </div>
+                              <span className="w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center flex-shrink-0">
+                                {unreadAnnouncementCount}
+                              </span>
+                            </div>
+                          </button>
+                        )}
+
+                        {/* 無通知狀態 */}
+                        {totalNotificationCount === 0 && (
+                          <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                              <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                            <p className="text-slate-500 font-bold">沒有新通知</p>
+                            <p className="text-xs text-slate-400 mt-1">所有通知都已處理完畢</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
-              </button>
+              </div>
               <button 
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
                 className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 shadow-md font-bold text-sm"
