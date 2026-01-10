@@ -1059,35 +1059,47 @@ function AppContent() {
       )}
 
       <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-50 fixed inset-y-0 left-0 transform transition-all duration-300 md:translate-x-0 md:static ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-xl flex-shrink-0">🏢</div>
-            <h1 className={`text-lg font-black text-slate-800 tracking-tight leading-none transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>企業管理系統</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-              className="hidden md:flex items-center justify-center w-9 h-9 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition active:scale-95"
-              title={isSidebarCollapsed ? '展開選單' : '收起選單'}
-            >
-              {isSidebarCollapsed ? '▶' : '◀'}
-            </button>
-            {!isSidebarCollapsed && (
+        <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center text-xl flex-shrink-0 shadow-lg">🏢</div>
+              <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
+                <h1 className="text-lg font-black text-slate-800 tracking-tight leading-none">企業管理系統</h1>
+                <p className="text-[10px] text-slate-400 font-bold mt-0.5">TaskFlow Pro</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
               <button 
-                onClick={() => {
-                  loadData(true);
-                  toast.success('資料已更新');
-                }} 
-                className="hidden md:flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition active:scale-95"
-                title="手動更新所有資料"
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+                className="hidden md:flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all active:scale-95 shadow-md font-bold text-sm"
+                title={isSidebarCollapsed ? '展開選單' : '收起選單'}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  {isSidebarCollapsed ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  )}
                 </svg>
-                <span className="text-sm font-bold">更新資料</span>
+                {!isSidebarCollapsed && <span>{isSidebarCollapsed ? '展開' : '收起'}</span>}
               </button>
-            )}
-            <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+              {!isSidebarCollapsed && (
+                <button 
+                  onClick={() => {
+                    loadData(true);
+                    toast.success('資料已更新');
+                  }} 
+                  className="hidden md:flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition active:scale-95 font-bold text-sm"
+                  title="手動更新所有資料"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>更新</span>
+                </button>
+              )}
+              <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 p-2 hover:bg-slate-100 rounded-lg transition"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
           </div>
         </div>
 
