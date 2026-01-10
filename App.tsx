@@ -1065,7 +1065,6 @@ function AppContent() {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center text-xl flex-shrink-0 shadow-lg">🏢</div>
               <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
                 <h1 className="text-lg font-black text-slate-800 tracking-tight leading-none">企業管理系統</h1>
-                <p className="text-[10px] text-slate-400 font-bold mt-0.5">TaskFlow Pro</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
