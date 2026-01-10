@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
 **最後更新**: 2026-01-10  
-**版本**: v8.9.106-manual-complete  
+**版本**: v8.9.107-notification-center  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -9,7 +9,7 @@
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `696236d43ca158d4d757cce6`
+- **生產環境 Deploy ID**: `69623f5e19401de87268cd40`
 - **測試環境 Deploy ID**: `696188ea5f419a423e9ba6f2`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -17,11 +17,11 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.106-manual-complete`
+- **Docker 映像**: `taskflow-pro:v8.9.107-notification-center`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 12 個用戶，完整 attendance_records 表結構
-- **快照**: `taskflow-snapshot-v8.9.106-attendance-complete-20260109_233125.tar.gz` (213MB)
+- **快照**: `taskflow-snapshot-v8.9.107-notification-center-20260110_120801.tar.gz` (213MB)
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
@@ -32,6 +32,66 @@
 ---
 
 ## 🎯 2026-01-10 更新記錄
+
+### 15. 通知中心功能 - 類似 Facebook 的通知系統 ⭐
+**完成時間**: 2026-01-10 晚上 20:00
+
+#### 功能特色
+- **下拉選單模式**: 點擊鈴鐺顯示通知選單，不直接跳轉
+- **多種通知類型**:
+  1. 📋 待接取任務（藍色圖標）
+  2. 💬 新訊息（綠色圖標）
+  3. 📢 新公告（橙色圖標）
+- **智能計數**: 鈴鐺徽章顯示總通知數（任務 + 聊天 + 公告）
+- **獨立跳轉**: 每個通知項目可獨立點擊跳轉到對應頁面
+
+#### 使用邏輯（類似 Facebook）
+1. 有人發訊息 → 鈴鐺顯示 `1`
+2. 同時有新任務 → 鈴鐺顯示 `2`
+3. 點擊鈴鐺 → 顯示下拉選單，列出所有通知
+4. 點擊特定通知 → 跳轉到對應頁面
+
+#### 視覺設計
+- **位置**: 主頁面標題列（「已連線」左側）
+- **通知中心標題**: 藍色漸層背景
+- **每個通知項目**: 獨立顏色圖標 + 標題 + 描述 + 紅色數字徽章
+- **Hover 效果**: 背景變色
+- **無通知時**: 顯示友善提示「沒有新通知」
+
+#### 技術實現
+- **狀態管理**: 
+  - `isNotificationMenuOpen` - 控制選單開關
+  - `taskNotificationCount` - 任務通知數量
+  - `unreadChatCount` - 未讀訊息數量
+  - `unreadAnnouncementCount` - 未讀公告數量
+  - `totalNotificationCount` - 總通知數量
+- **計算邏輯**:
+  - 任務: 新分配 + 公開任務 + 未讀更新
+  - 公告: 未標記已讀的公告
+  - 聊天: 現有的 `unreadChatCount`
+- **UI 細節**:
+  - 寬度: 320px (w-80)
+  - 最大高度: 384px (max-h-96) 可滾動
+  - 自動關閉: 點擊外部區域
+  - 動畫: 徽章閃爍效果 (animate-pulse)
+
+#### 部署信息
+- **前端 Deploy ID**: `69623f5e19401de87268cd40`
+- **後端版本**: `taskflow-pro:v8.9.107-notification-center`
+- **快照**: `taskflow-snapshot-v8.9.107-notification-center-20260110_120801.tar.gz` (213MB)
+- **Git Commits**: 
+  - `76879ae`: 添加通知鈴鐺功能到標題列
+  - `434fa04`: 重新設計通知鈴鐺為下拉選單模式（類似 Facebook）
+  - `04ff06b`: 將通知鈴鐺移到主頁面標題列（已連線旁邊）
+
+#### 改善效果
+- ✅ 統一的通知入口，不需要到處找通知
+- ✅ 清楚顯示各類通知數量
+- ✅ 快速跳轉到需要處理的頁面
+- ✅ 類似 Facebook 的使用體驗，用戶容易上手
+- ✅ 下拉選單不會被裁切（位置在主頁面）
+
+---
 
 ### 14. 假表排班月曆優化 - 今日排班卡片設計 ⭐
 **完成時間**: 2026-01-10 晚上
