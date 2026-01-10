@@ -1059,14 +1059,8 @@ function AppContent() {
       )}
 
       <aside className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-50 fixed inset-y-0 left-0 transform transition-all duration-300 md:translate-x-0 md:static ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
-        <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center text-xl flex-shrink-0 shadow-lg">🏢</div>
-              <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
-                <h1 className="text-lg font-black text-slate-800 tracking-tight leading-none">企業管理系統</h1>
-              </div>
-            </div>
+        <div className="p-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
