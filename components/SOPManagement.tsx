@@ -15,7 +15,8 @@ export const SOPManagement: React.FC<SOPManagementProps> = ({ departments, curre
   
   // View State (Filters)
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterDept, setFilterDept] = useState('ALL');
+  // 預設顯示當前用戶的部門，而不是 ALL
+  const [filterDept, setFilterDept] = useState(currentUser.department);
 
   // Edit State
   const [editingId, setEditingId] = useState<string | null>(null);
