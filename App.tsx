@@ -1065,6 +1065,13 @@ function AppContent() {
             <h1 className={`text-lg font-black text-slate-800 tracking-tight leading-none transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>企業管理系統</h1>
           </div>
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+              className="hidden md:flex items-center justify-center w-9 h-9 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition active:scale-95"
+              title={isSidebarCollapsed ? '展開選單' : '收起選單'}
+            >
+              {isSidebarCollapsed ? '▶' : '◀'}
+            </button>
             {!isSidebarCollapsed && (
               <button 
                 onClick={() => {
@@ -1076,8 +1083,8 @@ function AppContent() {
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span className="text-sm font-bold">更新資料</span>
+                </svg>
+                <span className="text-sm font-bold">更新資料</span>
               </button>
             )}
             <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
@@ -1113,14 +1120,6 @@ function AppContent() {
         </nav>
 
         <div className="p-4 border-t border-slate-100 space-y-2">
-           <button 
-             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-             className="hidden md:flex w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold hover:bg-blue-100 transition items-center justify-center gap-2"
-             title={isSidebarCollapsed ? '展開選單' : '收起選單'}
-           >
-             {isSidebarCollapsed ? '▶' : '◀'}
-             {!isSidebarCollapsed && <span>收起選單</span>}
-           </button>
            <button onClick={() => setChangePasswordOpen(true)} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-blue-50 hover:text-blue-600 transition flex items-center justify-center gap-2" title="修改密碼">{isSidebarCollapsed ? '🔐' : <>🔐 修改密碼</>}</button>
            <button onClick={handleLogout} className="w-full py-3 bg-slate-50 text-slate-500 rounded-xl font-bold hover:bg-red-50 hover:text-red-600 transition flex items-center justify-center gap-2" title="登出系統">{isSidebarCollapsed ? '🚪' : <>登出系統</>}</button>
         </div>
