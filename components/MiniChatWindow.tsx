@@ -178,6 +178,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
         ) : (
           messages.map((msg) => {
             const isMe = msg.userId === currentUser.id;
+            const isImage = msg.content.startsWith('data:image/');
             return (
               <div
                 key={msg.id}
@@ -185,13 +186,23 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
               >
                 <div className={`max-w-[75%] ${isMe ? 'order-2' : 'order-1'}`}>
                   <div
-                    className={`px-3 py-2 rounded-2xl ${
+                    className={`${isImage ? 'p-1' : 'px-3 py-2'} rounded-2xl ${
                       isMe
                         ? 'bg-blue-600 text-white rounded-br-sm'
                         : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
                     }`}
                   >
-                    <p className="text-sm break-words">{msg.content}</p>
+                    {isImage ? (
+                      <img 
+                        src={msg.content} 
+                        alt="圖片訊息" 
+                        className="max-w-full rounded-xl cursor-pointer hover:opacity-90 transition"
+                        style={{ maxHeight: '200px' }}
+                        onClick={() => window.open(msg.content, '_blank')}
+                      />
+                    ) : (
+                      <p className="text-sm break-words">{msg.content}</p>
+                    )}
                   </div>
                   <p className={`text-xs text-slate-400 mt-1 ${isMe ? 'text-right' : 'text-left'}`}>
                     {formatTime(msg.timestamp)}
