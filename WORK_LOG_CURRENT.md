@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-10  
-**版本**: v8.9.107-notification-center  
+**最後更新**: 2026-01-13  
+**版本**: v8.9.109-data-cleanup  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -9,25 +9,89 @@
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `69623f5e19401de87268cd40`
-- **測試環境 Deploy ID**: `696188ea5f419a423e9ba6f2`
+- **生產環境 Deploy ID**: `696602010b1bbc8a5df941dd`
+- **測試環境 Deploy ID**: `6966005dfc26eb0c848c9ec5`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
 - **WebSocket URL**: `wss://robust-managing-stay-largely.trycloudflare.com/ws`
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.107-notification-center`
+- **Docker 映像**: `taskflow-pro:v8.9.109-data-cleanup`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 12 個用戶，完整 attendance_records 表結構
-- **快照**: `taskflow-snapshot-v8.9.107-notification-center-20260110_120801.tar.gz` (213MB)
+- **快照**: `taskflow-snapshot-v8.9.109-20260113-162854-20260113_082920.tar.gz` (213MB)
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
 - **來源**: 從 Netlify source map 恢復
 - **狀態**: ✅ 與生產環境同步
+
+---
+
+## 🎯 2026-01-13 更新記錄
+
+### 16. 資料清理工具 - BOSS 專用批量刪除功能 ⭐
+**完成時間**: 2026-01-13 下午 16:30
+
+#### 功能概述
+為 BOSS 角色添加批量刪除舊資料的功能，可按時間範圍和資料分類清理過期資料。
+
+#### 功能特點
+**時間範圍選項**：
+- 一個月以前
+- 兩個月以前
+- 三個月以前
+- 六個月以前
+
+**資料分類（10 種）**：
+1. 📋 任務記錄（tasks）
+2. 📅 請假記錄（leave_requests）
+3. 📊 排班記錄（schedules）
+4. ⏰ 打卡記錄（attendance_records）
+5. 📝 每日任務記錄（routine_records）
+6. 💰 財務記錄（finance）
+7. 📢 公告記錄（announcements）
+8. 💡 提案記錄（suggestions）
+9. 📈 報表記錄（reports）
+10. 📝 備忘錄（memos）
+
+#### 功能特點
+- **權限控制**: 僅 BOSS 角色可使用
+- **時間範圍**: 1/2/3/6 個月前的資料
+- **預覽功能**: 刪除前可預覽將刪除的資料數量
+- **雙重確認**: 預覽 + 最終確認，防止誤刪
+- **操作日誌**: 記錄刪除操作的詳細信息
+- **批量刪除**: 支援多選資料分類同時刪除
+
+#### 技術實現
+- **前端組件**: `DataCleanupView.tsx`
+- **後端 API**: `/api/data-cleanup/preview` 和 `/api/data-cleanup/delete`
+- **權限控制**: 僅 BOSS 角色可使用
+- **UI 設計**: 紫色主題，步驟式操作流程
+
+#### 部署信息
+- **前端生產**: Deploy ID `696602010b1bbc8a5df941dd`
+- **前端測試**: Deploy ID `6966005dfc26eb0c848c9ec5`
+- **後端版本**: `taskflow-pro:v8.9.108-data-cleanup`
+- **快照備份**: `taskflow-snapshot-v8.9.109-20260113-162854-20260113_082920.tar.gz` (213MB)
+- **Git Commit**: `4c79ee3`
+
+#### 訪問路徑
+1. 登入 BOSS 帳號
+2. 點擊左側邊欄最下方「⚙️ 系統設定」
+3. 切換到「系統管理」標籤
+4. 找到「🗑️ 資料清理工具」區塊
+5. 點擊「開啟清理工具」按鈕
+
+#### 改善效果
+- ✅ 提供批量刪除舊資料的功能
+- ✅ 按時間範圍和分類靈活篩選
+- ✅ 預覽功能避免誤刪
+- ✅ 雙重確認保障安全
+- ✅ 操作日誌可追溯
 
 ---
 
