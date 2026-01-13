@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
 **最後更新**: 2026-01-13  
-**版本**: v8.9.109-data-cleanup  
+**版本**: v8.9.81-routine-data-cleaned  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -17,11 +17,12 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.109-data-cleanup`
+- **Docker 映像**: `taskflow-pro:v8.9.81-routine-data-cleaned`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 12 個用戶，完整 attendance_records 表結構
-- **快照**: `taskflow-snapshot-v8.9.109-20260113-162854-20260113_082920.tar.gz` (213MB)
+- **最新備份**: `taskflow-backup-2026-01-13T11-54-43-492Z.db` (3.20 MB)
+- **快照**: `taskflow-snapshot-v8.9.81-routine-data-cleaned-20260113_101252.tar.gz` (213MB)
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
@@ -32,6 +33,59 @@
 ---
 
 ## 🎯 2026-01-13 更新記錄
+
+### 17. 主管查看部屬每日任務完成狀態修復 ⭐
+**完成時間**: 2026-01-13 晚上 19:54
+
+#### 問題描述
+主管在「團隊工作概況 → 每日任務執行狀況」頁面無法看到部屬每日任務的完成狀態，所有任務都顯示為未完成。
+
+#### 根本原因
+後端 `routines.js` 的第一個 toggle 路由有嚴重錯誤：
+```javascript
+// 錯誤代碼
+completedItems[index] = isCompleted;  // 直接設置布林值，破壞數據結構
+```
+
+這導致任務數據從正確格式 `[{"text":"...", "completed":true}]` 被破壞成 `[true]`，任務文本完全丟失。
+
+#### 修復方案
+1. **修正 Toggle 路由**：
+   - 正確更新對象的 `completed` 屬性而非替換整個對象
+   - 添加類型檢查確保數據結構完整性
+
+2. **清理損壞數據**：
+   - 修復：1 條記錄（保留有效項目）
+   - 刪除：21 條記錄（完全損壞，無法恢復）
+   - 涵蓋日期：2026-01-06 至 2026-01-13
+
+#### 技術實現
+- **修復腳本**: `fix-routine-toggle.js` - 修正 toggle 路由邏輯
+- **清理腳本**: `fix-corrupted-routine-data.js` - 清理損壞的歷史數據
+- **診斷腳本**: `check-routine-data.js` - 檢查數據結構
+
+#### 部署信息
+- **後端版本**: `taskflow-pro:v8.9.81-routine-data-cleaned`
+- **快照備份**: `taskflow-snapshot-v8.9.81-routine-data-cleaned-20260113_101252.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-13T11-54-43-492Z.db` (3.20 MB)
+- **Git Commits**: 
+  - `61bbe99`: 修正 toggle 路由保持任務結構
+  - `97faab5`: 清理損壞的每日任務記錄
+
+#### 修復效果
+- ✅ 主管可以正確看到部屬每日任務完成狀態
+- ✅ 已完成任務顯示綠色背景 + ✓
+- ✅ 未完成任務顯示灰色背景 + ○
+- ✅ 進度條正確顯示完成百分比
+- ✅ 不會再發生數據結構破壞
+
+#### 關鍵教訓
+1. **數據結構完整性**：修改 JSON 數據時必須保持原有結構
+2. **容器內診斷**：使用 Node.js 腳本精確檢查數據格式
+3. **數據修復策略**：無法恢復的損壞數據應該刪除而非保留
+4. **遵循全域規則**：修改前創建快照，修改後創建新映像
+
+---
 
 ### 16. 資料清理工具 - BOSS 專用批量刪除功能 ⭐
 **完成時間**: 2026-01-13 下午 16:30
