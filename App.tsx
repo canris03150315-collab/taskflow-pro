@@ -12,11 +12,11 @@ import { api } from './services/api';
 import { NotificationToast, Notification } from './components/NotificationToast';
 import { ToastProvider, useToast } from './components/Toast';
 import { WebSocketClient, WebSocketMessage } from './utils/websocketClient';
+
+// 動態載入大型組件 - 程式碼分割優化
 import { FloatingChatButton } from './components/FloatingChatButton';
 import { FloatingChatList } from './components/FloatingChatList';
 import { MiniChatWindow } from './components/MiniChatWindow';
-
-// 動態載入大型組件 - 程式碼分割優化
 const SubordinateView = lazy(() => import('./components/SubordinateView').then(m => ({ default: m.SubordinateView })));
 const SubordinateRoutineView = lazy(() => import('./components/SubordinateRoutineView').then(m => ({ default: m.SubordinateRoutineView })));
 const PersonnelView = lazy(() => import('./components/PersonnelView').then(m => ({ default: m.PersonnelView })));
@@ -1491,42 +1491,40 @@ function AppContent() {
       </nav>
 
       {/* 懸浮聊天功能（僅桌面版顯示，不在聊天頁面時顯示） */}
-      {currentPage !== 'chat' && (
-        <>
-          {/* 懸浮聊天按鈕 */}
-          <FloatingChatButton
-            unreadCount={unreadChatCount}
-            onClick={() => setIsFloatingChatOpen(!isFloatingChatOpen)}
-            isOpen={isFloatingChatOpen}
+      <div className={currentPage === 'chat' ? 'hidden' : ''}>
+        {/* 懸浮聊天按鈕 */}
+        <FloatingChatButton
+          unreadCount={unreadChatCount}
+          onClick={() => setIsFloatingChatOpen(!isFloatingChatOpen)}
+          isOpen={isFloatingChatOpen}
+        />
+
+        {/* 聊天列表彈窗 */}
+        {isFloatingChatOpen && (
+          <FloatingChatList
+            currentUser={currentUser}
+            users={users}
+            channels={chatChannels}
+            onSelectChat={handleOpenChat}
+            onClose={() => setIsFloatingChatOpen(false)}
           />
+        )}
 
-          {/* 聊天列表彈窗 */}
-          {isFloatingChatOpen && (
-            <FloatingChatList
-              currentUser={currentUser}
-              users={users}
-              channels={chatChannels}
-              onSelectChat={handleOpenChat}
-              onClose={() => setIsFloatingChatOpen(false)}
-            />
-          )}
-
-          {/* 迷你聊天視窗（可開啟多個） */}
-          {openChatWindows.map((window, index) => (
-            <MiniChatWindow
-              key={window.userId}
-              currentUser={currentUser}
-              targetUserId={window.userId}
-              targetUserName={window.userName}
-              channelId={window.channelId}
-              position={index}
-              onClose={() => handleCloseChatWindow(window.userId)}
-              onMinimize={() => handleMinimizeChatWindow(window.userId)}
-              isMinimized={window.isMinimized}
-            />
-          ))}
-        </>
-      )}
+        {/* 迷你聊天視窗（可開啟多個） */}
+        {openChatWindows.map((window, index) => (
+          <MiniChatWindow
+            key={window.userId}
+            currentUser={currentUser}
+            targetUserId={window.userId}
+            targetUserName={window.userName}
+            channelId={window.channelId}
+            position={index}
+            onClose={() => handleCloseChatWindow(window.userId)}
+            onMinimize={() => handleMinimizeChatWindow(window.userId)}
+            isMinimized={window.isMinimized}
+          />
+        ))}
+      </div>
 
       {/* 版本號顯示 */}
       <div className="hidden md:block fixed bottom-2 right-2 text-xs text-slate-400 bg-white/80 px-2 py-1 rounded shadow-sm">
