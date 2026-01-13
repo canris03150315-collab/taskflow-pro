@@ -19,6 +19,18 @@ export const FloatingChatList: React.FC<FloatingChatListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'recent' | 'contacts'>('recent');
 
+  // 獲取部門名稱的輔助函數
+  const getDepartmentName = (deptId: string) => {
+    const deptMap: Record<string, string> = {
+      'Management': '營運管理部',
+      'Engineering': '技術工程部',
+      'Marketing': '市場行銷部',
+      'HR': '人力資源部',
+      'UNASSIGNED': '待分配 / 新人'
+    };
+    return deptMap[deptId] || deptId;
+  };
+
   // 獲取最近聊天列表
   const recentChats = useMemo(() => {
     return channels
@@ -162,7 +174,7 @@ export const FloatingChatList: React.FC<FloatingChatListProps> = ({
                       {/* 頭像 */}
                       <div className="relative flex-shrink-0">
                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                          {user.avatar || user.name.charAt(0)}
+                          {user.name.charAt(0)}
                         </div>
                         {unreadCount > 0 && (
                           <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white">
@@ -213,13 +225,13 @@ export const FloatingChatList: React.FC<FloatingChatListProps> = ({
                     <div className="flex items-center gap-3">
                       {/* 頭像 */}
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center text-white font-bold">
-                        {user.avatar || user.name.charAt(0)}
+                        {user.name.charAt(0)}
                       </div>
 
                       {/* 用戶資訊 */}
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-800 truncate">{user.name}</p>
-                        <p className="text-xs text-slate-500">{user.department}</p>
+                        <p className="text-xs text-slate-500">{getDepartmentName(user.department)}</p>
                       </div>
 
                       {/* 聊天圖標 */}
