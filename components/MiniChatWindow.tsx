@@ -178,7 +178,10 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
         ) : (
           messages.map((msg) => {
             const isMe = msg.userId === currentUser.id;
-            const isImage = msg.content.startsWith('data:image/');
+            const isImage = msg.content.startsWith('[IMG]');
+            const isFile = msg.content.startsWith('[FILE]');
+            const imageUrl = isImage ? msg.content.replace('[IMG]', '') : '';
+            
             return (
               <div
                 key={msg.id}
@@ -186,7 +189,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
               >
                 <div className={`max-w-[75%] ${isMe ? 'order-2' : 'order-1'}`}>
                   <div
-                    className={`${isImage ? 'p-1' : 'px-3 py-2'} rounded-2xl ${
+                    className={`${isImage || isFile ? 'p-1' : 'px-3 py-2'} rounded-2xl ${
                       isMe
                         ? 'bg-blue-600 text-white rounded-br-sm'
                         : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
@@ -194,12 +197,16 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
                   >
                     {isImage ? (
                       <img 
-                        src={msg.content} 
+                        src={imageUrl} 
                         alt="圖片訊息" 
                         className="max-w-full rounded-xl cursor-pointer hover:opacity-90 transition"
                         style={{ maxHeight: '200px' }}
-                        onClick={() => window.open(msg.content, '_blank')}
+                        onClick={() => window.open(imageUrl, '_blank')}
                       />
+                    ) : isFile ? (
+                      <div className="px-2 py-1">
+                        <p className="text-sm">📎 檔案</p>
+                      </div>
                     ) : (
                       <p className="text-sm break-words">{msg.content}</p>
                     )}
