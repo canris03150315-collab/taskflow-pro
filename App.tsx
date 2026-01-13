@@ -12,6 +12,9 @@ import { api } from './services/api';
 import { NotificationToast, Notification } from './components/NotificationToast';
 import { ToastProvider, useToast } from './components/Toast';
 import { WebSocketClient, WebSocketMessage } from './utils/websocketClient';
+import { FloatingChatButton } from './components/FloatingChatButton';
+import { FloatingChatList } from './components/FloatingChatList';
+import { MiniChatWindow } from './components/MiniChatWindow';
 
 // 動態載入大型組件 - 程式碼分割優化
 const SubordinateView = lazy(() => import('./components/SubordinateView').then(m => ({ default: m.SubordinateView })));
@@ -98,6 +101,16 @@ function AppContent() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [hasShownInitialNotifications, setHasShownInitialNotifications] = useState(false);
+
+  // 懸浮聊天狀態
+  const [isFloatingChatOpen, setIsFloatingChatOpen] = useState(false);
+  const [chatChannels, setChatChannels] = useState<any[]>([]);
+  const [openChatWindows, setOpenChatWindows] = useState<Array<{
+    userId: string;
+    userName: string;
+    channelId: string | null;
+    isMinimized: boolean;
+  }>>([]);
 
   const taskListRef = useRef<HTMLDivElement>(null);
 
@@ -316,9 +329,11 @@ function AppContent() {
                 const channelArray = Array.isArray(channels) ? channels : [];
                 const total = channelArray.reduce((acc, ch) => acc + (ch.unreadCount || 0), 0);
                 setUnreadChatCount(total);
+                setChatChannels(channelArray);
             } catch (error) {
                 console.error('Failed to fetch chat count', error);
                 setUnreadChatCount(0);
+                setChatChannels([]);
             }
         };
         fetchChatCount();
@@ -892,6 +907,37 @@ function AppContent() {
       }
   };
 
+  // 懸浮聊天處理函數
+  const handleOpenChat = (userId: string, userName: string) => {
+    const existingWindow = openChatWindows.find(w => w.userId === userId);
+    if (existingWindow) {
+      setOpenChatWindows(prev => 
+        prev.map(w => w.userId === userId ? { ...w, isMinimized: false } : w)
+      );
+    } else {
+      if (openChatWindows.length >= 3) {
+        toast.error('最多只能同時開啟 3 個聊天視窗');
+        return;
+      }
+      setOpenChatWindows(prev => [...prev, {
+        userId,
+        userName,
+        channelId: null,
+        isMinimized: false
+      }]);
+    }
+  };
+
+  const handleCloseChatWindow = (userId: string) => {
+    setOpenChatWindows(prev => prev.filter(w => w.userId !== userId));
+  };
+
+  const handleMinimizeChatWindow = (userId: string) => {
+    setOpenChatWindows(prev => 
+      prev.map(w => w.userId === userId ? { ...w, isMinimized: !w.isMinimized } : w)
+    );
+  };
+
   const handleNotificationClick = () => {
     setCurrentPage('tasks');
     setBoardTab('my_tasks');
@@ -1443,6 +1489,44 @@ function AppContent() {
           </button>
         </div>
       </nav>
+
+      {/* 懸浮聊天功能（僅桌面版顯示，不在聊天頁面時顯示） */}
+      {currentPage !== 'chat' && (
+        <>
+          {/* 懸浮聊天按鈕 */}
+          <FloatingChatButton
+            unreadCount={unreadChatCount}
+            onClick={() => setIsFloatingChatOpen(!isFloatingChatOpen)}
+            isOpen={isFloatingChatOpen}
+          />
+
+          {/* 聊天列表彈窗 */}
+          {isFloatingChatOpen && (
+            <FloatingChatList
+              currentUser={currentUser}
+              users={users}
+              channels={chatChannels}
+              onSelectChat={handleOpenChat}
+              onClose={() => setIsFloatingChatOpen(false)}
+            />
+          )}
+
+          {/* 迷你聊天視窗（可開啟多個） */}
+          {openChatWindows.map((window, index) => (
+            <MiniChatWindow
+              key={window.userId}
+              currentUser={currentUser}
+              targetUserId={window.userId}
+              targetUserName={window.userName}
+              channelId={window.channelId}
+              position={index}
+              onClose={() => handleCloseChatWindow(window.userId)}
+              onMinimize={() => handleMinimizeChatWindow(window.userId)}
+              isMinimized={window.isMinimized}
+            />
+          ))}
+        </>
+      )}
 
       {/* 版本號顯示 */}
       <div className="hidden md:block fixed bottom-2 right-2 text-xs text-slate-400 bg-white/80 px-2 py-1 rounded shadow-sm">
