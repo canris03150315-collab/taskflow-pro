@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import { User, MenuItemId, DEFAULT_MENU_GROUPS, MENU_LABELS } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import DataCleanupView from './DataCleanupView';
 
 interface SystemSettingsViewProps {
   currentUser: User;
@@ -21,6 +22,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ currentU
   const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
   const [isUploadingBackup, setIsUploadingBackup] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [showDataCleanup, setShowDataCleanup] = useState(false);
 
   const handleResetSystem = async () => {
       if (confirm('⚠️ 危險操作：確定要重置系統嗎？所有資料將被清空！')) {
@@ -298,50 +300,70 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ currentU
                     </div>
 
                     {currentUser.role === 'BOSS' && (
-                        <div className="pt-6 border-t border-slate-100">
-                            <h3 className="font-bold text-blue-600 mb-4 flex items-center gap-2">
-                                <span>💾</span> 資料備份與恢復
-                            </h3>
-                            <div className="space-y-3">
-                                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex justify-between items-center">
-                                    <div>
-                                        <div className="font-bold text-blue-700">下載資料庫備份</div>
-                                        <div className="text-xs text-blue-500">下載完整的資料庫備份檔案到本機</div>
-                                    </div>
-                                    <button 
-                                        onClick={handleDownloadBackup}
-                                        disabled={isDownloadingBackup}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {isDownloadingBackup ? '下載中...' : '下載備份'}
-                                    </button>
-                                </div>
-                                
-                                <div className="p-4 bg-orange-50 rounded-lg border border-orange-100 flex justify-between items-center">
-                                    <div>
-                                        <div className="font-bold text-orange-700">上傳並恢復備份</div>
-                                        <div className="text-xs text-orange-500">⚠️ 上傳備份檔案將覆蓋現有資料庫</div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            ref={uploadInputRef}
-                                            type="file"
-                                            accept=".db"
-                                            onChange={handleUploadBackup}
-                                            disabled={isUploadingBackup}
-                                            className="hidden"
-                                            id="backup-upload"
-                                        />
-                                        <label
-                                            htmlFor="backup-upload"
-                                            className={`px-4 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 shadow-lg shadow-orange-200 cursor-pointer ${isUploadingBackup ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        <>
+                            <div className="pt-6 border-t border-slate-100">
+                                <h3 className="font-bold text-blue-600 mb-4 flex items-center gap-2">
+                                    <span>💾</span> 資料備份與恢復
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex justify-between items-center">
+                                        <div>
+                                            <div className="font-bold text-blue-700">下載資料庫備份</div>
+                                            <div className="text-xs text-blue-500">下載完整的資料庫備份檔案到本機</div>
+                                        </div>
+                                        <button 
+                                            onClick={handleDownloadBackup}
+                                            disabled={isDownloadingBackup}
+                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {isUploadingBackup ? '上傳中...' : '選擇檔案'}
-                                        </label>
+                                            {isDownloadingBackup ? '下載中...' : '下載備份'}
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-100 flex justify-between items-center">
+                                        <div>
+                                            <div className="font-bold text-orange-700">上傳並恢復備份</div>
+                                            <div className="text-xs text-orange-500">⚠️ 上傳備份檔案將覆蓋現有資料庫</div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                ref={uploadInputRef}
+                                                type="file"
+                                                accept=".db"
+                                                onChange={handleUploadBackup}
+                                                disabled={isUploadingBackup}
+                                                className="hidden"
+                                                id="backup-upload"
+                                            />
+                                            <label
+                                                htmlFor="backup-upload"
+                                                className={`px-4 py-2 bg-orange-600 text-white rounded-lg font-bold hover:bg-orange-700 shadow-lg shadow-orange-200 cursor-pointer ${isUploadingBackup ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                {isUploadingBackup ? '上傳中...' : '選擇檔案'}
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+
+                            <div className="pt-6 border-t border-slate-100">
+                                <h3 className="font-bold text-purple-600 mb-4 flex items-center gap-2">
+                                    <span>🗑️</span> 資料清理工具
+                                </h3>
+                                <div className="p-4 bg-purple-50 rounded-lg border border-purple-100 flex justify-between items-center">
+                                    <div>
+                                        <div className="font-bold text-purple-700">批量刪除舊資料</div>
+                                        <div className="text-xs text-purple-500">按時間範圍和分類刪除過期資料</div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setShowDataCleanup(true)}
+                                        className="px-4 py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 shadow-lg shadow-purple-200"
+                                    >
+                                        開啟清理工具
+                                    </button>
+                                </div>
+                            </div>
+                        </>
                     )}
 
                     <div className="pt-6 border-t border-slate-100">
@@ -378,6 +400,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ currentU
                 </div>
             )}
         </div>
+
+        {showDataCleanup && (
+            <DataCleanupView onClose={() => setShowDataCleanup(false)} />
+        )}
     </div>
   );
 };
