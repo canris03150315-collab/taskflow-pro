@@ -1110,10 +1110,11 @@ const RealApi = {
     },
 
     kol: {
-        getProfiles: async (params?: { status?: string; search?: string }): Promise<{ profiles: any[] }> => {
+        getProfiles: async (params?: { status?: string; search?: string; departmentId?: string }): Promise<{ profiles: any[] }> => {
             const queryParams = new URLSearchParams();
             if (params?.status) queryParams.append('status', params.status);
             if (params?.search) queryParams.append('search', params.search);
+            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
             console.log('[KOL API] getProfiles 請求:', { params, url: `/kol/profiles?${queryParams}` });
             try {
                 const result = await request<{ profiles: any[] }>('GET', `/kol/profiles?${queryParams}`);
@@ -1147,6 +1148,7 @@ const RealApi = {
             if (params?.startDate) queryParams.append('startDate', params.startDate);
             if (params?.endDate) queryParams.append('endDate', params.endDate);
             if (params?.contractType) queryParams.append('contractType', params.contractType);
+            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
             return request<{ contracts: any[] }>('GET', `/kol/contracts?${queryParams}`);
         },
 
@@ -1178,10 +1180,11 @@ const RealApi = {
             return request<{ success: boolean }>('DELETE', `/kol/payments/${id}`);
         },
 
-        getStats: async (params?: { startDate?: string; endDate?: string }): Promise<any> => {
+        getStats: async (params?: { startDate?: string; endDate?: string; departmentId?: string }): Promise<any> => {
             const queryParams = new URLSearchParams();
             if (params?.startDate) queryParams.append('startDate', params.startDate);
             if (params?.endDate) queryParams.append('endDate', params.endDate);
+            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
             return request<any>('GET', `/kol/stats?${queryParams}`);
         },
 

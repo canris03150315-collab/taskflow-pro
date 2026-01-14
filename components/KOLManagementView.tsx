@@ -30,8 +30,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     try {
       setLoading(true);
       const [profilesRes, statsRes] = await Promise.all([
-        api.kol.getProfiles({ status: statusFilter !== 'ALL' ? statusFilter : undefined, search: searchQuery || undefined }),
-        api.kol.getStats()
+        api.kol.getProfiles({ status: statusFilter !== 'ALL' ? statusFilter : undefined, search: searchQuery || undefined, departmentId: currentUser.department }),
+        api.kol.getStats({ departmentId: currentUser.department })
       ]);
       
       // 轉換 snake_case 到 camelCase
@@ -54,7 +54,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       setStats(statsRes);
 
       if (activeView === 'contracts') {
-        const contractsRes = await api.kol.getContracts({});
+        const contractsRes = await api.kol.getContracts({ departmentId: currentUser.department });
         const transformedContracts = contractsRes.contracts.map((c: any) => ({
           id: c.id,
           kolId: c.kol_id || c.kolId,
@@ -127,7 +127,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
 
   const handleAddProfile = async (data: any) => {
     try {
-      await api.kol.createProfile(data);
+      await api.kol.createProfile({ ...data, departmentId: currentUser.department });
       setShowAddModal(false);
       loadData();
     } catch (error) {
