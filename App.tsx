@@ -32,6 +32,7 @@ const SystemSettingsView = lazy(() => import('./components/SystemSettingsView').
 const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
 const PerformanceView = lazy(() => import('./components/PerformanceView').then(m => ({ default: m.PerformanceView })));
 const SOPView = lazy(() => import('./components/SOPView').then(m => ({ default: m.SOPView })));
+const KOLManagementView = lazy(() => import('./components/KOLManagementView').then(m => ({ default: m.KOLManagementView })));
 const LeaveManagementView = lazy(() => import('./components/LeaveManagementView').then(m => ({ default: m.LeaveManagementView })));
 const DepartmentDataView = lazy(() => import('./components/DepartmentDataView').then(m => ({ default: m.DepartmentDataView })));
 
@@ -1375,6 +1376,7 @@ function AppContent() {
              )}
              {currentPage === 'reports' && (isCreatingReport ? <CreateReportView onCancel={() => setIsCreatingReport(false)} onSubmit={handleCreateReport} isProcessing={isReportProcessing} /> : <ReportView currentUser={currentUser} users={users} reports={reports} departments={departments} onCreateClick={() => setIsCreatingReport(true)} onOpenReportModal={() => setIsCreatingReport(true)} />)}
              {currentPage === 'finance' && <FinanceView currentUser={currentUser} users={users} departments={departments} records={financeRecords} onAddRecord={handleAddFinanceRecord} onConfirmRecord={handleConfirmFinanceRecord} onDeleteRecord={handleDeleteFinanceRecord} />}
+             {currentPage === 'kol_management' && <KOLManagementView currentUser={currentUser} departments={departments} />}
              {currentPage === 'data_center' && <DepartmentDataView currentUser={currentUser} users={users} departments={departments} tasks={tasks} reports={reports} financeRecords={financeRecords} />}
              {currentPage === 'forum' && <ForumView currentUser={currentUser} users={users} suggestions={suggestions} departments={departments} onAddSuggestion={handleAddSuggestion} onUpdateStatus={handleUpdateSuggestionStatus} onToggleUpvote={handleToggleUpvote} onAddComment={handleAddSuggestionComment} />}
              {currentPage === 'chat' && <ChatSystem currentUser={currentUser} users={users} departments={departments} />}
