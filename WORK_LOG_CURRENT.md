@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-14  
-**版本**: v8.9.124-kol-complete-system  
+**最後更新**: 2026-01-15  
+**版本**: v8.9.126-routine-history-query-scope-fix  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -17,17 +17,112 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.124-kol-complete-system`
+- **Docker 映像**: `taskflow-pro:v8.9.126-routine-history-query-scope-fix`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 12 個用戶，完整 KOL 管理表結構
-- **快照**: `taskflow-snapshot-v8.9.124-kol-complete-system-20260114_053609.tar.gz` (213MB)
+- **快照**: `taskflow-snapshot-v8.9.126-routine-history-query-scope-fix-20260114_220947.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-14T22-12-41-215Z.db` (3.20 MB)
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `aabb266` - feat: 完整 KOL 管理系統
-- **狀態**: ✅ 與測試環境同步
+- **Git Commit**: `78af648` - fix: 修復下屬每日任務統計查詢範圍
+- **狀態**: ✅ 與生產環境同步
+
+---
+
+## 🎯 2026-01-15 更新記錄
+
+### 19. 下屬每日任務完成統計顯示修復 ⭐⭐
+**完成時間**: 2026-01-15 上午 06:12
+
+#### 問題描述
+主管在「團隊工作概況 → 每日任務執行狀況」頁面看不到下屬的任務完成狀態，所有卡片都顯示「今日尚未開始每日任務」，但實際上資料庫中有完成記錄。
+
+#### 根本原因（兩個錯誤）
+
+**1. 欄位映射錯誤**：
+- 資料庫欄位名稱：`completed_items`
+- 後端錯誤使用：`r.items`
+- 結果：前端收到空的 `items` 陣列
+
+**2. 查詢範圍錯誤（主要問題）**：
+- 原始查詢：只返回當前登入用戶自己的記錄
+- 問題：主管無法看到下屬的記錄
+- SQL: `WHERE user_id = ? AND department_id = ?`
+
+#### 修復方案
+
+**修復 1：欄位映射**
+```javascript
+// 修改前
+items: JSON.parse(r.items || '[]')
+
+// 修改後
+items: JSON.parse(r.completed_items || '[]')
+```
+
+**修復 2：查詢範圍（根據角色）**
+```javascript
+// SUPERVISOR: 返回整個部門的記錄
+if (req.user.role === 'SUPERVISOR') {
+  records = dbCall(db, 'prepare',
+    'SELECT * FROM routine_records WHERE department_id = ? AND date >= ?'
+  ).all(userDept, startDate);
+}
+
+// BOSS/MANAGER: 返回所有記錄
+else if (req.user.role === 'BOSS' || req.user.role === 'MANAGER') {
+  records = dbCall(db, 'prepare',
+    'SELECT * FROM routine_records WHERE date >= ?'
+  ).all(startDate);
+}
+
+// EMPLOYEE: 只返回自己的記錄
+else {
+  records = dbCall(db, 'prepare',
+    'SELECT * FROM routine_records WHERE user_id = ? AND department_id = ? AND date >= ?'
+  ).all(userId, userDept, startDate);
+}
+```
+
+#### 技術實現
+- **診斷腳本**: `diagnose-routine-history-fixed.js` - 診斷資料庫實際數據
+- **修復腳本 1**: `fix-routine-history-field-mapping.js` - 修復欄位映射
+- **修復腳本 2**: `fix-routine-history-query-final.js` - 修復查詢範圍
+- **驗證腳本**: `verify-routine-history-api-fix.js` - 驗證修復效果
+
+#### 部署信息
+- **後端版本**: `taskflow-pro:v8.9.126-routine-history-query-scope-fix`
+- **快照備份**: 
+  - v8.9.125: `taskflow-snapshot-v8.9.125-routine-history-field-fix-20260114_220241.tar.gz` (213MB)
+  - v8.9.126: `taskflow-snapshot-v8.9.126-routine-history-query-scope-fix-20260114_220947.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-14T22-12-41-215Z.db` (3.20 MB)
+- **Git Commits**: 
+  - `3c9e128`: 修復欄位映射錯誤
+  - `78af648`: 修復查詢範圍錯誤
+
+#### 診斷發現
+資料庫中確實有完成記錄：
+- **2026-01-13**: 2 人完成 100% (user-1767674479948, user-1767451212149)
+- **2026-01-14**: 3 人完成 100%
+- **問題**: 後端 API 查詢條件錯誤，導致前端收不到數據
+
+#### 修復效果
+- ✅ BOSS 可以看到所有部門的所有下屬記錄
+- ✅ SUPERVISOR 可以看到自己部門的所有下屬記錄
+- ✅ EMPLOYEE 只看到自己的記錄
+- ✅ 完成百分比正確顯示
+- ✅ 已完成任務顯示綠色背景 + ✓
+- ✅ 未完成任務顯示灰色背景 + ○
+- ✅ 進度條正確顯示完成百分比
+
+#### 關鍵教訓
+1. **容器內診斷**：使用 Node.js 腳本精確檢查資料庫數據和欄位名稱
+2. **權限邏輯**：不同角色需要不同的查詢範圍
+3. **欄位映射**：確保後端使用正確的資料庫欄位名稱
+4. **遵循全域規則**：修改前創建快照，修改後創建新映像和資料庫備份
 
 ---
 
