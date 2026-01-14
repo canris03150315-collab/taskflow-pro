@@ -150,6 +150,12 @@ const RealApi = {
         getById: async (id: string): Promise<User | null> => {
             try {
                 const user = await request<any>('GET', `/users/${id}`);
+                console.log('[API] getById 用戶數據:', {
+                    id: user.id,
+                    name: user.name,
+                    role: user.role,
+                    permissions: user.permissions
+                });
                 return {
                     ...user,
                     password: user.password || '',
