@@ -1108,7 +1108,15 @@ const RealApi = {
             const queryParams = new URLSearchParams();
             if (params?.status) queryParams.append('status', params.status);
             if (params?.search) queryParams.append('search', params.search);
-            return request<{ profiles: any[] }>('GET', `/kol/profiles?${queryParams}`);
+            console.log('[KOL API] getProfiles 請求:', { params, url: `/kol/profiles?${queryParams}` });
+            try {
+                const result = await request<{ profiles: any[] }>('GET', `/kol/profiles?${queryParams}`);
+                console.log('[KOL API] getProfiles 成功:', result);
+                return result;
+            } catch (error) {
+                console.error('[KOL API] getProfiles 失敗:', error);
+                throw error;
+            }
         },
 
         getProfile: async (id: string): Promise<{ profile: any; contracts: any[]; payments: any[] }> => {
