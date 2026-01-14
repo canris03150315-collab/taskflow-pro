@@ -1185,6 +1185,14 @@ const RealApi = {
             if (params?.targetId) queryParams.append('targetId', params.targetId);
             if (params?.limit) queryParams.append('limit', params.limit.toString());
             return request<{ logs: any[] }>('GET', `/kol/logs?${queryParams}`);
+        },
+
+        importExcel: async (data: any[]): Promise<{ success: boolean; results: any; message: string }> => {
+            return request<{ success: boolean; results: any; message: string }>('POST', '/kol/import-excel', { data });
+        },
+
+        exportExcel: async (): Promise<{ profiles: any[] }> => {
+            return request<{ profiles: any[] }>('GET', '/kol/export-excel');
         }
     },
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, KOLProfile, KOLContract, KOLPayment, KOLStats } from '../types';
 import { api } from '../services/api';
 
@@ -15,6 +15,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const [selectedProfile, setSelectedProfile] = useState<KOLProfile | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -81,6 +83,85 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     setShowDetailModal(true);
   };
 
+  const handleExcelImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const data = e.target?.result;
+        if (!data) return;
+
+        const workbook = await import('xlsx').then(XLSX => XLSX.read(data, { type: 'binary' }));
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = await import('xlsx').then(XLSX => XLSX.utils.sheet_to_json(worksheet));
+
+        const formattedData = jsonData.map((row: any) => ({
+          facebookId: row['臉書ID'] || row['facebookId'],
+          platformAccount: row['平台帳號'] || row['platformAccount'],
+          contactInfo: row['聯絡方式'] || row['contactInfo'],
+          status: row['狀態'] || row['status'] || 'ACTIVE',
+          notes: row['備註'] || row['notes'],
+          startDate: row['開始日期'] || row['startDate'],
+          endDate: row['到期日'] || row['endDate'],
+          salaryAmount: parseFloat(row['工資/傭金'] || row['salaryAmount'] || 0),
+          depositAmount: parseFloat(row['訂金'] || row['depositAmount'] || 0),
+          unpaidAmount: parseFloat(row['未付金額'] || row['unpaidAmount'] || 0),
+          clearedAmount: parseFloat(row['截清金額'] || row['clearedAmount'] || 0),
+          totalPaid: parseFloat(row['總付金額'] || row['totalPaid'] || 0),
+          contractType: row['類型'] || row['contractType'] || 'NORMAL',
+          contractNotes: row['合作備註'] || row['contractNotes']
+        }));
+
+        const result = await api.kol.importExcel(formattedData);
+        alert(`導入完成！成功: ${result.results.success}, 失敗: ${result.results.failed}`);
+        loadData();
+      };
+      reader.readAsBinaryString(file);
+    } catch (error) {
+      console.error('Excel import error:', error);
+      alert('Excel 導入失敗');
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleExcelExport = async () => {
+    try {
+      const { profiles } = await api.kol.exportExcel();
+      const XLSX = await import('xlsx');
+      
+      const exportData = profiles.map((p: any) => ({
+        '臉書ID': p.facebook_id,
+        '平台帳號': p.platform_account,
+        '聯絡方式': p.contact_info || '',
+        '狀態': p.status,
+        '備註': p.notes || '',
+        '開始日期': p.start_date || '',
+        '到期日': p.end_date || '',
+        '工資/傭金': p.salary_amount || 0,
+        '訂金': p.deposit_amount || 0,
+        '未付金額': p.unpaid_amount || 0,
+        '截清金額': p.cleared_amount || 0,
+        '總付金額': p.total_paid || 0,
+        '類型': p.contract_type || '',
+        '合作備註': p.contract_notes || ''
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'KOL工資紀錄');
+      XLSX.writeFile(workbook, `KOL工資紀錄-${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      console.error('Excel export error:', error);
+      alert('Excel 匯出失敗');
+    }
+  };
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">載入中...</div>;
   }
@@ -135,6 +216,28 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md whitespace-nowrap"
           >
             + 新增 KOL
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelImport}
+            className="hidden"
+          />
+          
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all shadow-md whitespace-nowrap"
+          >
+            📥 導入 Excel
+          </button>
+
+          <button
+            onClick={handleExcelExport}
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-md whitespace-nowrap"
+          >
+            📤 匯出 Excel
           </button>
         </div>
       </div>
