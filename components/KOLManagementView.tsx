@@ -444,8 +444,33 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
   );
 };
 
-// KOL 詳情 Modal 組件（簡化版）
+// KOL 詳情 Modal 組件
 const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpdate: () => void }> = ({ profile, onClose, onUpdate }) => {
+  const [details, setDetails] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadDetails = async () => {
+      try {
+        const data = await api.kol.getProfile(profile.id);
+        setDetails(data);
+      } catch (error) {
+        console.error('Load details error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDetails();
+  }, [profile.id]);
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-8">載入中...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -453,23 +478,100 @@ const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpd
           <h2 className="text-xl font-bold">{profile.facebookId}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
         </div>
-        <div className="p-6">
-          <div className="space-y-4">
-            <div>
-              <span className="text-sm text-gray-600">平台帳號：</span>
-              <span className="font-medium">{profile.platformAccount}</span>
-            </div>
-            <div>
-              <span className="text-sm text-gray-600">狀態：</span>
-              <span className="font-medium">{profile.status}</span>
-            </div>
-            {profile.notes && (
+        
+        <div className="p-6 space-y-6">
+          {/* 基本資訊 */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3">基本資訊</h3>
+            <div className="grid grid-cols-2 gap-4">
               <div>
+                <span className="text-sm text-gray-600">臉書ID：</span>
+                <span className="font-medium">{details?.profile?.facebook_id}</span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-600">平台帳號：</span>
+                <span className="font-medium">{details?.profile?.platform_account}</span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-600">聯絡方式：</span>
+                <span className="font-medium">{details?.profile?.contact_info || '-'}</span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-600">狀態：</span>
+                <span className="font-medium">{details?.profile?.status}</span>
+              </div>
+            </div>
+            {details?.profile?.notes && (
+              <div className="mt-3">
                 <span className="text-sm text-gray-600">備註：</span>
-                <p className="mt-1">{profile.notes}</p>
+                <p className="mt-1 text-gray-700">{details.profile.notes}</p>
               </div>
             )}
           </div>
+
+          {/* 合約記錄 */}
+          <div>
+            <h3 className="text-lg font-semibold mb-3">合約記錄 ({details?.contracts?.length || 0})</h3>
+            {details?.contracts && details.contracts.length > 0 ? (
+              <div className="space-y-3">
+                {details.contracts.map((contract: any) => (
+                  <div key={contract.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600">工資/傭金：</span>
+                        <span className="font-medium text-green-600">${contract.salary_amount}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">訂金：</span>
+                        <span className="font-medium">${contract.deposit_amount}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">未付金額：</span>
+                        <span className="font-medium text-orange-600">${contract.unpaid_amount}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">截清金額：</span>
+                        <span className="font-medium">${contract.cleared_amount}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">總付金額：</span>
+                        <span className="font-medium">${contract.total_paid}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">類型：</span>
+                        <span className="font-medium">{contract.contract_type}</span>
+                      </div>
+                    </div>
+                    {contract.start_date && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        期間：{contract.start_date} ~ {contract.end_date || '持續中'}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500">暫無合約記錄</p>
+            )}
+          </div>
+
+          {/* 支付記錄 */}
+          {details?.payments && details.payments.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3">支付記錄 ({details.payments.length})</h3>
+              <div className="space-y-2">
+                {details.payments.map((payment: any) => (
+                  <div key={payment.id} className="flex justify-between items-center border-b border-gray-100 pb-2">
+                    <div>
+                      <span className="font-medium">${payment.amount}</span>
+                      <span className="text-sm text-gray-600 ml-2">{payment.payment_type}</span>
+                    </div>
+                    <span className="text-sm text-gray-500">{payment.payment_date}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
