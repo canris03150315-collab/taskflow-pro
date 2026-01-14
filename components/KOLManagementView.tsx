@@ -83,6 +83,17 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     setShowDetailModal(true);
   };
 
+  const handleDeleteProfile = async (id: string) => {
+    try {
+      await api.kol.deleteProfile(id);
+      alert('刪除成功');
+      loadData();
+    } catch (error) {
+      console.error('Delete profile error:', error);
+      alert('刪除失敗');
+    }
+  };
+
   const handleExcelImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -116,7 +127,17 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         }));
 
         const result = await api.kol.importExcel(formattedData);
-        alert(`導入完成！成功: ${result.results.success}, 失敗: ${result.results.failed}`);
+        
+        let message = `導入完成！\n成功: ${result.results.success} 筆\n失敗: ${result.results.failed} 筆`;
+        
+        if (result.results.errors && result.results.errors.length > 0) {
+          message += '\n\n失敗詳情：';
+          result.results.errors.forEach((err: any) => {
+            message += `\n第 ${err.row} 行: ${err.error}`;
+          });
+        }
+        
+        alert(message);
         loadData();
       };
       reader.readAsBinaryString(file);
@@ -247,20 +268,35 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         {filteredProfiles.map((profile) => (
           <div
             key={profile.id}
-            className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6 cursor-pointer"
-            onClick={() => handleViewDetail(profile)}
+            className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h3 className="font-bold text-lg text-gray-900">{profile.facebookId}</h3>
                 <p className="text-sm text-gray-600">@{profile.platformAccount}</p>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.status)}`}>
-                {getStatusText(profile.status)}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.status)}`}>
+                  {getStatusText(profile.status)}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`確定要刪除 ${profile.facebookId} 嗎？此操作無法復原。`)) {
+                      handleDeleteProfile(profile.id);
+                    }
+                  }}
+                  className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                  title="刪除"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-sm" onClick={() => handleViewDetail(profile)} style={{cursor: 'pointer'}}>
               <div className="flex justify-between">
                 <span className="text-gray-600">合作記錄</span>
                 <span className="font-medium">{profile.contractCount || 0} 筆</span>
