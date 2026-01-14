@@ -1376,7 +1376,6 @@ function AppContent() {
              )}
              {currentPage === 'reports' && (isCreatingReport ? <CreateReportView onCancel={() => setIsCreatingReport(false)} onSubmit={handleCreateReport} isProcessing={isReportProcessing} /> : <ReportView currentUser={currentUser} users={users} reports={reports} departments={departments} onCreateClick={() => setIsCreatingReport(true)} onOpenReportModal={() => setIsCreatingReport(true)} />)}
              {currentPage === 'finance' && <FinanceView currentUser={currentUser} users={users} departments={departments} records={financeRecords} onAddRecord={handleAddFinanceRecord} onConfirmRecord={handleConfirmFinanceRecord} onDeleteRecord={handleDeleteFinanceRecord} />}
-             {currentPage === 'kol_management' && <KOLManagementView currentUser={currentUser} departments={departments} />}
              {currentPage === 'data_center' && <DepartmentDataView currentUser={currentUser} users={users} departments={departments} tasks={tasks} reports={reports} financeRecords={financeRecords} />}
              {currentPage === 'forum' && <ForumView currentUser={currentUser} users={users} suggestions={suggestions} departments={departments} onAddSuggestion={handleAddSuggestion} onUpdateStatus={handleUpdateSuggestionStatus} onToggleUpvote={handleToggleUpvote} onAddComment={handleAddSuggestionComment} />}
              {currentPage === 'chat' && <ChatSystem currentUser={currentUser} users={users} departments={departments} />}

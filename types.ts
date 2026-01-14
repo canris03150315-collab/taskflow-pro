@@ -417,7 +417,6 @@ export type MenuItemId =
   | 'team' 
   | 'reports' 
   | 'finance' 
-  | 'kol_management'
   | 'data_center' 
   | 'forum' 
   | 'chat' 
@@ -446,7 +445,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
   {
     id: 'admin',
     label: '行政與資源',
-    items: ['bulletin', 'sop', 'finance', 'kol_management', 'performance', 'forum']
+    items: ['bulletin', 'sop', 'finance', 'performance', 'forum']
   },
   {
     id: 'system',
@@ -458,7 +457,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
 // Fallback for old compatibility (Flat list to Groups)
 export const DEFAULT_MENU_ORDER: MenuItemId[] = [
   'dashboard', 'chat', 'bulletin', 'tasks', 'leaves', 'sop', 
-  'performance', 'team', 'reports', 'finance', 'kol_management', 'data_center', 
+  'performance', 'team', 'reports', 'finance', 'data_center', 
   'forum', 'memo', 'personnel', 'settings'
 ];
 
@@ -471,8 +470,7 @@ export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = 
   performance: { label: '績效考核 (KPI)', icon: '🏆' },
   team: { label: '團隊工作概況', icon: '📉' },
   reports: { label: '工作報表中心', icon: '📝' },
-  finance: { label: '零用金', icon: '💰' },
-  kol_management: { label: 'KOL 管理', icon: '👤' },
+  finance: { label: '零用金與KOL', icon: '💰' },
   data_center: { label: '部門數據中心', icon: '📥' }, 
   forum: { label: '提案討論區', icon: '💬' },
   chat: { label: '企業通訊', icon: '📨' },
