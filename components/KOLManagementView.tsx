@@ -230,10 +230,12 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
 
         const formattedData = jsonData.map((row: any) => {
           const dateRange = parseDateRange(row['開始日期:到期日'] || row['合約期間'] || '');
+          const fbId = row['臉書ID'] || row['平台ID'] || row['platformId'] || row['facebookId'] || '';
           return {
-            platformId: row['臉書ID'] || row['平台ID'] || row['platformId'] || row['facebookId'],
+            facebookId: fbId,
+            platformId: fbId,
             platform: row['平台'] || row['platform'] || 'FACEBOOK',
-            platformAccount: row['平台帳號'] || row['platformAccount'],
+            platformAccount: row['平台帳號'] || row['platformAccount'] || fbId,
             contactInfo: row['聯絡方式'] || row['contactInfo'] || '',
             status: row['狀態'] || row['status'] || 'ACTIVE',
             notes: row['備註:'] || row['備註'] || row['notes'] || '',
