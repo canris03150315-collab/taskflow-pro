@@ -291,9 +291,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
 
   // Load schedule rules
   const loadScheduleRules = async (deptId?: string) => {
-    if (!canManageRules) return;
-    
-    const targetDept = deptId || selectedDepartment;
+    const targetDept = deptId || selectedDepartment || currentUser.department;
     
     try {
       const rules = await api.schedules.getRules(targetDept);
@@ -407,8 +405,8 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
 
   // Load rules when department changes
   React.useEffect(() => {
-    if (activeTab === 'schedule' && canApprove) {
-      loadScheduleRules(selectedDepartment);
+    if (activeTab === 'schedule') {
+      loadScheduleRules(canApprove ? selectedDepartment : currentUser.department);
     }
   }, [selectedDepartment, activeTab]);
 
