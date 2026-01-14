@@ -33,15 +33,58 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         api.kol.getProfiles({ status: statusFilter !== 'ALL' ? statusFilter : undefined, search: searchQuery || undefined }),
         api.kol.getStats()
       ]);
-      setProfiles(profilesRes.profiles);
+      
+      // 轉換 snake_case 到 camelCase
+      const transformedProfiles = profilesRes.profiles.map((p: any) => ({
+        id: p.id,
+        facebookId: p.facebook_id || p.facebookId,
+        platformAccount: p.platform_account || p.platformAccount,
+        contactInfo: p.contact_info || p.contactInfo,
+        status: p.status,
+        notes: p.notes,
+        createdAt: p.created_at || p.createdAt,
+        updatedAt: p.updated_at || p.updatedAt,
+        createdBy: p.created_by || p.createdBy,
+        contractCount: p.contractCount,
+        activeContracts: p.activeContracts,
+        totalUnpaid: p.totalUnpaid
+      }));
+      setProfiles(transformedProfiles);
       setStats(statsRes);
 
       if (activeView === 'contracts') {
         const contractsRes = await api.kol.getContracts({});
-        setContracts(contractsRes.contracts);
+        const transformedContracts = contractsRes.contracts.map((c: any) => ({
+          id: c.id,
+          kolId: c.kol_id || c.kolId,
+          startDate: c.start_date || c.startDate,
+          endDate: c.end_date || c.endDate,
+          salaryAmount: c.salary_amount || c.salaryAmount,
+          depositAmount: c.deposit_amount || c.depositAmount,
+          unpaidAmount: c.unpaid_amount || c.unpaidAmount,
+          clearedAmount: c.cleared_amount || c.clearedAmount,
+          totalPaid: c.total_paid || c.totalPaid,
+          contractType: c.contract_type || c.contractType,
+          notes: c.notes,
+          facebookId: c.facebook_id || c.facebookId,
+          platformAccount: c.platform_account || c.platformAccount,
+          kolStatus: c.kol_status || c.kolStatus
+        }));
+        setContracts(transformedContracts);
       } else if (activeView === 'payments') {
         const paymentsRes = await api.kol.getPayments({});
-        setPayments(paymentsRes.payments);
+        const transformedPayments = paymentsRes.payments.map((p: any) => ({
+          id: p.id,
+          contractId: p.contract_id || p.contractId,
+          paymentDate: p.payment_date || p.paymentDate,
+          amount: p.amount,
+          paymentType: p.payment_type || p.paymentType,
+          notes: p.notes,
+          kolId: p.kol_id || p.kolId,
+          facebookId: p.facebook_id || p.facebookId,
+          platformAccount: p.platform_account || p.platformAccount
+        }));
+        setPayments(transformedPayments);
       }
     } catch (error) {
       console.error('Load KOL data error:', error);
