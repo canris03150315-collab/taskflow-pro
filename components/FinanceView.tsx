@@ -782,7 +782,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
         {/* KOL 管理內容 */}
         {mainTab === 'KOL' && (
             <Suspense fallback={<div className="flex items-center justify-center h-64">載入中...</div>}>
-                <KOLManagementView currentUser={currentUser} />
+                <KOLManagementView currentUser={currentUser} departments={departments} />
             </Suspense>
         )}
     </div>

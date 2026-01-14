@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, KOLProfile, KOLContract, KOLPayment, KOLStats, KOL_PLATFORMS, KOLPlatform } from '../types';
+import { User, KOLProfile, KOLContract, KOLPayment, KOLStats, KOL_PLATFORMS, KOLPlatform, DepartmentDef, Role } from '../types';
 import { api } from '../services/api';
 
 interface KOLManagementViewProps {
   currentUser: User;
+  departments?: DepartmentDef[];
 }
 
-export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUser }) => {
+export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUser, departments = [] }) => {
   const [profiles, setProfiles] = useState<KOLProfile[]>([]);
   const [contracts, setContracts] = useState<KOLContract[]>([]);
   const [payments, setPayments] = useState<KOLPayment[]>([]);
@@ -20,18 +21,21 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddContractModal, setShowAddContractModal] = useState(false);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [selectedDept, setSelectedDept] = useState<string>(currentUser.department);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isBoss = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
 
   useEffect(() => {
     loadData();
-  }, [statusFilter, searchQuery, activeView]);
+  }, [statusFilter, searchQuery, activeView, selectedDept]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       const [profilesRes, statsRes] = await Promise.all([
-        api.kol.getProfiles({ status: statusFilter !== 'ALL' ? statusFilter : undefined, search: searchQuery || undefined, departmentId: currentUser.department }),
-        api.kol.getStats({ departmentId: currentUser.department })
+        api.kol.getProfiles({ status: statusFilter !== 'ALL' ? statusFilter : undefined, search: searchQuery || undefined, departmentId: isBoss ? selectedDept : currentUser.department }),
+        api.kol.getStats({ departmentId: isBoss ? selectedDept : currentUser.department })
       ]);
       
       // 轉換 snake_case 到 camelCase
@@ -54,7 +58,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       setStats(statsRes);
 
       if (activeView === 'contracts') {
-        const contractsRes = await api.kol.getContracts({ departmentId: currentUser.department });
+        const contractsRes = await api.kol.getContracts({ departmentId: isBoss ? selectedDept : currentUser.department });
         const transformedContracts = contractsRes.contracts.map((c: any) => ({
           id: c.id,
           kolId: c.kol_id || c.kolId,
@@ -354,6 +358,19 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       {/* 工具列 */}
       <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="flex flex-wrap gap-4">
+          {/* 部門選擇器 - 只有主管可見 */}
+          {isBoss && departments.length > 0 && (
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50 font-medium"
+            >
+              {departments.map(dept => (
+                <option key={dept.id} value={dept.id}>🏢 {dept.name}</option>
+              ))}
+            </select>
+          )}
+
           {activeView === 'profiles' && (
             <>
               <select
