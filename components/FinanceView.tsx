@@ -300,16 +300,18 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             >
                 💰 零用金管理
             </button>
-            <button
-                onClick={() => setMainTab('KOL')}
-                className={`flex-1 py-4 px-6 rounded-xl font-bold text-lg transition-all shadow-md ${
-                    mainTab === 'KOL'
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white scale-105'
-                        : 'bg-white text-gray-600 hover:shadow-lg'
-                }`}
-            >
-                🎯 KOL 管理
-            </button>
+            {isBoss && (
+                <button
+                    onClick={() => setMainTab('KOL')}
+                    className={`flex-1 py-4 px-6 rounded-xl font-bold text-lg transition-all shadow-md ${
+                        mainTab === 'KOL'
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white scale-105'
+                            : 'bg-white text-gray-600 hover:shadow-lg'
+                    }`}
+                >
+                    🎯 KOL 管理
+                </button>
+            )}
         </div>
 
         {/* 零用金管理內容 */}
