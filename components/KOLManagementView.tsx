@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, KOLProfile, KOLContract, KOLPayment, KOLStats } from '../types';
+import { User, KOLProfile, KOLContract, KOLPayment, KOLStats, KOL_PLATFORMS, KOLPlatform } from '../types';
 import { api } from '../services/api';
 
 interface KOLManagementViewProps {
@@ -37,7 +37,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       // 轉換 snake_case 到 camelCase
       const transformedProfiles = profilesRes.profiles.map((p: any) => ({
         id: p.id,
-        facebookId: p.facebook_id || p.facebookId,
+        platform: p.platform || 'FACEBOOK',
+        platformId: p.platform_id || p.platformId || p.facebook_id || p.facebookId,
         platformAccount: p.platform_account || p.platformAccount,
         contactInfo: p.contact_info || p.contactInfo,
         status: p.status,
@@ -66,7 +67,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           totalPaid: c.total_paid || c.totalPaid,
           contractType: c.contract_type || c.contractType,
           notes: c.notes,
-          facebookId: c.facebook_id || c.facebookId,
+          platform: c.platform || 'FACEBOOK',
+          platformId: c.platform_id || c.platformId || c.facebook_id || c.facebookId,
           platformAccount: c.platform_account || c.platformAccount,
           kolStatus: c.kol_status || c.kolStatus
         }));
@@ -81,7 +83,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           paymentType: p.payment_type || p.paymentType,
           notes: p.notes,
           kolId: p.kol_id || p.kolId,
-          facebookId: p.facebook_id || p.facebookId,
+          platform: p.platform || 'FACEBOOK',
+          platformId: p.platform_id || p.platformId || p.facebook_id || p.facebookId,
           platformAccount: p.platform_account || p.platformAccount
         }));
         setPayments(transformedPayments);
@@ -96,7 +99,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const filteredProfiles = useMemo(() => {
     return profiles.filter(p => {
       if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
-      if (searchQuery && !p.facebookId.toLowerCase().includes(searchQuery.toLowerCase()) && 
+      if (searchQuery && !p.platformId.toLowerCase().includes(searchQuery.toLowerCase()) && 
           !p.platformAccount.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
@@ -145,7 +148,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   };
 
   const handleQuickPayment = async (profile: KOLProfile) => {
-    const amount = prompt(`為 ${profile.facebookId} 記錄支付金額：`);
+    const amount = prompt(`為 ${profile.platformId} 記錄支付金額：`);
     if (!amount || isNaN(parseFloat(amount))) return;
 
     try {
@@ -214,7 +217,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         const jsonData = await import('xlsx').then(XLSX => XLSX.utils.sheet_to_json(worksheet));
 
         const formattedData = jsonData.map((row: any) => ({
-          facebookId: row['臉書ID'] || row['facebookId'],
+          platformId: row['平台ID'] || row['platformId'] || row['臉書ID'] || row['facebookId'],
+          platform: row['平台'] || row['platform'] || 'FACEBOOK',
           platformAccount: row['平台帳號'] || row['platformAccount'],
           contactInfo: row['聯絡方式'] || row['contactInfo'],
           status: row['狀態'] || row['status'] || 'ACTIVE',
@@ -433,7 +437,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
-                  <h3 className="font-bold text-lg text-gray-900">{profile.facebookId}</h3>
+                  <h3 className="font-bold text-lg text-gray-900">{KOL_PLATFORMS.find(p => p.value === profile.platform)?.icon} {profile.platformId}</h3>
                   <p className="text-sm text-gray-600">@{profile.platformAccount}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -442,7 +446,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   </span>
                   <button
                     onClick={() => {
-                      if (confirm(`確定要刪除 ${profile.facebookId} 嗎？`)) {
+                      if (confirm(`確定要刪除 ${profile.platformId} 嗎？`)) {
                         handleDeleteProfile(profile.id);
                       }
                     }}
@@ -516,7 +520,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
               {contracts.map((contract) => (
                 <tr key={contract.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <div className="font-medium">{contract.facebookId}</div>
+                    <div className="font-medium">{contract.platformId}</div>
                     <div className="text-sm text-gray-500">@{contract.platformAccount}</div>
                   </td>
                   <td className="px-4 py-3 font-medium text-green-600">${contract.salaryAmount}</td>
@@ -580,7 +584,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                 <tr key={payment.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm">{payment.paymentDate}</td>
                   <td className="px-4 py-3">
-                    <div className="font-medium">{payment.facebookId}</div>
+                    <div className="font-medium">{payment.platformId}</div>
                     <div className="text-sm text-gray-500">@{payment.platformAccount}</div>
                   </td>
                   <td className="px-4 py-3 font-medium text-green-600">${payment.amount}</td>
@@ -648,7 +652,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
 // 新增 KOL Modal
 const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void }> = ({ onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
-    facebookId: '',
+    platform: 'FACEBOOK' as KOLPlatform,
+    platformId: '',
     platformAccount: '',
     contactInfo: '',
     status: 'ACTIVE',
@@ -668,13 +673,27 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">臉書ID *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">平台 *</label>
+            <select
+              required
+              value={formData.platform}
+              onChange={(e) => setFormData({ ...formData, platform: e.target.value as KOLPlatform })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              {KOL_PLATFORMS.map(p => (
+                <option key={p.value} value={p.value}>{p.icon} {p.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">平台 ID *</label>
             <input
               type="text"
               required
-              value={formData.facebookId}
-              onChange={(e) => setFormData({ ...formData, facebookId: e.target.value })}
+              value={formData.platformId}
+              onChange={(e) => setFormData({ ...formData, platformId: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="例如: facebook.com/xxx 的 xxx"
             />
           </div>
           <div>
@@ -771,7 +790,7 @@ const KOLDetailModal: React.FC<{
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-bold">{profile.facebookId}</h2>
+          <h2 className="text-xl font-bold">{KOL_PLATFORMS.find(p => p.value === profile.platform)?.icon} {profile.platformId}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
         </div>
         
@@ -780,7 +799,8 @@ const KOLDetailModal: React.FC<{
           <div>
             <h3 className="text-lg font-semibold mb-3">基本資訊</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-gray-600">臉書ID：</span><span className="font-medium">{details?.profile?.facebook_id}</span></div>
+              <div><span className="text-gray-600">平台：</span><span className="font-medium">{KOL_PLATFORMS.find(p => p.value === (details?.profile?.platform || 'FACEBOOK'))?.label}</span></div>
+              <div><span className="text-gray-600">平台ID：</span><span className="font-medium">{details?.profile?.platform_id || details?.profile?.facebook_id}</span></div>
               <div><span className="text-gray-600">平台帳號：</span><span className="font-medium">{details?.profile?.platform_account}</span></div>
               <div><span className="text-gray-600">聯絡方式：</span><span className="font-medium">{details?.profile?.contact_info || '-'}</span></div>
               <div><span className="text-gray-600">狀態：</span><span className="font-medium">{details?.profile?.status}</span></div>
@@ -889,7 +909,7 @@ const AddContractModal: React.FC<{
             >
               <option value="">請選擇</option>
               {profiles.map(p => (
-                <option key={p.id} value={p.id}>{p.facebookId} (@{p.platformAccount})</option>
+                <option key={p.id} value={p.id}>{KOL_PLATFORMS.find(pl => pl.value === p.platform)?.icon} {p.platformId} (@{p.platformAccount})</option>
               ))}
             </select>
           </div>
@@ -994,7 +1014,7 @@ const AddPaymentModal: React.FC<{
               <option value="">請選擇</option>
               {contracts.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.facebookId} - ${c.salaryAmount} (未付: ${c.unpaidAmount})
+                  {c.platformId} - ${c.salaryAmount} (未付: ${c.unpaidAmount})
                 </option>
               ))}
             </select>

@@ -499,10 +499,21 @@ export interface WorkLog {
 export type KOLStatus = 'ACTIVE' | 'STOPPED' | 'NEGOTIATING' | 'LOST_CONTACT';
 export type ContractType = 'NORMAL' | 'ADVANCE' | 'ACTIVITY' | 'VIDEO';
 export type PaymentType = 'DEPOSIT' | 'SALARY' | 'ADVANCE' | 'ACTIVITY';
+export type KOLPlatform = 'FACEBOOK' | 'INSTAGRAM' | 'YOUTUBE' | 'TIKTOK' | 'THREADS' | 'OTHER';
+
+export const KOL_PLATFORMS: { value: KOLPlatform; label: string; icon: string }[] = [
+  { value: 'FACEBOOK', label: 'Facebook', icon: '📘' },
+  { value: 'INSTAGRAM', label: 'Instagram', icon: '📸' },
+  { value: 'YOUTUBE', label: 'YouTube', icon: '🎬' },
+  { value: 'TIKTOK', label: 'TikTok', icon: '🎵' },
+  { value: 'THREADS', label: 'Threads', icon: '🧵' },
+  { value: 'OTHER', label: '其他', icon: '🌐' },
+];
 
 export interface KOLProfile {
   id: string;
-  facebookId: string;
+  platform: KOLPlatform;
+  platformId: string;  // 原 facebookId，改為通用平台 ID
   platformAccount: string;
   contactInfo?: string;
   status: KOLStatus;
@@ -530,7 +541,8 @@ export interface KOLContract {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
-  facebookId?: string;
+  platform?: KOLPlatform;
+  platformId?: string;
   platformAccount?: string;
   kolStatus?: KOLStatus;
 }
@@ -546,7 +558,8 @@ export interface KOLPayment {
   createdAt: string;
   createdBy: string;
   kolId?: string;
-  facebookId?: string;
+  platform?: KOLPlatform;
+  platformId?: string;
   platformAccount?: string;
 }
 
