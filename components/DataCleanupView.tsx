@@ -23,7 +23,10 @@ const dataCategories: DataCategory[] = [
   { id: 'announcements', name: '公告記錄', table: 'announcements', icon: '📢', description: '過期的公告' },
   { id: 'suggestions', name: '提案記錄', table: 'suggestions', icon: '💡', description: '已處理的提案' },
   { id: 'reports', name: '報表記錄', table: 'reports', icon: '📈', description: '歷史營運報表' },
-  { id: 'memos', name: '備忘錄', table: 'memos', icon: '📝', description: '過期的備忘錄' }
+  { id: 'memos', name: '備忘錄', table: 'memos', icon: '📝', description: '過期的備忘錄' },
+  { id: 'kol_profiles', name: 'KOL 檔案', table: 'kol_profiles', icon: '👤', description: 'KOL 基本資料' },
+  { id: 'kol_contracts', name: 'KOL 合約', table: 'kol_contracts', icon: '📄', description: 'KOL 合約記錄' },
+  { id: 'kol_payments', name: 'KOL 付款', table: 'kol_payments', icon: '💵', description: 'KOL 付款記錄' }
 ];
 
 const timeRanges = [
