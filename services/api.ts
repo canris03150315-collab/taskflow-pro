@@ -1102,6 +1102,91 @@ const RealApi = {
             return request<{ success: boolean; message: string }>('DELETE', `/work-logs/${id}`);
         }
     },
+
+    kol: {
+        getProfiles: async (params?: { status?: string; search?: string }): Promise<{ profiles: any[] }> => {
+            const queryParams = new URLSearchParams();
+            if (params?.status) queryParams.append('status', params.status);
+            if (params?.search) queryParams.append('search', params.search);
+            return request<{ profiles: any[] }>('GET', `/kol/profiles?${queryParams}`);
+        },
+
+        getProfile: async (id: string): Promise<{ profile: any; contracts: any[]; payments: any[] }> => {
+            return request<{ profile: any; contracts: any[]; payments: any[] }>('GET', `/kol/profiles/${id}`);
+        },
+
+        createProfile: async (data: any): Promise<{ profile: any }> => {
+            return request<{ profile: any }>('POST', '/kol/profiles', data);
+        },
+
+        updateProfile: async (id: string, data: any): Promise<{ profile: any }> => {
+            return request<{ profile: any }>('PUT', `/kol/profiles/${id}`, data);
+        },
+
+        deleteProfile: async (id: string): Promise<{ success: boolean }> => {
+            return request<{ success: boolean }>('DELETE', `/kol/profiles/${id}`);
+        },
+
+        getContracts: async (params?: any): Promise<{ contracts: any[] }> => {
+            const queryParams = new URLSearchParams();
+            if (params?.kolId) queryParams.append('kolId', params.kolId);
+            if (params?.startDate) queryParams.append('startDate', params.startDate);
+            if (params?.endDate) queryParams.append('endDate', params.endDate);
+            if (params?.contractType) queryParams.append('contractType', params.contractType);
+            return request<{ contracts: any[] }>('GET', `/kol/contracts?${queryParams}`);
+        },
+
+        createContract: async (data: any): Promise<{ contract: any }> => {
+            return request<{ contract: any }>('POST', '/kol/contracts', data);
+        },
+
+        updateContract: async (id: string, data: any): Promise<{ contract: any }> => {
+            return request<{ contract: any }>('PUT', `/kol/contracts/${id}`, data);
+        },
+
+        deleteContract: async (id: string): Promise<{ success: boolean }> => {
+            return request<{ success: boolean }>('DELETE', `/kol/contracts/${id}`);
+        },
+
+        getPayments: async (params?: any): Promise<{ payments: any[] }> => {
+            const queryParams = new URLSearchParams();
+            if (params?.contractId) queryParams.append('contractId', params.contractId);
+            if (params?.startDate) queryParams.append('startDate', params.startDate);
+            if (params?.endDate) queryParams.append('endDate', params.endDate);
+            return request<{ payments: any[] }>('GET', `/kol/payments?${queryParams}`);
+        },
+
+        createPayment: async (data: any): Promise<{ payment: any }> => {
+            return request<{ payment: any }>('POST', '/kol/payments', data);
+        },
+
+        deletePayment: async (id: string): Promise<{ success: boolean }> => {
+            return request<{ success: boolean }>('DELETE', `/kol/payments/${id}`);
+        },
+
+        getStats: async (params?: { startDate?: string; endDate?: string }): Promise<any> => {
+            const queryParams = new URLSearchParams();
+            if (params?.startDate) queryParams.append('startDate', params.startDate);
+            if (params?.endDate) queryParams.append('endDate', params.endDate);
+            return request<any>('GET', `/kol/stats?${queryParams}`);
+        },
+
+        batchCreatePayments: async (payments: any[]): Promise<{ success: boolean; count: number }> => {
+            return request<{ success: boolean; count: number }>('POST', '/kol/batch/payments', { payments });
+        },
+
+        batchUpdateStatus: async (kolIds: string[], status: string): Promise<{ success: boolean; count: number }> => {
+            return request<{ success: boolean; count: number }>('PUT', '/kol/batch/status', { kolIds, status });
+        },
+
+        getLogs: async (params?: any): Promise<{ logs: any[] }> => {
+            const queryParams = new URLSearchParams();
+            if (params?.targetType) queryParams.append('targetType', params.targetType);
+            if (params?.targetId) queryParams.append('targetId', params.targetId);
+            if (params?.limit) queryParams.append('limit', params.limit.toString());
+            return request<{ logs: any[] }>('GET', `/kol/logs?${queryParams}`);
+        }
+    },
 };
 
 const MockApi = RealApi;

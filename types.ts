@@ -493,3 +493,79 @@ export interface WorkLog {
   createdAt: string;
   updatedAt: string;
 }
+
+// --- KOL Management Types ---
+
+export type KOLStatus = 'ACTIVE' | 'STOPPED' | 'NEGOTIATING' | 'LOST_CONTACT';
+export type ContractType = 'NORMAL' | 'ADVANCE' | 'ACTIVITY' | 'VIDEO';
+export type PaymentType = 'DEPOSIT' | 'SALARY' | 'ADVANCE' | 'ACTIVITY';
+
+export interface KOLProfile {
+  id: string;
+  facebookId: string;
+  platformAccount: string;
+  contactInfo?: string;
+  status: KOLStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  contractCount?: number;
+  activeContracts?: number;
+  totalUnpaid?: number;
+}
+
+export interface KOLContract {
+  id: string;
+  kolId: string;
+  startDate?: string;
+  endDate?: string;
+  salaryAmount: number;
+  depositAmount: number;
+  unpaidAmount: number;
+  clearedAmount: number;
+  totalPaid: number;
+  contractType: ContractType;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  facebookId?: string;
+  platformAccount?: string;
+  kolStatus?: KOLStatus;
+}
+
+export interface KOLPayment {
+  id: string;
+  contractId: string;
+  paymentDate: string;
+  amount: number;
+  paymentType: PaymentType;
+  notes?: string;
+  attachment?: string;
+  createdAt: string;
+  createdBy: string;
+  kolId?: string;
+  facebookId?: string;
+  platformAccount?: string;
+}
+
+export interface KOLStats {
+  totalKOLs: number;
+  activeKOLs: number;
+  activeContracts: number;
+  totalUnpaid: number;
+  monthlyPayments: number;
+  monthlyContracts: number;
+}
+
+export interface KOLOperationLog {
+  id: string;
+  operationType: string;
+  targetType: string;
+  targetId: string;
+  userId: string;
+  userName: string;
+  changes: string;
+  createdAt: string;
+}

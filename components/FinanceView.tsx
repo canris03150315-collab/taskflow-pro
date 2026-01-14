@@ -1,6 +1,8 @@
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 import { User, FinanceRecord, DepartmentDef, Role, hasPermission } from '../types';
+
+const KOLManagementView = lazy(() => import('./KOLManagementView').then(m => ({ default: m.KOLManagementView })));
 
 interface FinanceViewProps {
   currentUser: User;
@@ -21,6 +23,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   onConfirmRecord,
   onDeleteRecord 
 }) => {
+  const [mainTab, setMainTab] = useState<'PETTY_CASH' | 'KOL'>('PETTY_CASH');
   const [activeTab, setActiveTab] = useState<'PERSONAL' | 'DEPT' | 'ALL'>('DEPT');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewImage, setViewImage] = useState<string | null>(null); // For image preview modal
@@ -285,33 +288,60 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20 animate-fade-in">
         
-        {/* Header & Tabs */}
-        <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-slate-200 pb-4">
-            <div className="w-full md:w-auto">
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                    <span>💰</span> 財務零用金管理
-                </h2>
-                <p className="text-sm text-slate-500 font-bold mt-1">部門公費與員工零用金收支紀錄</p>
-            </div>
+        {/* 主分頁導航 */}
+        <div className="flex gap-4 mb-6">
+            <button
+                onClick={() => setMainTab('PETTY_CASH')}
+                className={`flex-1 py-4 px-6 rounded-xl font-bold text-lg transition-all shadow-md ${
+                    mainTab === 'PETTY_CASH'
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white scale-105'
+                        : 'bg-white text-gray-600 hover:shadow-lg'
+                }`}
+            >
+                💰 零用金管理
+            </button>
+            <button
+                onClick={() => setMainTab('KOL')}
+                className={`flex-1 py-4 px-6 rounded-xl font-bold text-lg transition-all shadow-md ${
+                    mainTab === 'KOL'
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white scale-105'
+                        : 'bg-white text-gray-600 hover:shadow-lg'
+                }`}
+            >
+                🎯 KOL 管理
+            </button>
+        </div>
 
-            <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto w-full md:w-auto">
-                <button 
-                    onClick={() => setActiveTab('DEPT')}
-                    className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${activeTab === 'DEPT' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    部門公費
-                </button>
-                <button 
-                    onClick={() => setActiveTab('PERSONAL')}
-                    className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${activeTab === 'PERSONAL' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    個人零用金
-                </button>
-                {isBoss && (
-                    <button 
-                        onClick={() => setActiveTab('ALL')}
-                        className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${activeTab === 'ALL' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
+        {/* 零用金管理內容 */}
+        {mainTab === 'PETTY_CASH' && (
+            <>
+                {/* Header & Tabs */}
+                <div className="flex flex-col md:flex-row justify-between items-end gap-4 border-b border-slate-200 pb-4">
+                    <div className="w-full md:w-auto">
+                        <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                            <span>💰</span> 零用金管理
+                        </h2>
+                        <p className="text-sm text-slate-500 font-bold mt-1">部門公費與員工零用金收支紀錄</p>
+                    </div>
+
+                    <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto w-full md:w-auto">
+                        <button 
+                            onClick={() => setActiveTab('DEPT')}
+                            className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${activeTab === 'DEPT' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            部門零用金
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('PERSONAL')}
+                            className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${activeTab === 'PERSONAL' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            個人零用金
+                        </button>
+                        {isBoss && (
+                            <button 
+                                onClick={() => setActiveTab('ALL')}
+                                className={`flex-1 md:flex-none px-4 py-2 rounded-md text-sm font-bold transition whitespace-nowrap ${activeTab === 'ALL' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
                         全公司總覽
                     </button>
                 )}
@@ -745,6 +775,15 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                     </button>
                 </div>
             </div>
+        )}
+            </>
+        )}
+
+        {/* KOL 管理內容 */}
+        {mainTab === 'KOL' && (
+            <Suspense fallback={<div className="flex items-center justify-center h-64">載入中...</div>}>
+                <KOLManagementView currentUser={currentUser} />
+            </Suspense>
         )}
     </div>
   );
