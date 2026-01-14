@@ -310,7 +310,9 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
   // Save schedule rules
   const handleSaveScheduleRules = async () => {
     try {
-      await api.schedules.updateRules(currentUser.department, rulesForm);
+      // 使用 selectedDepartment 而非 currentUser.department，支持跨部門修改
+      const targetDept = canApprove ? selectedDepartment : currentUser.department;
+      await api.schedules.updateRules(targetDept, rulesForm);
       toast.success('規則設定已保存');
       setShowRulesModal(false);
     } catch (error: any) {
