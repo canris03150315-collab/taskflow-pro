@@ -8,19 +8,23 @@ interface KOLManagementViewProps {
 
 export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUser }) => {
   const [profiles, setProfiles] = useState<KOLProfile[]>([]);
+  const [contracts, setContracts] = useState<KOLContract[]>([]);
+  const [payments, setPayments] = useState<KOLPayment[]>([]);
   const [stats, setStats] = useState<KOLStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState<'profiles' | 'contracts' | 'payments'>('profiles');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<KOLProfile | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [showAddContractModal, setShowAddContractModal] = useState(false);
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, activeView]);
 
   const loadData = async () => {
     try {
@@ -31,6 +35,14 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       ]);
       setProfiles(profilesRes.profiles);
       setStats(statsRes);
+
+      if (activeView === 'contracts') {
+        const contractsRes = await api.kol.getContracts({});
+        setContracts(contractsRes.contracts);
+      } else if (activeView === 'payments') {
+        const paymentsRes = await api.kol.getPayments({});
+        setPayments(paymentsRes.payments);
+      }
     } catch (error) {
       console.error('Load KOL data error:', error);
     } finally {
@@ -78,11 +90,6 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     }
   };
 
-  const handleViewDetail = async (profile: KOLProfile) => {
-    setSelectedProfile(profile);
-    setShowDetailModal(true);
-  };
-
   const handleDeleteProfile = async (id: string) => {
     try {
       await api.kol.deleteProfile(id);
@@ -91,6 +98,60 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     } catch (error) {
       console.error('Delete profile error:', error);
       alert('刪除失敗');
+    }
+  };
+
+  const handleQuickPayment = async (profile: KOLProfile) => {
+    const amount = prompt(`為 ${profile.facebookId} 記錄支付金額：`);
+    if (!amount || isNaN(parseFloat(amount))) return;
+
+    try {
+      const contractsRes = await api.kol.getContracts({ kolId: profile.id });
+      if (contractsRes.contracts.length === 0) {
+        alert('此 KOL 沒有合約，請先新增合約');
+        setSelectedProfile(profile);
+        setShowAddContractModal(true);
+        return;
+      }
+
+      const contract = contractsRes.contracts[0];
+      await api.kol.createPayment({
+        contractId: contract.id,
+        paymentDate: new Date().toISOString().split('T')[0],
+        amount: parseFloat(amount),
+        paymentType: 'SALARY',
+        notes: '快速支付'
+      });
+
+      alert('支付記錄成功！');
+      loadData();
+    } catch (error) {
+      console.error('Quick payment error:', error);
+      alert('支付記錄失敗');
+    }
+  };
+
+  const handleAddContract = async (data: any) => {
+    try {
+      await api.kol.createContract(data);
+      setShowAddContractModal(false);
+      alert('合約新增成功！');
+      loadData();
+    } catch (error) {
+      console.error('Add contract error:', error);
+      alert('新增合約失敗');
+    }
+  };
+
+  const handleAddPayment = async (data: any) => {
+    try {
+      await api.kol.createPayment(data);
+      setShowAddPaymentModal(false);
+      alert('支付記錄成功！');
+      loadData();
+    } catch (error) {
+      console.error('Add payment error:', error);
+      alert('記錄支付失敗');
     }
   };
 
@@ -200,7 +261,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           <div className="text-3xl font-bold mt-2">{stats?.activeKOLs || 0}</div>
         </div>
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="text-sm opacity-90">未付款項</div>
+          <div className="text-sm opacity-90">未付款項 ⚠️</div>
           <div className="text-3xl font-bold mt-2">${stats?.totalUnpaid?.toFixed(0) || 0}</div>
         </div>
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
@@ -209,121 +270,290 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         </div>
       </div>
 
-      {/* 篩選和搜尋 */}
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          >
-            <option value="ALL">全部狀態</option>
-            <option value="ACTIVE">正常合作</option>
-            <option value="STOPPED">停止合作</option>
-            <option value="NEGOTIATING">協議中</option>
-            <option value="LOST_CONTACT">失聯</option>
-          </select>
+      {/* 主導航標籤頁 */}
+      <div className="bg-white rounded-xl shadow-sm p-2 flex gap-2">
+        <button
+          onClick={() => setActiveView('profiles')}
+          className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
+            activeView === 'profiles' 
+              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' 
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          👥 KOL 列表
+        </button>
+        <button
+          onClick={() => setActiveView('contracts')}
+          className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
+            activeView === 'contracts' 
+              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' 
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          📄 合約管理
+        </button>
+        <button
+          onClick={() => setActiveView('payments')}
+          className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
+            activeView === 'payments' 
+              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' 
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          💰 支付記錄
+        </button>
+      </div>
 
-          <input
-            type="text"
-            placeholder="搜尋 KOL 名稱或帳號..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
+      {/* 工具列 */}
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="flex flex-wrap gap-4">
+          {activeView === 'profiles' && (
+            <>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="ALL">全部狀態</option>
+                <option value="ACTIVE">正常合作</option>
+                <option value="STOPPED">停止合作</option>
+                <option value="NEGOTIATING">協議中</option>
+                <option value="LOST_CONTACT">失聯</option>
+              </select>
 
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all shadow-md whitespace-nowrap"
-          >
-            + 新增 KOL
-          </button>
+              <input
+                type="text"
+                placeholder="搜尋 KOL..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleExcelImport}
-            className="hidden"
-          />
-          
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all shadow-md whitespace-nowrap"
-          >
-            📥 導入 Excel
-          </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 shadow-md whitespace-nowrap"
+              >
+                + 新增 KOL
+              </button>
 
-          <button
-            onClick={handleExcelExport}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-md whitespace-nowrap"
-          >
-            📤 匯出 Excel
-          </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleExcelImport}
+                className="hidden"
+              />
+              
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 shadow-md whitespace-nowrap"
+              >
+                📥 導入 Excel
+              </button>
+
+              <button
+                onClick={handleExcelExport}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-md whitespace-nowrap"
+              >
+                📤 匯出 Excel
+              </button>
+            </>
+          )}
+
+          {activeView === 'contracts' && (
+            <button
+              onClick={() => setShowAddContractModal(true)}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 shadow-md whitespace-nowrap"
+            >
+              + 新增合約
+            </button>
+          )}
+
+          {activeView === 'payments' && (
+            <button
+              onClick={() => setShowAddPaymentModal(true)}
+              className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 shadow-md whitespace-nowrap"
+            >
+              + 記錄支付
+            </button>
+          )}
         </div>
       </div>
 
-      {/* KOL 列表 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredProfiles.map((profile) => (
-          <div
-            key={profile.id}
-            className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <h3 className="font-bold text-lg text-gray-900">{profile.facebookId}</h3>
-                <p className="text-sm text-gray-600">@{profile.platformAccount}</p>
+      {/* KOL 列表視圖 */}
+      {activeView === 'profiles' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredProfiles.map((profile) => (
+            <div
+              key={profile.id}
+              className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="font-bold text-lg text-gray-900">{profile.facebookId}</h3>
+                  <p className="text-sm text-gray-600">@{profile.platformAccount}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.status)}`}>
+                    {getStatusText(profile.status)}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (confirm(`確定要刪除 ${profile.facebookId} 嗎？`)) {
+                        handleDeleteProfile(profile.id);
+                      }
+                    }}
+                    className="p-1 text-red-500 hover:bg-red-50 rounded"
+                    title="刪除"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.status)}`}>
-                  {getStatusText(profile.status)}
-                </span>
+
+              <div 
+                className="space-y-2 text-sm cursor-pointer" 
+                onClick={() => {
+                  setSelectedProfile(profile);
+                  setShowDetailModal(true);
+                }}
+              >
+                <div className="flex justify-between">
+                  <span className="text-gray-600">合作記錄</span>
+                  <span className="font-medium">{profile.contractCount || 0} 筆</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">活躍合作</span>
+                  <span className="font-medium">{profile.activeContracts || 0} 個</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">未付金額</span>
+                  <span className={`font-medium ${(profile.totalUnpaid || 0) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                    ${profile.totalUnpaid?.toFixed(0) || 0}
+                  </span>
+                </div>
+              </div>
+
+              {(profile.totalUnpaid || 0) > 0 && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`確定要刪除 ${profile.facebookId} 嗎？此操作無法復原。`)) {
-                      handleDeleteProfile(profile.id);
-                    }
-                  }}
-                  className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                  title="刪除"
+                  onClick={() => handleQuickPayment(profile)}
+                  className="w-full mt-4 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                  </svg>
+                  💰 快速支付
                 </button>
-              </div>
+              )}
             </div>
+          ))}
 
-            <div className="space-y-2 text-sm" onClick={() => handleViewDetail(profile)} style={{cursor: 'pointer'}}>
-              <div className="flex justify-between">
-                <span className="text-gray-600">合作記錄</span>
-                <span className="font-medium">{profile.contractCount || 0} 筆</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">活躍合作</span>
-                <span className="font-medium">{profile.activeContracts || 0} 個</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">未付金額</span>
-                <span className="font-medium text-orange-600">${profile.totalUnpaid?.toFixed(0) || 0}</span>
-              </div>
+          {filteredProfiles.length === 0 && (
+            <div className="col-span-full text-center py-12 text-gray-500">
+              <div className="text-4xl mb-4">🔍</div>
+              <p>沒有找到符合條件的 KOL</p>
             </div>
+          )}
+        </div>
+      )}
 
-            {profile.notes && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 line-clamp-2">{profile.notes}</p>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* 合約列表視圖 */}
+      {activeView === 'contracts' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">KOL</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">工資/傭金</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">訂金</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">未付金額</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">已付金額</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">到期日</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {contracts.map((contract) => (
+                <tr key={contract.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{contract.facebookId}</div>
+                    <div className="text-sm text-gray-500">@{contract.platformAccount}</div>
+                  </td>
+                  <td className="px-4 py-3 font-medium text-green-600">${contract.salaryAmount}</td>
+                  <td className="px-4 py-3">${contract.depositAmount}</td>
+                  <td className="px-4 py-3 font-medium text-orange-600">${contract.unpaidAmount}</td>
+                  <td className="px-4 py-3">${contract.totalPaid}</td>
+                  <td className="px-4 py-3 text-sm">{contract.endDate || '-'}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={async () => {
+                        const amount = prompt('記錄支付金額：');
+                        if (amount && !isNaN(parseFloat(amount))) {
+                          try {
+                            await api.kol.createPayment({
+                              contractId: contract.id,
+                              paymentDate: new Date().toISOString().split('T')[0],
+                              amount: parseFloat(amount),
+                              paymentType: 'SALARY'
+                            });
+                            alert('支付記錄成功！');
+                            loadData();
+                          } catch (error) {
+                            alert('支付記錄失敗');
+                          }
+                        }
+                      }}
+                      className="text-green-600 hover:text-green-800 text-sm font-medium mr-3"
+                    >
+                      💰 支付
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-      {filteredProfiles.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
-          <div className="text-4xl mb-4">🔍</div>
-          <p>沒有找到符合條件的 KOL</p>
+          {contracts.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-4xl mb-4">📄</div>
+              <p>暫無合約記錄</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 支付記錄視圖 */}
+      {activeView === 'payments' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">日期</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">KOL</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">金額</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">類型</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">備註</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {payments.map((payment) => (
+                <tr key={payment.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm">{payment.paymentDate}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{payment.facebookId}</div>
+                    <div className="text-sm text-gray-500">@{payment.platformAccount}</div>
+                  </td>
+                  <td className="px-4 py-3 font-medium text-green-600">${payment.amount}</td>
+                  <td className="px-4 py-3 text-sm">{payment.paymentType}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{payment.notes || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {payments.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-4xl mb-4">💰</div>
+              <p>暫無支付記錄</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -343,14 +573,36 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             setShowDetailModal(false);
             setSelectedProfile(null);
           }}
-          onUpdate={loadData}
+          onAddContract={() => {
+            setShowAddContractModal(true);
+          }}
+          onRefresh={loadData}
+        />
+      )}
+
+      {/* 新增合約 Modal */}
+      {showAddContractModal && (
+        <AddContractModal
+          profiles={profiles}
+          selectedProfileId={selectedProfile?.id}
+          onClose={() => setShowAddContractModal(false)}
+          onSubmit={handleAddContract}
+        />
+      )}
+
+      {/* 記錄支付 Modal */}
+      {showAddPaymentModal && (
+        <AddPaymentModal
+          contracts={contracts}
+          onClose={() => setShowAddPaymentModal(false)}
+          onSubmit={handleAddPayment}
         />
       )}
     </div>
   );
 };
 
-// 新增 KOL Modal 組件
+// 新增 KOL Modal
 const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void }> = ({ onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     facebookId: '',
@@ -367,19 +619,19 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold">新增 KOL</h2>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">臉書 ID *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">臉書ID *</label>
             <input
               type="text"
               required
               value={formData.facebookId}
               onChange={(e) => setFormData({ ...formData, facebookId: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             />
           </div>
           <div>
@@ -389,7 +641,7 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
               required
               value={formData.platformAccount}
               onChange={(e) => setFormData({ ...formData, platformAccount: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             />
           </div>
           <div>
@@ -398,21 +650,8 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
               type="text"
               value={formData.contactInfo}
               onChange={(e) => setFormData({ ...formData, contactInfo: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">狀態</label>
-            <select
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-            >
-              <option value="ACTIVE">正常合作</option>
-              <option value="NEGOTIATING">協議中</option>
-              <option value="STOPPED">停止合作</option>
-              <option value="LOST_CONTACT">失聯</option>
-            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
@@ -420,23 +659,12 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             />
           </div>
           <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              取消
-            </button>
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
-            >
-              新增
-            </button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg">新增</button>
           </div>
         </form>
       </div>
@@ -444,12 +672,17 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
   );
 };
 
-// KOL 詳情 Modal 組件
-const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpdate: () => void }> = ({ profile, onClose, onUpdate }) => {
-  const [details, setDetails] = React.useState<any>(null);
-  const [loading, setLoading] = React.useState(true);
+// KOL 詳情 Modal
+const KOLDetailModal: React.FC<{ 
+  profile: KOLProfile; 
+  onClose: () => void; 
+  onAddContract: () => void;
+  onRefresh: () => void;
+}> = ({ profile, onClose, onAddContract, onRefresh }) => {
+  const [details, setDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const loadDetails = async () => {
       try {
         const data = await api.kol.getProfile(profile.id);
@@ -462,6 +695,26 @@ const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpd
     };
     loadDetails();
   }, [profile.id]);
+
+  const handleQuickPayment = async (contractId: string) => {
+    const amount = prompt('記錄支付金額：');
+    if (!amount || isNaN(parseFloat(amount))) return;
+
+    try {
+      await api.kol.createPayment({
+        contractId,
+        paymentDate: new Date().toISOString().split('T')[0],
+        amount: parseFloat(amount),
+        paymentType: 'SALARY'
+      });
+      alert('支付記錄成功！');
+      const data = await api.kol.getProfile(profile.id);
+      setDetails(data);
+      onRefresh();
+    } catch (error) {
+      alert('支付記錄失敗');
+    }
+  };
 
   if (loading) {
     return (
@@ -476,7 +729,7 @@ const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpd
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-bold">{profile.facebookId}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
         </div>
         
         <div className="p-6 space-y-6">
@@ -484,68 +737,38 @@ const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpd
           <div>
             <h3 className="text-lg font-semibold mb-3">基本資訊</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <span className="text-sm text-gray-600">臉書ID：</span>
-                <span className="font-medium">{details?.profile?.facebook_id}</span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">平台帳號：</span>
-                <span className="font-medium">{details?.profile?.platform_account}</span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">聯絡方式：</span>
-                <span className="font-medium">{details?.profile?.contact_info || '-'}</span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-600">狀態：</span>
-                <span className="font-medium">{details?.profile?.status}</span>
-              </div>
+              <div><span className="text-gray-600">臉書ID：</span><span className="font-medium">{details?.profile?.facebook_id}</span></div>
+              <div><span className="text-gray-600">平台帳號：</span><span className="font-medium">{details?.profile?.platform_account}</span></div>
+              <div><span className="text-gray-600">聯絡方式：</span><span className="font-medium">{details?.profile?.contact_info || '-'}</span></div>
+              <div><span className="text-gray-600">狀態：</span><span className="font-medium">{details?.profile?.status}</span></div>
             </div>
-            {details?.profile?.notes && (
-              <div className="mt-3">
-                <span className="text-sm text-gray-600">備註：</span>
-                <p className="mt-1 text-gray-700">{details.profile.notes}</p>
-              </div>
-            )}
           </div>
 
           {/* 合約記錄 */}
           <div>
-            <h3 className="text-lg font-semibold mb-3">合約記錄 ({details?.contracts?.length || 0})</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-semibold">合約記錄 ({details?.contracts?.length || 0})</h3>
+              <button onClick={onAddContract} className="px-4 py-1 bg-purple-500 text-white rounded-lg text-sm">+ 新增合約</button>
+            </div>
             {details?.contracts && details.contracts.length > 0 ? (
               <div className="space-y-3">
                 {details.contracts.map((contract: any) => (
                   <div key={contract.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <span className="text-gray-600">工資/傭金：</span>
-                        <span className="font-medium text-green-600">${contract.salary_amount}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">訂金：</span>
-                        <span className="font-medium">${contract.deposit_amount}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">未付金額：</span>
-                        <span className="font-medium text-orange-600">${contract.unpaid_amount}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">截清金額：</span>
-                        <span className="font-medium">${contract.cleared_amount}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">總付金額：</span>
-                        <span className="font-medium">${contract.total_paid}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">類型：</span>
-                        <span className="font-medium">{contract.contract_type}</span>
-                      </div>
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div><span className="text-gray-600">工資/傭金：</span><span className="font-medium text-green-600">${contract.salary_amount}</span></div>
+                      <div><span className="text-gray-600">訂金：</span><span className="font-medium">${contract.deposit_amount}</span></div>
+                      <div><span className="text-gray-600">未付金額：</span><span className="font-medium text-orange-600">${contract.unpaid_amount}</span></div>
+                      <div><span className="text-gray-600">截清金額：</span><span className="font-medium">${contract.cleared_amount}</span></div>
+                      <div><span className="text-gray-600">總付金額：</span><span className="font-medium">${contract.total_paid}</span></div>
+                      <div><span className="text-gray-600">類型：</span><span className="font-medium">{contract.contract_type}</span></div>
                     </div>
-                    {contract.start_date && (
-                      <div className="mt-2 text-sm text-gray-600">
-                        期間：{contract.start_date} ~ {contract.end_date || '持續中'}
-                      </div>
+                    {contract.unpaid_amount > 0 && (
+                      <button
+                        onClick={() => handleQuickPayment(contract.id)}
+                        className="mt-3 px-4 py-1 bg-green-500 text-white rounded-lg text-sm"
+                      >
+                        💰 記錄支付
+                      </button>
                     )}
                   </div>
                 ))}
@@ -563,7 +786,7 @@ const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpd
                 {details.payments.map((payment: any) => (
                   <div key={payment.id} className="flex justify-between items-center border-b border-gray-100 pb-2">
                     <div>
-                      <span className="font-medium">${payment.amount}</span>
+                      <span className="font-medium text-green-600">${payment.amount}</span>
                       <span className="text-sm text-gray-600 ml-2">{payment.payment_type}</span>
                     </div>
                     <span className="text-sm text-gray-500">{payment.payment_date}</span>
@@ -573,6 +796,215 @@ const KOLDetailModal: React.FC<{ profile: KOLProfile; onClose: () => void; onUpd
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+};
+
+// 新增合約 Modal
+const AddContractModal: React.FC<{ 
+  profiles: KOLProfile[];
+  selectedProfileId?: string;
+  onClose: () => void; 
+  onSubmit: (data: any) => void;
+}> = ({ profiles, selectedProfileId, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    kolId: selectedProfileId || '',
+    salaryAmount: '',
+    depositAmount: '0',
+    unpaidAmount: '',
+    startDate: '',
+    endDate: '',
+    contractType: 'NORMAL',
+    notes: ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      ...formData,
+      salaryAmount: parseFloat(formData.salaryAmount),
+      depositAmount: parseFloat(formData.depositAmount),
+      unpaidAmount: parseFloat(formData.unpaidAmount || formData.salaryAmount)
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold">新增合約</h2>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">選擇 KOL *</label>
+            <select
+              required
+              value={formData.kolId}
+              onChange={(e) => setFormData({ ...formData, kolId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">請選擇</option>
+              {profiles.map(p => (
+                <option key={p.id} value={p.id}>{p.facebookId} (@{p.platformAccount})</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">工資/傭金 *</label>
+              <input
+                type="number"
+                required
+                value={formData.salaryAmount}
+                onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">訂金</label>
+              <input
+                type="number"
+                value={formData.depositAmount}
+                onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">未付金額</label>
+            <input
+              type="number"
+              value={formData.unpaidAmount}
+              placeholder="留空則等於工資/傭金"
+              onChange={(e) => setFormData({ ...formData, unpaidAmount: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">到期日</label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg">新增</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// 記錄支付 Modal
+const AddPaymentModal: React.FC<{ 
+  contracts: KOLContract[];
+  onClose: () => void; 
+  onSubmit: (data: any) => void;
+}> = ({ contracts, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    contractId: '',
+    paymentDate: new Date().toISOString().split('T')[0],
+    amount: '',
+    paymentType: 'SALARY',
+    notes: ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      ...formData,
+      amount: parseFloat(formData.amount)
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold">記錄支付</h2>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">選擇合約 *</label>
+            <select
+              required
+              value={formData.contractId}
+              onChange={(e) => setFormData({ ...formData, contractId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">請選擇</option>
+              {contracts.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.facebookId} - ${c.salaryAmount} (未付: ${c.unpaidAmount})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">支付金額 *</label>
+              <input
+                type="number"
+                required
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">支付日期 *</label>
+              <input
+                type="date"
+                required
+                value={formData.paymentDate}
+                onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">支付類型</label>
+            <select
+              value={formData.paymentType}
+              onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="SALARY">工資</option>
+              <option value="DEPOSIT">訂金</option>
+              <option value="BONUS">獎金</option>
+              <option value="OTHER">其他</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg">記錄支付</button>
+          </div>
+        </form>
       </div>
     </div>
   );
