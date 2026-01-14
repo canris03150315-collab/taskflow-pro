@@ -427,73 +427,99 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         </div>
       </div>
 
-      {/* KOL 列表視圖 */}
+      {/* KOL 列表視圖 - 條列式 */}
       {activeView === 'profiles' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProfiles.map((profile) => (
-            <div
-              key={profile.id}
-              className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg text-gray-900">{KOL_PLATFORMS.find(p => p.value === profile.platform)?.icon} {profile.platformId}</h3>
-                  <p className="text-sm text-gray-600">@{profile.platformAccount}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.status)}`}>
-                    {getStatusText(profile.status)}
-                  </span>
-                  <button
-                    onClick={() => {
-                      if (confirm(`確定要刪除 ${profile.platformId} 嗎？`)) {
-                        handleDeleteProfile(profile.id);
-                      }
-                    }}
-                    className="p-1 text-red-500 hover:bg-red-50 rounded"
-                    title="刪除"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-
-              <div 
-                className="space-y-2 text-sm cursor-pointer" 
-                onClick={() => {
-                  setSelectedProfile(profile);
-                  setShowDetailModal(true);
-                }}
-              >
-                <div className="flex justify-between">
-                  <span className="text-gray-600">合作記錄</span>
-                  <span className="font-medium">{profile.contractCount || 0} 筆</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">活躍合作</span>
-                  <span className="font-medium">{profile.activeContracts || 0} 個</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">未付金額</span>
-                  <span className={`font-medium ${(profile.totalUnpaid || 0) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    ${profile.totalUnpaid?.toFixed(0) || 0}
-                  </span>
-                </div>
-              </div>
-
-              {(profile.totalUnpaid || 0) > 0 && (
-                <button
-                  onClick={() => handleQuickPayment(profile)}
-                  className="w-full mt-4 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
-                >
-                  💰 快速支付
-                </button>
-              )}
-            </div>
-          ))}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">平台</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">平台 ID / 帳號</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">狀態</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">合約數</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">未付金額</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredProfiles.map((profile) => (
+                <tr key={profile.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <span className="text-xl">{KOL_PLATFORMS.find(p => p.value === profile.platform)?.icon}</span>
+                    <span className="ml-1 text-xs text-gray-500">{KOL_PLATFORMS.find(p => p.value === profile.platform)?.label}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div 
+                      className="cursor-pointer hover:text-purple-600"
+                      onClick={() => {
+                        setSelectedProfile(profile);
+                        setShowDetailModal(true);
+                      }}
+                    >
+                      <div className="font-medium">{profile.platformId}</div>
+                      <div className="text-sm text-gray-500">@{profile.platformAccount}</div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.status)}`}>
+                      {getStatusText(profile.status)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="text-sm">
+                      <span className="font-medium">{profile.contractCount || 0}</span>
+                      <span className="text-gray-500"> 筆</span>
+                      {(profile.activeContracts || 0) > 0 && (
+                        <span className="ml-1 text-green-600">({profile.activeContracts} 活躍)</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`font-medium ${(profile.totalUnpaid || 0) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                      ${profile.totalUnpaid?.toFixed(0) || 0}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      {(profile.contractCount || 0) > 0 && (
+                        <button
+                          onClick={() => handleQuickPayment(profile)}
+                          className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                          title="快速支付"
+                        >
+                          💰 支付
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedProfile(profile);
+                          setShowAddContractModal(true);
+                        }}
+                        className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600"
+                        title="新增合約"
+                      >
+                        📄 合約
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`確定要刪除 ${profile.platformId} 嗎？`)) {
+                            handleDeleteProfile(profile.id);
+                          }
+                        }}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                        title="刪除"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
           {filteredProfiles.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-gray-500">
               <div className="text-4xl mb-4">🔍</div>
               <p>沒有找到符合條件的 KOL</p>
             </div>
