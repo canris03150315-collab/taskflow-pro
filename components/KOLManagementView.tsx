@@ -220,23 +220,34 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = await import('xlsx').then(XLSX => XLSX.utils.sheet_to_json(worksheet));
 
-        const formattedData = jsonData.map((row: any) => ({
-          platformId: row['平台ID'] || row['platformId'] || row['臉書ID'] || row['facebookId'],
-          platform: row['平台'] || row['platform'] || 'FACEBOOK',
-          platformAccount: row['平台帳號'] || row['platformAccount'],
-          contactInfo: row['聯絡方式'] || row['contactInfo'],
-          status: row['狀態'] || row['status'] || 'ACTIVE',
-          notes: row['備註'] || row['notes'],
-          startDate: row['開始日期'] || row['startDate'],
-          endDate: row['到期日'] || row['endDate'],
-          salaryAmount: parseFloat(row['工資/傭金'] || row['salaryAmount'] || 0),
-          depositAmount: parseFloat(row['訂金'] || row['depositAmount'] || 0),
-          unpaidAmount: parseFloat(row['未付金額'] || row['unpaidAmount'] || 0),
-          clearedAmount: parseFloat(row['截清金額'] || row['clearedAmount'] || 0),
-          totalPaid: parseFloat(row['總付金額'] || row['totalPaid'] || 0),
-          contractType: row['類型'] || row['contractType'] || 'NORMAL',
-          contractNotes: row['合作備註'] || row['contractNotes']
-        }));
+        // 解析日期範圍（開始日期:到期日 或 開始日期-到期日）
+        const parseDateRange = (dateStr: string) => {
+          if (!dateStr) return { start: '', end: '' };
+          const str = String(dateStr);
+          const parts = str.split(/[-:~]/);
+          return { start: parts[0]?.trim() || '', end: parts[1]?.trim() || '' };
+        };
+
+        const formattedData = jsonData.map((row: any) => {
+          const dateRange = parseDateRange(row['開始日期:到期日'] || row['合約期間'] || '');
+          return {
+            platformId: row['臉書ID'] || row['平台ID'] || row['platformId'] || row['facebookId'],
+            platform: row['平台'] || row['platform'] || 'FACEBOOK',
+            platformAccount: row['平台帳號'] || row['platformAccount'],
+            contactInfo: row['聯絡方式'] || row['contactInfo'] || '',
+            status: row['狀態'] || row['status'] || 'ACTIVE',
+            notes: row['備註:'] || row['備註'] || row['notes'] || '',
+            startDate: row['開始日期'] || dateRange.start || '',
+            endDate: row['到期日'] || dateRange.end || '',
+            salaryAmount: parseFloat(row['工資/傭金'] || row['salaryAmount'] || 0),
+            depositAmount: parseFloat(row['訂金'] || row['depositAmount'] || 0),
+            unpaidAmount: parseFloat(row['未付金額'] || row['unpaidAmount'] || 0),
+            clearedAmount: parseFloat(row['截清金額'] || row['clearedAmount'] || 0),
+            totalPaid: parseFloat(row['總付金額'] || row['totalPaid'] || 0),
+            contractType: row['類型'] || row['contractType'] || 'NORMAL',
+            contractNotes: row['合作備註'] || row['contractNotes'] || ''
+          };
+        });
 
         const result = await api.kol.importExcel(formattedData);
         
