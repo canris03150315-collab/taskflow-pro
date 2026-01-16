@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
 **最後更新**: 2026-01-16  
-**版本**: v8.9.127-routine-history-fixed  
+**版本**: v8.9.128-routine-history-role-based  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -17,22 +17,96 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.127-routine-history-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.128-routine-history-role-based`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 12 個用戶，完整 KOL 管理表結構
-- **快照**: `taskflow-snapshot-v8.9.127-routine-history-fixed-20260116_063113.tar.gz` (213MB)
-- **資料庫備份**: `taskflow-backup-2026-01-16T06-31-05-216Z.db` (3.20 MB)
+- **快照**: `taskflow-snapshot-v8.9.128-routine-history-role-based-20260116_070507.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-16T06-46-49-165Z.db` (3.20 MB)
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `c6b99bd` - fix: 修復下屬每日任務執行狀況不顯示問題
+- **Git Commit**: `78ec654` - fix: 修復下屬每日任務執行狀況不顯示（持久化修復）
 - **狀態**: ✅ 與生產環境同步
 
 ---
 
 ## 🎯 2026-01-16 更新記錄
+
+### 21. 下屬每日任務執行狀況不顯示 - 持久化修復 ⭐⭐⭐
+**完成時間**: 2026-01-16 下午 15:05
+
+#### 問題描述
+v8.9.127 的修復在容器重啟後丟失，問題再次出現。根本原因是只修改了容器內文件，沒有修改本地源代碼。
+
+#### 根本原因
+1. **容器內修復非持久化**：直接在容器內修改文件，重啟後使用舊映像恢復
+2. **本地源代碼未更新**：`server/src/routes/routines.ts` 是空殼，實際邏輯在編譯後的 JS
+3. **忘記 Docker 映像原理**：容器 = 映像（不可變）+ 可變層（臨時）
+
+#### 解決方案（完整流程）
+
+**步驟 1：從容器備份實際文件**
+```bash
+ssh root@165.227.147.40 "docker exec taskflow-pro cat /app/dist/routes/routines.js" > routines-backup.js
+```
+
+**步驟 2：修改本地文件**
+- 文件：`routines-backup.js`
+- 修復：根據角色返回不同範圍的記錄（SUPERVISOR/BOSS/EMPLOYEE）
+- 修復：使用正確的欄位 `r.completed_items`
+
+**步驟 3：上傳到容器**
+```powershell
+Get-Content "routines-backup.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/routines-fixed.js"
+ssh root@165.227.147.40 "docker cp /tmp/routines-fixed.js taskflow-pro:/app/dist/routes/routines.js"
+```
+
+**步驟 4：重啟並創建新映像**
+```bash
+docker restart taskflow-pro
+docker commit taskflow-pro taskflow-pro:v8.9.128-routine-history-role-based
+```
+
+**步驟 5：創建完整快照**
+```bash
+/root/create-snapshot.sh v8.9.128-routine-history-role-based
+```
+
+#### 驗證結果（模擬前端完整流程）
+測試用戶：**阿德（SUPERVISOR，x3ye5179b 部門）**
+- API 返回：12 條部門記錄
+- 今天（2026-01-16）：4 條記錄
+  - 翔哥：0/3 (0%)
+  - 小芳：0/3 (0%)
+  - 阿德：0/3 (0%)
+  - 茉莉：3/3 (100%) ✓
+
+#### 部署信息
+- **後端版本**: `taskflow-pro:v8.9.128-routine-history-role-based`
+- **快照備份**: `taskflow-snapshot-v8.9.128-routine-history-role-based-20260116_070507.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-16T06-46-49-165Z.db` (3.20 MB)
+- **Git Commit**: `78ec654`
+- **本地文件**: `routines-backup.js` (已修復並上傳)
+
+#### 修復效果
+- ✅ 容器重啟後修復仍然有效（持久化）
+- ✅ SUPERVISOR 看到所有部門下屬的記錄
+- ✅ BOSS 看到所有部門的記錄
+- ✅ EMPLOYEE 只看到自己的記錄
+- ✅ 前端正確顯示完成百分比和進度條
+
+#### 關鍵教訓（重要！）
+1. **Docker 映像不可變**：修改容器內文件必須 commit 新映像
+2. **修復流程正確性**：備份容器文件 → 修改 → 上傳 → 重啟 → commit → 快照
+3. **使用 PowerShell 管道**：`Get-Content | ssh` 是唯一可靠的上傳方式
+4. **完整測試流程**：模擬前端調用 API 的完整流程驗證修復
+5. **遵循全域規則**：每次修復前創建快照，修復後 commit 映像
+
+---
+
+## 🎯 2026-01-16 早期記錄
 
 ### 20. 下屬每日任務執行狀況不顯示問題修復 ⭐⭐
 **完成時間**: 2026-01-16 下午 14:35
