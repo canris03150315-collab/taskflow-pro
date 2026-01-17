@@ -806,14 +806,14 @@ function AppContent() {
       }
   };
 
-  const handleCreateReport = async (content: DailyReportContent, type: ReportType) => {
+  const handleCreateReport = async (content: DailyReportContent, type: ReportType, reportDate?: string) => {
       if(!currentUser) return;
       setReportProcessing(true);
       const newReport: Report = {
           id: `rep-${Date.now()}`,
           type,
           userId: currentUser.id,
-          createdAt: new Date().toISOString().split('T')[0],
+          createdAt: reportDate || new Date().toISOString().split('T')[0],
           content
       };
       const savedReport = await api.reports.create(newReport);
@@ -1079,16 +1079,32 @@ function AppContent() {
       if (id === 'personnel' && !(hasPermission(currentUser!, 'MANAGE_USERS') || currentUser!.role === Role.BOSS || currentUser!.role === Role.MANAGER || currentUser!.role === Role.SUPERVISOR)) return null;
       if (id === 'chat') {
         const badge = unreadChatCount > 0 ? <Badge count={unreadChatCount} /> : null;
-        return <button key={id} onClick={() => { setCurrentPage(id); setIsCreatingReport(false); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}><span className="text-lg">{config.icon}</span>{!isSidebarCollapsed && <span>{config.label}</span>}{!isSidebarCollapsed && badge}</button>;
+        return (
+          <button 
+            key={id} 
+            onClick={() => { setCurrentPage(id); setIsCreatingReport(false); setIsMobileMenuOpen(false); }} 
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
+          >
+            {isSidebarCollapsed ? (
+              <span className="text-xl">{config.icon}</span>
+            ) : (
+              <span>{config.label}</span>
+            )}
+            {!isSidebarCollapsed && badge}
+          </button>
+        );
       }
       return (
         <button 
             key={id}
             onClick={() => { setCurrentPage(id); setIsCreatingReport(false); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? (id === 'settings' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700 shadow-sm') : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? (id === 'settings' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700 shadow-sm') : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
         >
-            <span className="text-lg">{config.icon}</span>
-            {!isSidebarCollapsed && <span>{config.label}</span>}
+            {isSidebarCollapsed ? (
+              <span className="text-xl">{config.icon}</span>
+            ) : (
+              <span>{config.label}</span>
+            )}
         </button>
       );
   };
