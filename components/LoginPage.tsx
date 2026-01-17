@@ -35,7 +35,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans relative">
+      {/* LOGO 在右下角 */}
+      <div className="absolute bottom-8 right-8">
+        <img 
+          src="/kerberos-logo.png" 
+          alt="Kerberos AI Technology" 
+          className="h-20 md:h-24 w-auto"
+        />
+      </div>
+
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
         
         <div className="p-8 md:p-10">
