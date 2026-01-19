@@ -170,7 +170,7 @@ router.delete('/conversations', authenticateToken, checkBossPermission, async (r
 async function getSystemContext(db) {
   const users = await db.all('SELECT id, name, role, department FROM users');
   const departments = await db.all('SELECT id, name FROM departments');
-  const tasks = await db.all('SELECT id, title, status, priority FROM tasks WHERE status != "Completed" LIMIT 20');
+  const tasks = await db.all('SELECT id, title, status, urgency FROM tasks WHERE status != "Completed" LIMIT 20');
   const recentAnnouncements = await db.all('SELECT id, title, created_at FROM announcements ORDER BY created_at DESC LIMIT 5');
   
   return {
