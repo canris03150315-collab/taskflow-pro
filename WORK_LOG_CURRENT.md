@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-19 21:37  
-**版本**: v8.9.136-ai-temp-disabled  
-**狀態**: ⚠️ AI 助理暫時停用（等待 Gemini API Key 問題解決）
+**最後更新**: 2026-01-19 22:15  
+**版本**: v8.9.137-ai-graceful-fallback  
+**狀態**: ⚠️ AI 助理處於優雅降級模式（等待 Gemini API Key 生效）
 
 ---
 
@@ -34,6 +34,50 @@
 ---
 
 ## 🎯 2026-01-19 更新記錄
+
+### 27. AI 助理優雅降級機制 (Graceful Fallback) ⭐⭐
+**完成時間**: 2026-01-19 晚上 22:15
+**狀態**: ✅ 已部署
+
+#### 問題描述
+當 Gemini API Key 無效或服務不可用時，後端會拋出 500 錯誤，導致前端介面顯示錯誤且無法進行後續操作。之前的「暫時停用」版本雖然解決了報錯問題，但完全切斷了 API 調用嘗試，無法在 API Key 恢復時自動運作。
+
+#### 解決方案
+實作優雅降級 (Graceful Fallback) 機制：
+1. **保留 API 調用邏輯**：系統仍會嘗試調用 Gemini API。
+2. **錯誤捕獲**：在 `fetch` 調用周圍添加 `try-catch`。
+3. **友善回應**：
+   - 若 API 返回非 200 狀態（如 400 API Key 無效），返回：「⚠️ AI 服務暫時無法使用 (錯誤代碼: [status])。請檢查 API Key 設定或稍後再試。」
+   - 若發生網路錯誤，返回：「⚠️ 網路連線錯誤，無法連接至 AI 服務。」
+4. **正常格式返回**：後端返回正常的 JSON 格式 (`{ response: "..." }`)，前端將其視為正常的 AI 回應顯示，避免紅色的錯誤提示。
+
+#### 技術實現
+- **文件**: `ai-assistant-ascii.js` (部署為 `/app/dist/routes/ai-assistant.js`)
+- **代碼變更**:
+  ```javascript
+  try {
+    const response = await fetch(...);
+    if (!response.ok) {
+      aiResponse = '\u26a0\ufe0f AI \u670d\u52d9...'; // Unicode escaped message
+    } else {
+      // Process successful response
+    }
+  } catch (error) {
+    aiResponse = '\u26a0\ufe0f \u7db2\u8def...';
+  }
+  ```
+
+#### 部署信息
+- **後端版本**: `taskflow-pro:v8.9.137-ai-graceful-fallback`
+- **快照**: `taskflow-snapshot-v8.9.137-ai-graceful-fallback-20260119_140808.tar.gz`
+- **驗證**: 使用 `verify-graceful-fallback.js` 模擬 API 調用，確認在 API Key 無效時返回了預期的友善訊息和 200 狀態碼。
+
+#### 效益
+- ✅ **自動恢復**：一旦 API Key 生效，無需重新部署，系統會自動恢復正常回答。
+- ✅ **用戶體驗**：用戶看到的是對話框中的提示訊息，而不是系統錯誤彈窗。
+- ✅ **診斷方便**：訊息中包含錯誤代碼，方便快速判斷問題原因。
+
+---
 
 ### 26. AI 智能助理功能開發（暫時停用） ⭐⭐⭐
 **完成時間**: 2026-01-19 晚上 21:37  

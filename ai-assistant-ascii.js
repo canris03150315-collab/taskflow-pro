@@ -74,28 +74,43 @@ router.post('/query', authenticateToken, checkBossPermission, async (req, res) =
     const systemPrompt = buildSystemPrompt(systemContext);
     
     // Call Gemini API
-    const response = await fetch(GEMINI_API_URL + '?key=' + GEMINI_API_KEY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          { role: 'user', parts: [{ text: systemPrompt }] },
-          ...conversationHistory,
-          { role: 'user', parts: [{ text: message }] }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048
+    let aiResponse = '';
+    
+    try {
+      const response = await fetch(GEMINI_API_URL + '?key=' + GEMINI_API_KEY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            { role: 'user', parts: [{ text: systemPrompt }] },
+            ...conversationHistory,
+            { role: 'user', parts: [{ text: message }] }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('Gemini API error status:', response.status);
+        // Fallback message: "⚠️ AI 服務暫時無法使用 (錯誤代碼: [status])。請檢查 API Key 設定或稍後再試。"
+        aiResponse = '\u26a0\ufe0f AI \u670d\u52d9\u66ab\u6642\u7121\u6cd5\u4f7f\u7528 (\u932f\u8aa4\u4ee3\u78bc: ' + response.status + ')\u3002\u8acb\u6aa2\u67e5 API Key \u8a2d\u5b9a\u6216\u7a0d\u5f8c\u518d\u8a66\u3002';
+      } else {
+        const data = await response.json();
+        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+          aiResponse = data.candidates[0].content.parts[0].text;
+        } else {
+          console.error('Unexpected Gemini response structure:', JSON.stringify(data));
+          aiResponse = '\u26a0\ufe0f AI \u56de\u61c9\u683c\u5f0f\u7570\u5e38\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002';
         }
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error('Gemini API error: ' + response.statusText);
+      }
+    } catch (fetchError) {
+      console.error('Gemini API network error:', fetchError);
+      // Fallback message: "⚠️ 網路連線錯誤，無法連接至 AI 服務。"
+      aiResponse = '\u26a0\ufe0f \u7db2\u8def\u9023\u7dda\u932f\u8aa4\uff0c\u7121\u6cd5\u9023\u63a5\u81f3 AI \u670d\u52d9\u3002';
     }
-    
-    const data = await response.json();
-    const aiResponse = data.candidates[0].content.parts[0].text;
     
     // Analyze intent and check if action is needed
     const intentAnalysis = analyzeIntent(message, aiResponse);
