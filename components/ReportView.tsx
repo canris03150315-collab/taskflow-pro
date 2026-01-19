@@ -226,6 +226,26 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                     <p className="text-slate-500 text-sm mt-1">
                         {activeTab === 'worklogs' ? '查看與管理工作日誌' : '查看與管理每日營運報表'}
                     </p>
+                    {activeTab === 'reports' && (
+                        <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div className="flex items-start gap-2">
+                                <span className="text-blue-600 text-lg">ℹ️</span>
+                                <div className="flex-1">
+                                    <p className="text-sm text-blue-900 font-medium">
+                                        📅 顯示最近 7 天內的報表
+                                    </p>
+                                    <p className="text-xs text-blue-700 mt-1">
+                                        {currentUser.role === 'EMPLOYEE' 
+                                            ? '您可以直接查看、編輯和刪除自己 7 天內的報表。查看 7 天前的報表需要申請雙重認證。'
+                                            : currentUser.role === 'SUPERVISOR'
+                                            ? '您可以直接查看部門 7 天內的報表。查看 7 天前的報表需要申請雙重認證。'
+                                            : '您可以直接查看所有 7 天內的報表。查看 7 天前的報表需要申請雙重認證。'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 {activeTab === 'reports' && (
                     <button 
@@ -366,10 +386,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                     </>
                 ) : null}
 
-                {/* Only show reports if authorized */}
-                {isAuthorized && (
-                    <>
-                        {/* Filter Controls */}
+                {/* Reports List - Backend already filters to 7 days */}
+                {/* Filter Controls - Only for non-employees */}
+                    {currentUser.role !== 'EMPLOYEE' && (
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
                             <h3 className="font-semibold text-gray-900 mb-3">🔍 篩選報表</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -447,8 +466,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                 </button>
                             )}
                         </div>
+                    )}
 
-                        {loading ? (
+                    {/* Report List - Visible to all users */}
+                    {loading ? (
                             <div className="p-8 text-center text-slate-400">載入中...</div>
                         ) : (
                             <div className="space-y-4">
@@ -657,13 +678,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                 })()}
                             </div>
                         )}
-                    </>
-                )}
             </div>
         )}
-
+        
         {/* Load More Button - only show when there are more filtered reports */}
-        {isAuthorized && (() => {
+        {activeTab === 'reports' && (() => {
             let filteredReports = reports;
             if (filterDepartment !== 'all') {
                 filteredReports = filteredReports.filter(report => {

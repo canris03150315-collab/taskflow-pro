@@ -20,6 +20,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddContractModal, setShowAddContractModal] = useState(false);
+  const [showEditContractModal, setShowEditContractModal] = useState(false);
+  const [selectedContract, setSelectedContract] = useState<KOLContract | null>(null);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const [selectedDept, setSelectedDept] = useState<string>(currentUser.department);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -190,6 +192,31 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     } catch (error) {
       console.error('Add contract error:', error);
       alert('新增合約失敗');
+    }
+  };
+
+  const handleEditContract = async (data: any) => {
+    if (!selectedContract) return;
+    try {
+      await api.kol.updateContract(selectedContract.id, data);
+      setShowEditContractModal(false);
+      setSelectedContract(null);
+      alert('合約更新成功！');
+      loadData();
+    } catch (error) {
+      console.error('Edit contract error:', error);
+      alert('更新合約失敗');
+    }
+  };
+
+  const handleDeleteContract = async (contractId: string) => {
+    try {
+      await api.kol.deleteContract(contractId);
+      alert('合約刪除成功！');
+      loadData();
+    } catch (error) {
+      console.error('Delete contract error:', error);
+      alert('刪除合約失敗');
     }
   };
 
@@ -585,28 +612,52 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   <td className="px-4 py-3">${contract.totalPaid}</td>
                   <td className="px-4 py-3 text-sm">{contract.endDate || '-'}</td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={async () => {
-                        const amount = prompt('記錄支付金額：');
-                        if (amount && !isNaN(parseFloat(amount))) {
-                          try {
-                            await api.kol.createPayment({
-                              contractId: contract.id,
-                              paymentDate: new Date().toISOString().split('T')[0],
-                              amount: parseFloat(amount),
-                              paymentType: 'SALARY'
-                            });
-                            alert('支付記錄成功！');
-                            loadData();
-                          } catch (error) {
-                            alert('支付記錄失敗');
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          const amount = prompt('記錄支付金額：');
+                          if (amount && !isNaN(parseFloat(amount))) {
+                            try {
+                              await api.kol.createPayment({
+                                contractId: contract.id,
+                                paymentDate: new Date().toISOString().split('T')[0],
+                                amount: parseFloat(amount),
+                                paymentType: 'SALARY'
+                              });
+                              alert('支付記錄成功！');
+                              loadData();
+                            } catch (error) {
+                              alert('支付記錄失敗');
+                            }
                           }
-                        }
-                      }}
-                      className="text-green-600 hover:text-green-800 text-sm font-medium mr-3"
-                    >
-                      💰 支付
-                    </button>
+                        }}
+                        className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                        title="記錄支付"
+                      >
+                        💰 支付
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedContract(contract);
+                          setShowEditContractModal(true);
+                        }}
+                        className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        title="編輯合約"
+                      >
+                        ✏️ 編輯
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`確定要刪除此合約嗎？\n\nKOL: ${contract.platformId}\n工資: $${contract.salaryAmount}\n未付: $${contract.unpaidAmount}`)) {
+                            handleDeleteContract(contract.id);
+                          }
+                        }}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                        title="刪除合約"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -690,6 +741,19 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           selectedProfileId={selectedProfile?.id}
           onClose={() => setShowAddContractModal(false)}
           onSubmit={handleAddContract}
+        />
+      )}
+
+      {/* 編輯合約 Modal */}
+      {showEditContractModal && selectedContract && (
+        <EditContractModal
+          contract={selectedContract}
+          profiles={profiles}
+          onClose={() => {
+            setShowEditContractModal(false);
+            setSelectedContract(null);
+          }}
+          onSubmit={handleEditContract}
         />
       )}
 
@@ -1023,6 +1087,120 @@ const AddContractModal: React.FC<{
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg">新增</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// 編輯合約 Modal
+const EditContractModal: React.FC<{ 
+  contract: KOLContract;
+  profiles: KOLProfile[];
+  onClose: () => void; 
+  onSubmit: (data: any) => void;
+}> = ({ contract, profiles, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    kolId: contract.kolId,
+    salaryAmount: contract.salaryAmount.toString(),
+    depositAmount: contract.depositAmount.toString(),
+    unpaidAmount: contract.unpaidAmount.toString(),
+    startDate: contract.startDate || '',
+    endDate: contract.endDate || '',
+    contractType: contract.contractType || 'NORMAL',
+    notes: contract.notes || ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      ...formData,
+      salaryAmount: parseFloat(formData.salaryAmount),
+      depositAmount: parseFloat(formData.depositAmount),
+      unpaidAmount: parseFloat(formData.unpaidAmount),
+      clearedAmount: contract.clearedAmount || 0,
+      totalPaid: contract.totalPaid || 0
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold">編輯合約</h2>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">KOL</label>
+            <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+              {KOL_PLATFORMS.find(pl => pl.value === contract.platform)?.icon} {contract.platformId} (@{contract.platformAccount})
+            </div>
+            <p className="text-xs text-gray-500 mt-1">編輯合約時無法更改 KOL</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">工資/傭金 *</label>
+              <input
+                type="number"
+                required
+                value={formData.salaryAmount}
+                onChange={(e) => setFormData({ ...formData, salaryAmount: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">訂金</label>
+              <input
+                type="number"
+                value={formData.depositAmount}
+                onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">未付金額 *</label>
+            <input
+              type="number"
+              required
+              value={formData.unpaidAmount}
+              onChange={(e) => setFormData({ ...formData, unpaidAmount: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
+              <input
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">到期日</label>
+              <input
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={3}
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg">更新</button>
           </div>
         </form>
       </div>

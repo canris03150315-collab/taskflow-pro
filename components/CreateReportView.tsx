@@ -4,11 +4,27 @@ import { DailyReportContent, ReportType } from '../types';
 
 interface CreateReportViewProps {
   onCancel: () => void;
-  onSubmit: (content: DailyReportContent, type: ReportType) => void;
+  onSubmit: (content: DailyReportContent, type: ReportType, reportDate?: string) => void;
   isProcessing: boolean;
 }
 
 export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, onSubmit, isProcessing }) => {
+  // Report Date - default to today
+  const getTodayDate = () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 8);
+    return now.toISOString().split('T')[0];
+  };
+  const [reportDate, setReportDate] = useState<string>(getTodayDate());
+  
+  // Get min date (7 days ago) for date picker
+  const getMinDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() - 7);
+    date.setHours(date.getHours() + 8);
+    return date.toISOString().split('T')[0];
+  };
+  
   // Operational Metrics
   const [lineLeads, setLineLeads] = useState<number | ''>('');
   const [registrations, setRegistrations] = useState<number | ''>('');
@@ -29,6 +45,7 @@ export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, on
     
     // 二次確認
     const confirmMessage = `確定要提交營運報表嗎？\n\n` +
+      `📅 報表日期：${reportDate}\n` +
       `💰 充值金額：$${Number(depositAmount) || 0}\n` +
       `💸 提現金額：$${Number(withdrawalAmount) || 0}\n` +
       `📊 淨入金額：$${netIncome}\n\n` +
@@ -48,7 +65,7 @@ export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, on
       conversionRate,
       firstDepositRate,
       notes
-    }, ReportType.DAILY);
+    }, ReportType.DAILY, reportDate);
   };
 
   return (
@@ -69,6 +86,30 @@ export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, on
 
        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
           <form id="report-form" onSubmit={handleSubmit} className="p-8 space-y-8">
+              
+              {/* Report Date Selection */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                  <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                      📅 報表日期 <span className="text-xs text-slate-400 font-normal ml-2">可選擇今天或過去7天內的日期</span>
+                  </h3>
+                  <div className="flex items-center gap-4">
+                      <input 
+                          type="date" 
+                          value={reportDate}
+                          onChange={(e) => setReportDate(e.target.value)}
+                          min={getMinDate()}
+                          max={getTodayDate()}
+                          required
+                          className="px-4 py-2.5 rounded-lg border-2 border-blue-300 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg text-slate-700 bg-white"
+                      />
+                      {reportDate !== getTodayDate() && (
+                          <div className="flex items-center gap-2 text-orange-600 text-sm font-bold">
+                              <span>⚠️</span>
+                              <span>補KEY報表</span>
+                          </div>
+                      )}
+                  </div>
+              </div>
               
               {/* Section 1: Financials */}
               <div>

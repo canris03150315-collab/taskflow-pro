@@ -1,7 +1,7 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-16  
-**版本**: v8.9.128-routine-history-role-based  
+**最後更新**: 2026-01-19  
+**版本**: v8.9.129-kol-contract-insert-fix  
 **狀態**: ✅ 穩定運行
 
 ---
@@ -17,11 +17,11 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.128-routine-history-role-based`
+- **Docker 映像**: `taskflow-pro:v8.9.129-kol-contract-insert-fix`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 12 個用戶，完整 KOL 管理表結構
-- **快照**: `taskflow-snapshot-v8.9.128-routine-history-role-based-20260116_070507.tar.gz` (213MB)
+- **快照**: `taskflow-snapshot-v8.9.129-kol-contract-insert-fix-20260119_055426.tar.gz` (213MB)
 - **資料庫備份**: `taskflow-backup-2026-01-16T06-46-49-165Z.db` (3.20 MB)
 - **狀態**: ✅ 正常運行
 
@@ -29,6 +29,332 @@
 - **Git 狀態**: 已初始化，有完整歷史
 - **Git Commit**: `78ec654` - fix: 修復下屬每日任務執行狀況不顯示（持久化修復）
 - **狀態**: ✅ 與生產環境同步
+
+---
+
+## 🎯 2026-01-19 更新記錄
+
+### 25. KOL 合約編輯 UI 優化 ⭐⭐
+**完成時間**: 2026-01-19 下午 14:40
+
+#### 問題描述
+用戶反映編輯合約時，系統要求選擇 KOL，但下拉選單中沒有任何 KOL 可選。這不符合邏輯，因為編輯合約時 KOL 已經確定，不應該讓用戶重新選擇。
+
+#### 用戶反饋
+> "編輯合約 我選擇了一個合約 還要我選擇KOL 這不符合邏輯 我已經確定是要編輯那張合約了還要選擇KOL 且現在下拉條按出沒有KOL可以選擇 可能是有問題"
+
+#### 根本原因
+`EditContractModal` 使用了與 `AddContractModal` 相同的 UI 模式，顯示 KOL 下拉選單。但編輯合約時，合約已經綁定到特定 KOL，不應該允許更改。
+
+#### 優化方案
+將 KOL 選擇器改為只顯示當前合約綁定的 KOL 資訊（不可編輯）。
+
+**優化前**：
+```typescript
+<select
+  required
+  value={formData.kolId}
+  onChange={(e) => setFormData({ ...formData, kolId: e.target.value })}
+  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+>
+  <option value="">請選擇</option>
+  {profiles.map(p => (
+    <option key={p.id} value={p.id}>...</option>
+  ))}
+</select>
+```
+
+**優化後**：
+```typescript
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">KOL</label>
+  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+    {KOL_PLATFORMS.find(pl => pl.value === contract.platform)?.icon} {contract.platformId} (@{contract.platformAccount})
+  </div>
+  <p className="text-xs text-gray-500 mt-1">編輯合約時無法更改 KOL</p>
+</div>
+```
+
+#### 部署信息
+- **前端 Deploy ID**: `696dd151f3fda7571b063e6d`
+- **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
+- **後端版本**: `taskflow-pro:v8.9.129-kol-contract-insert-fix` (無需修改)
+- **優化時間**: 2026-01-19 14:40
+
+#### 優化效果
+- ✅ 編輯合約時清楚顯示當前 KOL 資訊
+- ✅ 不再顯示混淆的下拉選單
+- ✅ 明確提示「編輯合約時無法更改 KOL」
+- ✅ 更符合業務邏輯和用戶預期
+- ✅ 灰色背景視覺上表示不可編輯
+
+#### UI 改進
+**新增合約**：顯示下拉選單，可選擇 KOL
+**編輯合約**：顯示固定資訊，不可更改 KOL
+
+#### 關鍵教訓
+1. **業務邏輯優先**：UI 設計應符合業務邏輯，合約綁定 KOL 後不應允許更改
+2. **用戶反饋重要**：用戶指出的邏輯問題往往是 UX 設計缺陷
+3. **視覺提示**：使用灰色背景和提示文字明確表示欄位不可編輯
+4. **差異化設計**：新增和編輯應該有不同的 UI 模式
+
+---
+
+### 24. KOL 合約編輯無法儲存問題修復 ⭐
+**完成時間**: 2026-01-19 下午 14:30
+
+#### 問題描述
+用戶反映編輯合約後無法儲存，系統沒有任何錯誤提示。
+
+#### 診斷過程
+
+**1. 檢查後端日誌**
+```
+SqliteError: NOT NULL constraint failed: kol_contracts.cleared_amount
+code: 'SQLITE_CONSTRAINT_NOTNULL'
+```
+
+**2. 檢查後端 PUT 路由**
+後端路由正確包含了 `cleared_amount` 和 `total_paid` 欄位：
+```javascript
+UPDATE kol_contracts 
+SET start_date = ?, end_date = ?, salary_amount = ?, deposit_amount = ?,
+    unpaid_amount = ?, cleared_amount = ?, total_paid = ?, contract_type = ?,
+    notes = ?, updated_at = ?
+WHERE id = ?
+```
+
+#### 根本原因
+前端 `EditContractModal` 在提交時沒有傳送 `clearedAmount` 和 `totalPaid` 欄位，導致後端 UPDATE 語句因 NOT NULL 約束失敗。
+
+#### 修復方案
+在前端 `handleSubmit` 函數中添加缺少的欄位，使用合約現有值或預設值 0。
+
+**修復前**：
+```typescript
+onSubmit({
+  ...formData,
+  salaryAmount: parseFloat(formData.salaryAmount),
+  depositAmount: parseFloat(formData.depositAmount),
+  unpaidAmount: parseFloat(formData.unpaidAmount)
+});
+```
+
+**修復後**：
+```typescript
+onSubmit({
+  ...formData,
+  salaryAmount: parseFloat(formData.salaryAmount),
+  depositAmount: parseFloat(formData.depositAmount),
+  unpaidAmount: parseFloat(formData.unpaidAmount),
+  clearedAmount: contract.clearedAmount || 0,
+  totalPaid: contract.totalPaid || 0
+});
+```
+
+#### 部署信息
+- **前端 Deploy ID**: `696dced0bf4e745ee98905e8`
+- **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
+- **後端版本**: `taskflow-pro:v8.9.129-kol-contract-insert-fix` (無需修改)
+- **修復時間**: 2026-01-19 14:30
+
+#### 修復效果
+- ✅ 編輯合約功能完全正常
+- ✅ 可以成功更新合約資料
+- ✅ 保留現有的 `clearedAmount` 和 `totalPaid` 值
+- ✅ 所有欄位正確保存到資料庫
+
+#### 關鍵教訓
+1. **後端日誌診斷**：`docker logs` 清楚顯示 NOT NULL 約束失敗
+2. **完整性檢查**：前端提交數據必須包含所有後端 NOT NULL 欄位
+3. **預設值處理**：使用 `|| 0` 確保數值欄位有預設值
+4. **保留現有值**：編輯時應保留不在表單中的欄位值
+
+---
+
+### 23. KOL 合約編輯和刪除功能 ⭐⭐
+**完成時間**: 2026-01-19 下午 14:10
+
+#### 功能需求
+用戶要求為 KOL 合約添加編輯和刪除功能，方便管理合約資料。
+
+#### 技術實現
+
+**前端修改** (`components/KOLManagementView.tsx`)
+
+**1. 添加狀態管理**
+```typescript
+const [showEditContractModal, setShowEditContractModal] = useState(false);
+const [selectedContract, setSelectedContract] = useState<KOLContract | null>(null);
+```
+
+**2. 添加處理函數**
+```typescript
+// 編輯合約
+const handleEditContract = async (data: any) => {
+  if (!selectedContract) return;
+  try {
+    await api.kol.updateContract(selectedContract.id, data);
+    setShowEditContractModal(false);
+    setSelectedContract(null);
+    alert('合約更新成功！');
+    loadData();
+  } catch (error) {
+    console.error('Edit contract error:', error);
+    alert('更新合約失敗');
+  }
+};
+
+// 刪除合約
+const handleDeleteContract = async (contractId: string) => {
+  try {
+    await api.kol.deleteContract(contractId);
+    alert('合約刪除成功！');
+    loadData();
+  } catch (error) {
+    console.error('Delete contract error:', error);
+    alert('刪除合約失敗');
+  }
+};
+```
+
+**3. 修改合約列表 UI**
+在每個合約行添加三個操作按鈕：
+- 💰 **支付** (綠色) - 快速記錄支付
+- ✏️ **編輯** (藍色) - 編輯合約資料
+- 🗑️ **刪除** (紅色) - 刪除合約（帶確認對話框）
+
+**4. 添加編輯合約 Modal**
+```typescript
+const EditContractModal: React.FC<{ 
+  contract: KOLContract;
+  profiles: KOLProfile[];
+  onClose: () => void; 
+  onSubmit: (data: any) => void;
+}> = ({ contract, profiles, onClose, onSubmit }) => {
+  // 預填充現有合約資料
+  const [formData, setFormData] = useState({
+    kolId: contract.kolId,
+    salaryAmount: contract.salaryAmount.toString(),
+    depositAmount: contract.depositAmount.toString(),
+    unpaidAmount: contract.unpaidAmount.toString(),
+    startDate: contract.startDate || '',
+    endDate: contract.endDate || '',
+    contractType: contract.contractType || 'NORMAL',
+    notes: contract.notes || ''
+  });
+  // ... 表單實現
+};
+```
+
+**後端 API**
+- ✅ `PUT /api/kol/contracts/:id` - 已存在
+- ✅ `DELETE /api/kol/contracts/:id` - 已存在
+
+#### 部署信息
+- **前端 Deploy ID**: `696dc9badf1d5e5e6b0daeb3`
+- **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
+- **後端版本**: `taskflow-pro:v8.9.129-kol-contract-insert-fix` (無需修改)
+- **部署時間**: 2026-01-19 14:10
+
+#### 功能特點
+
+**編輯功能**：
+- ✅ 點擊「✏️ 編輯」按鈕打開編輯 Modal
+- ✅ 預填充現有合約所有資料
+- ✅ 可修改 KOL、工資、訂金、未付金額、日期、備註
+- ✅ 提交後立即更新列表
+
+**刪除功能**：
+- ✅ 點擊「🗑️」按鈕觸發刪除
+- ✅ 顯示確認對話框，包含合約詳細信息
+- ✅ 確認後刪除合約並更新列表
+
+**UI 優化**：
+- ✅ 三個按鈕清晰排列，顏色區分功能
+- ✅ 編輯 Modal 與新增 Modal 風格一致
+- ✅ 刪除前有詳細確認信息，防止誤刪
+
+#### 關鍵教訓
+1. **後端路由檢查**：先檢查後端是否已有對應路由，避免重複開發
+2. **狀態管理**：使用 `selectedContract` 追蹤當前編輯的合約
+3. **用戶體驗**：刪除前顯示詳細確認信息，包含 KOL 名稱和金額
+4. **代碼複用**：編輯 Modal 與新增 Modal 結構相似，保持一致性
+
+---
+
+### 22. KOL 合約新增失敗問題修復 ⭐
+**完成時間**: 2026-01-19 下午 13:54
+
+#### 問題描述
+用戶在 KOL 管理系統中新增合約時，系統顯示「新增合約失敗」錯誤提示。
+
+#### 診斷過程
+
+**1. 檢查前端代碼**
+- `KOLManagementView.tsx` 的 `handleAddContract` 函數正常
+- `AddContractModal` 組件正常提交數據
+- API 調用 `api.kol.createContract(data)` 正常
+
+**2. 檢查資料庫結構**
+```javascript
+// 使用診斷腳本檢查
+Columns: id, kol_id, start_date, end_date, salary_amount, deposit_amount, 
+         unpaid_amount, cleared_amount, total_paid, contract_type, notes, 
+         created_at, updated_at, created_by, department_id
+```
+- ✅ 表結構完整，所有必要欄位都存在
+
+**3. 檢查後端日誌**
+```
+SqliteError: 15 values for 14 columns
+```
+
+#### 根本原因
+後端 `/app/dist/routes/kol.js` 的 POST /contracts 路由中，INSERT 語句有 **15 個佔位符 (?)** 但只有 **14 個欄位**，導致 SQL 語法錯誤。
+
+**錯誤的 INSERT 語句**：
+```sql
+INSERT INTO kol_contracts (
+  id, kol_id, start_date, end_date, salary_amount, deposit_amount, 
+  unpaid_amount, cleared_amount, total_paid, contract_type, notes, 
+  created_at, updated_at, created_by
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)  -- 15 個 ?
+```
+
+#### 修復方案
+移除多餘的佔位符，使其與欄位數量匹配。
+
+**修復後的 INSERT 語句**：
+```sql
+INSERT INTO kol_contracts (
+  id, kol_id, start_date, end_date, salary_amount, deposit_amount, 
+  unpaid_amount, cleared_amount, total_paid, contract_type, notes, 
+  created_at, updated_at, created_by
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)  -- 14 個 ?
+```
+
+#### 技術實現
+- **診斷腳本**: `diagnose-kol-contract.js` - 檢查資料庫表結構
+- **檢查腳本**: `check-kol-routes.js` - 檢查後端路由
+- **修復腳本**: `fix-kol-contract-insert.js` - 修正 INSERT 語句
+
+#### 部署信息
+- **後端版本**: `taskflow-pro:v8.9.129-kol-contract-insert-fix`
+- **快照備份**: `taskflow-snapshot-v8.9.129-kol-contract-insert-fix-20260119_055426.tar.gz` (213MB)
+- **修復時間**: 2026-01-19 13:54
+
+#### 修復效果
+- ✅ 新增合約功能完全正常
+- ✅ 可以成功創建 KOL 合約
+- ✅ 所有欄位正確保存到資料庫
+- ✅ 前端顯示「合約新增成功！」
+
+#### 關鍵教訓
+1. **容器內診斷**：使用 Node.js 腳本精確檢查後端代碼和資料庫
+2. **查看後端日誌**：`docker logs` 提供關鍵錯誤信息
+3. **SQL 語法檢查**：INSERT 語句的欄位數量必須與佔位符數量完全匹配
+4. **遵循全域規則**：修復後立即 `docker commit` 創建新映像和快照
 
 ---
 

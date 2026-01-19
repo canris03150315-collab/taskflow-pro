@@ -1,0 +1,23 @@
+<svg width="450" height="280" viewBox="0 0 450 280" xmlns="http://www.w3.org/2000/svg">
+  <!-- 黑色邊框 -->
+  <rect x="0" y="0" width="450" height="280" fill="#000000"/>
+  
+  <!-- 紅色背景 -->
+  <rect x="10" y="10" width="430" height="260" fill="#FF0000"/>
+  
+  <!-- 公司名稱 Kerberos -->
+  <text x="225" y="75" font-family="serif" font-size="52" font-weight="bold" fill="#000000" text-anchor="middle">Kerberos</text>
+  
+  <!-- 副標題 AI TECHNOLOGY Co.Ltd -->
+  <text x="225" y="105" font-family="sans-serif" font-size="18" fill="#000000" text-anchor="middle">AI TECHNOLOGY Co.Ltd</text>
+  
+  <!-- 三角形 M 圖案 -->
+  <g transform="translate(225, 165)">
+    <!-- 左側三角形 -->
+    <polygon points="-90,60 -45,-35 0,60" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <!-- 中間三角形 -->
+    <polygon points="-45,-35 0,60 45,-35" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+    <!-- 右側三角形 -->
+    <polygon points="0,60 45,-35 90,60" fill="#FFFFFF" stroke="#000000" stroke-width="4"/>
+  </g>
+</svg>
