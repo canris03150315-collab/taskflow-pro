@@ -451,7 +451,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
   {
     id: 'system',
     label: '系統設定',
-    items: ['settings']
+    items: ['ai-assistant', 'settings']
   }
 ];
 
@@ -459,7 +459,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
 export const DEFAULT_MENU_ORDER: MenuItemId[] = [
   'dashboard', 'chat', 'bulletin', 'tasks', 'leaves', 'sop', 
   'performance', 'team', 'reports', 'finance', 'data_center', 
-  'forum', 'memo', 'personnel', 'settings'
+  'forum', 'memo', 'personnel', 'ai-assistant', 'settings'
 ];
 
 export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = {
