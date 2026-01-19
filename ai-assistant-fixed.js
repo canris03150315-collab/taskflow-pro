@@ -204,21 +204,21 @@ Always be professional, concise, and helpful.`;
 function analyzeIntent(userMessage, aiResponse) {
   const msg = userMessage.toLowerCase();
   
-  // Check for action keywords (using Unicode escape for Chinese characters)
-  if (msg.includes('create') || msg.includes('add') || msg.includes('\u5275\u5efa') || msg.includes('\u65b0\u589e')) {
-    if (msg.includes('task') || msg.includes('\u4efb\u52d9')) {
+  // Check for action keywords
+  if (msg.includes('create') || msg.includes('add') || msg.includes('創建') || msg.includes('新增')) {
+    if (msg.includes('task') || msg.includes('任務')) {
       return { needsAction: true, intent: 'create_task', action: 'create_task' };
     }
-    if (msg.includes('memo') || msg.includes('\u5099\u5fd8\u9304')) {
+    if (msg.includes('memo') || msg.includes('備忘錄')) {
       return { needsAction: true, intent: 'create_memo', action: 'create_memo' };
     }
-    if (msg.includes('announcement') || msg.includes('\u516c\u544a')) {
+    if (msg.includes('announcement') || msg.includes('公告')) {
       return { needsAction: true, intent: 'create_announcement', action: 'create_announcement' };
     }
   }
   
   // Query intents
-  if (msg.includes('how') || msg.includes('what') || msg.includes('\u5982\u4f55') || msg.includes('\u4ec0\u9ebc')) {
+  if (msg.includes('how') || msg.includes('what') || msg.includes('如何') || msg.includes('什麼')) {
     return { needsAction: false, intent: 'query' };
   }
   
