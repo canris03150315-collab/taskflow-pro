@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-19  
-**版本**: v8.9.130-kol-contract-edit-ui-fix  
-**狀態**: ✅ 穩定運行
+**最後更新**: 2026-01-19 21:37  
+**版本**: v8.9.136-ai-temp-disabled  
+**狀態**: ⚠️ AI 助理暫時停用（等待 Gemini API Key 問題解決）
 
 ---
 
@@ -17,22 +17,128 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.130-kol-contract-edit-ui-fix`
+- **Docker 映像**: `taskflow-pro:v8.9.136-ai-temp-disabled`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 12 個用戶，完整 KOL 管理表結構
-- **快照**: `taskflow-snapshot-v8.9.130-kol-contract-edit-ui-fix-20260119_070612.tar.gz` (213MB)
-- **資料庫備份**: `taskflow-backup-2026-01-16T06-46-49-165Z.db` (3.20 MB)
-- **狀態**: ✅ 正常運行
+- **資料庫**: 12 個用戶，完整 KOL 管理表結構，AI conversations 表
+- **快照**: `taskflow-snapshot-v8.9.136-ai-temp-disabled-20260119_133416.tar.gz` (213MB)
+- **環境變數**: GEMINI_API_KEY 已設置
+- **狀態**: ✅ 正常運行（AI 助理功能暫時停用）
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `3d844f6` - feat: KOL 合約編輯和刪除功能完整實現
+- **Git Commit**: `7038cc2` - temp: AI 助理暫時停用 - 等待 Gemini API Key 問題解決
 - **狀態**: ✅ 與生產環境同步
+- **交接文檔**: `HANDOFF-TO-GEMINI-20260119.md`
 
 ---
 
 ## 🎯 2026-01-19 更新記錄
+
+### 26. AI 智能助理功能開發（暫時停用） ⭐⭐⭐
+**完成時間**: 2026-01-19 晚上 21:37  
+**狀態**: ⚠️ 後端代碼已修復，但 Gemini API Key 無法使用，暫時返回維護訊息
+
+#### 功能目標
+為 BOSS 角色提供專屬的 AI 智能助理，可以：
+- 查詢公司數據（備忘錄、任務、員工、報表等）
+- 提供智能分析和建議
+- 保存對話歷史
+
+#### 已完成工作
+
+**1. 後端路由完全修復** ✅
+- 文件：`/app/dist/routes/ai-assistant.js`
+- 修復內容：
+  - ✅ 錯誤的資料庫調用（`dbCall` → `db.all/run`）
+  - ✅ 中文字符轉為 Unicode Escape（符合 Pure ASCII 要求）
+  - ✅ SQL 查詢欄位錯誤（`priority` → `urgency`）
+  - ✅ SQL 語法錯誤（使用模板字串避免引號衝突）
+- Git Commits:
+  - `adf3fc4`: 修復資料庫調用和 ASCII 轉換
+  - `c041b04`: 修復 tasks 欄位
+  - `e105b29`: 修復 SQL 語法
+
+**2. 環境變數設置** ✅
+- 在 Docker 容器中設置 `GEMINI_API_KEY`
+- 重啟容器時自動帶入環境變數
+
+**3. 資料庫表結構** ✅
+- 已存在 `ai_conversations` 表用於保存對話歷史
+
+#### 當前問題：Gemini API Key 無法使用
+
+**問題現象**：
+- ✅ AI Studio 網頁可以正常使用
+- ❌ API Key 從程式調用時返回 `API_KEY_INVALID`
+- ❌ 從本地和伺服器測試都失敗
+- ❌ 嘗試多個模型和 API endpoint 都失敗
+- ❌ 等待 10+ 分鐘仍無效
+
+**已嘗試的解決方案**：
+1. ✅ 啟用 Gemini API
+2. ✅ 設置計費帳戶
+3. ✅ 修改 API Key 限制為「無」
+4. ✅ 創建新的 API Key
+5. ✅ 測試不同的 API 格式
+6. ❌ 所有方法都失敗
+
+**API Key 資訊**：
+- Key: `AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI`
+- 專案: task pro (573459402239)
+- 狀態: AI Studio 可用，程式調用無效
+
+#### 暫時解決方案
+
+**部署內容**：
+- 修改 AI 助理路由，返回友好的「功能維護中」訊息
+- 用戶不會看到錯誤，只是暫時無法使用 AI 功能
+
+**維護訊息**：
+```
+🔧 AI 智能助理功能目前正在升級維護中，預計很快就會上線。
+
+我們正在優化 AI 服務以提供更好的體驗，請稍後再試。感謝您的耐心等候！
+```
+
+#### 部署信息
+- **後端版本**: `taskflow-pro:v8.9.136-ai-temp-disabled`
+- **快照**: `taskflow-snapshot-v8.9.136-ai-temp-disabled-20260119_133416.tar.gz` (213MB)
+- **Git Commit**: `7038cc2` - temp: AI 助理暫時停用
+- **環境變數**: GEMINI_API_KEY 已設置
+
+#### 交接文檔
+**為 Gemini 接手準備的完整文檔**：
+- 文件：`HANDOFF-TO-GEMINI-20260119.md`
+- 包含：
+  - 專案背景和系統架構
+  - 已完成的工作和代碼修復
+  - API Key 問題的診斷過程
+  - 測試方法和腳本
+  - 緊急恢復步驟
+  - 所有關鍵資訊（伺服器、Git、API Key）
+
+#### 下一步建議
+1. **解決 Gemini API Key 問題**（推薦）
+   - 檢查是否需要 OAuth 而非 API Key
+   - 等待 24 小時後重試
+   - 聯繫 Google Support
+
+2. **使用其他 AI 服務**
+   - OpenAI GPT API
+   - Anthropic Claude API
+
+3. **繼續優化其他功能**
+   - 暫時保持維護訊息
+   - 等待 API Key 問題解決
+
+#### 關鍵教訓
+1. **第三方 API 依賴風險**：API Key 可能有各種限制和啟用延遲
+2. **優雅降級**：提供友好的維護訊息比報錯更好
+3. **完整文檔**：交接時需要詳細記錄所有診斷過程
+4. **環境變數管理**：確保容器重啟時正確帶入環境變數
+
+---
 
 ### 25. KOL 合約編輯 UI 優化 ⭐⭐
 **完成時間**: 2026-01-19 下午 14:40
