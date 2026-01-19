@@ -422,6 +422,7 @@ export type MenuItemId =
   | 'chat' 
   | 'memo' 
   | 'personnel' 
+  | 'ai-assistant'
   | 'settings';
 
 // NEW: Group Structure
@@ -476,6 +477,7 @@ export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = 
   chat: { label: '企業通訊', icon: '📨' },
   memo: { label: '個人備忘錄', icon: '✏️' },
   personnel: { label: '人員帳號管理', icon: '👥' },
+  'ai-assistant': { label: 'AI 智能助理', icon: '✨' },
   settings: { label: '系統設定', icon: '⚙️' },
 };
 

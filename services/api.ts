@@ -1212,6 +1212,25 @@ const RealApi = {
             return request<{ profiles: any[] }>('GET', '/kol/export-excel');
         }
     },
+
+    aiAssistant: {
+        getConversations: async (limit?: number): Promise<{ conversations: any[] }> => {
+            const queryParams = limit ? `?limit=${limit}` : '';
+            return request<{ conversations: any[] }>('GET', `/ai-assistant/conversations${queryParams}`);
+        },
+
+        sendQuery: async (message: string): Promise<{ response: string; intent?: string; actionTaken?: string; actionResult?: any }> => {
+            return request<{ response: string; intent?: string; actionTaken?: string; actionResult?: any }>('POST', '/ai-assistant/query', { message });
+        },
+
+        deleteConversation: async (id: string): Promise<{ success: boolean }> => {
+            return request<{ success: boolean }>('DELETE', `/ai-assistant/conversations/${id}`);
+        },
+
+        clearConversations: async (): Promise<{ success: boolean }> => {
+            return request<{ success: boolean }>('DELETE', '/ai-assistant/conversations');
+        }
+    },
 };
 
 const MockApi = RealApi;

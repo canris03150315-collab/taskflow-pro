@@ -35,6 +35,7 @@ const SOPView = lazy(() => import('./components/SOPView').then(m => ({ default: 
 const KOLManagementView = lazy(() => import('./components/KOLManagementView').then(m => ({ default: m.KOLManagementView })));
 const LeaveManagementView = lazy(() => import('./components/LeaveManagementView').then(m => ({ default: m.LeaveManagementView })));
 const DepartmentDataView = lazy(() => import('./components/DepartmentDataView').then(m => ({ default: m.DepartmentDataView })));
+const AIAssistantView = lazy(() => import('./components/AIAssistantView').then(m => ({ default: m.default })));
 
 // 載入中骨架屏組件
 const PageSkeleton = () => (
@@ -1398,6 +1399,7 @@ function AppContent() {
              {currentPage === 'memo' && <MemoView currentUser={currentUser} />}
              {currentPage === 'performance' && <PerformanceView currentUser={currentUser} users={users} departments={departments} />}
              {currentPage === 'sop' && <SOPView currentUser={currentUser} users={users} departments={departments} />}
+             {currentPage === 'ai-assistant' && <AIAssistantView currentUser={currentUser} />}
              {currentPage === 'settings' && <SystemSettingsView currentUser={currentUser} onLogout={handleLogout} />}
            </Suspense>
            
