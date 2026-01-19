@@ -320,6 +320,7 @@ ssh root@165.227.147.40 "find /root/taskflow-snapshots/ -name '*.tar.gz' -mtime 
 |--------|----------|----------|----------|------|
 | v7.4.0 | 2026-01-02 10:30 | Supervisor權限、聊天修復、報表中心 | taskflow-snapshot-v7.4.0-*.tar.gz | 崩潰前最後穩定版 |
 | v7.4.3 | 2026-01-02 11:16 | 同 v7.4.0，使用昨天資料 | taskflow-snapshot-v7.4.3-*.tar.gz | 當前運行版本 |
+| v8.9.138 | 2026-01-19 23:20 | AI 助理完全修復 (Gemini 2.0) | taskflow-snapshot-v8.9.138-*.tar.gz | AI 功能恢復正常 |
 
 ---
 
