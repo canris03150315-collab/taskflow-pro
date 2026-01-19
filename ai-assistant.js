@@ -3,11 +3,15 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { authenticateToken } = require('../middleware/auth');
 
+// Gemini API configuration
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent';
+
 // Check if user is boss
 function checkBossPermission(req, res, next) {
   const currentUser = req.user;
   if (currentUser.role !== 'BOSS') {
-    return res.status(403).json({ error: '\u50c5\u9650BOSS\u53ef\u4f7f\u7528AI\u52a9\u7406' });
+    return res.status(403).json({ error: 'Only boss can access AI assistant' });
   }
   next();
 }
@@ -27,11 +31,11 @@ router.get('/conversations', authenticateToken, checkBossPermission, async (req,
     res.json({ conversations });
   } catch (error) {
     console.error('Get conversations error:', error);
-    res.status(500).json({ error: '\u7121\u6cd5\u53d6\u5f97\u5c0d\u8a71\u8a18\u9304' });
+    res.status(500).json({ error: 'Failed to get conversations' });
   }
 });
 
-// POST /query - Temporarily disabled
+// POST /query - Send query to AI assistant
 router.post('/query', authenticateToken, checkBossPermission, async (req, res) => {
   try {
     const db = req.db;
@@ -39,37 +43,223 @@ router.post('/query', authenticateToken, checkBossPermission, async (req, res) =
     const { message } = req.body;
     
     if (!message) {
-      return res.status(400).json({ error: '\u8a0a\u606f\u4e0d\u80fd\u70ba\u7a7a' });
+      return res.status(400).json({ error: 'Message is required' });
     }
     
     // Save user message
     const userMsgId = uuidv4();
-    const timestamp = new Date().toISOString();
+    const now = new Date().toISOString();
     
     await db.run(
-      `INSERT INTO ai_conversations (id, user_id, role, message, created_at) VALUES (?, ?, ?, ?, ?)`,
-      [userMsgId, userId, 'user', message, timestamp]
+      'INSERT INTO ai_conversations (id, user_id, role, message, created_at) VALUES (?, ?, ?, ?, ?)',
+      [userMsgId, userId, 'user', message, now]
     );
     
-    // Return friendly maintenance message instead of calling Gemini API
-    const aiResponse = '\ud83d\udd27 AI \u667a\u80fd\u52a9\u7406\u529f\u80fd\u76ee\u524d\u6b63\u5728\u5347\u7d1a\u7dad\u8b77\u4e2d\uff0c\u9810\u8a08\u5f88\u5feb\u5c31\u6703\u4e0a\u7dda\u3002\n\n\u6211\u5011\u6b63\u5728\u512a\u5316 AI \u670d\u52d9\u4ee5\u63d0\u4f9b\u66f4\u597d\u7684\u9ad4\u9a57\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002\u611f\u8b1d\u60a8\u7684\u8010\u5fc3\u7b49\u5019\uff01';
+    // Get recent conversation history for context
+    const recentConversations = await db.all(
+      'SELECT role, message FROM ai_conversations WHERE user_id = ? ORDER BY created_at DESC LIMIT 10',
+      [userId]
+    );
+    
+    // Build context from history
+    const conversationHistory = recentConversations.reverse().map(conv => ({
+      role: conv.role === 'user' ? 'user' : 'model',
+      parts: [{ text: conv.message }]
+    }));
+    
+    // Get system data for context
+    const systemContext = await getSystemContext(db);
+    
+    // Build system prompt
+    const systemPrompt = buildSystemPrompt(systemContext);
+    
+    // Call Gemini API
+    let aiResponse = '';
+    
+    try {
+      const response = await fetch(GEMINI_API_URL + '?key=' + GEMINI_API_KEY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            { role: 'user', parts: [{ text: systemPrompt }] },
+            ...conversationHistory,
+            { role: 'user', parts: [{ text: message }] }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2048
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('Gemini API error status:', response.status);
+        // Fallback message: "⚠️ AI 服務暫時無法使用 (錯誤代碼: [status])。請檢查 API Key 設定或稍後再試。"
+        aiResponse = '\u26a0\ufe0f AI \u670d\u52d9\u66ab\u6642\u7121\u6cd5\u4f7f\u7528 (\u932f\u8aa4\u4ee3\u78bc: ' + response.status + ')\u3002\u8acb\u6aa2\u67e5 API Key \u8a2d\u5b9a\u6216\u7a0d\u5f8c\u518d\u8a66\u3002';
+      } else {
+        const data = await response.json();
+        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+          aiResponse = data.candidates[0].content.parts[0].text;
+        } else {
+          console.error('Unexpected Gemini response structure:', JSON.stringify(data));
+          aiResponse = '\u26a0\ufe0f AI \u56de\u61c9\u683c\u5f0f\u7570\u5e38\uff0c\u8acb\u7a0d\u5f8c\u518d\u8a66\u3002';
+        }
+      }
+    } catch (fetchError) {
+      console.error('Gemini API network error:', fetchError);
+      // Fallback message: "⚠️ 網路連線錯誤，無法連接至 AI 服務。"
+      aiResponse = '\u26a0\ufe0f \u7db2\u8def\u9023\u7dda\u932f\u8aa4\uff0c\u7121\u6cd5\u9023\u63a5\u81f3 AI \u670d\u52d9\u3002';
+    }
+    
+    // Analyze intent and check if action is needed
+    const intentAnalysis = analyzeIntent(message, aiResponse);
+    
+    let actionResult = null;
+    if (intentAnalysis.needsAction) {
+      actionResult = await executeAction(db, userId, intentAnalysis, req);
+    }
     
     // Save AI response
     const aiMsgId = uuidv4();
     await db.run(
-      `INSERT INTO ai_conversations (id, user_id, role, message, created_at) VALUES (?, ?, ?, ?, ?)`,
-      [aiMsgId, userId, 'assistant', aiResponse, new Date().toISOString()]
+      'INSERT INTO ai_conversations (id, user_id, role, message, intent, action_taken, action_result, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [aiMsgId, userId, 'assistant', aiResponse, 
+        intentAnalysis.intent || null,
+        intentAnalysis.action || null,
+        actionResult ? JSON.stringify(actionResult) : null,
+        now]
     );
     
-    res.json({
+    res.json({ 
       response: aiResponse,
-      conversationId: userMsgId
+      intent: intentAnalysis.intent,
+      actionTaken: intentAnalysis.action,
+      actionResult: actionResult
     });
     
   } catch (error) {
     console.error('AI query error:', error);
-    res.status(500).json({ error: '\u8655\u7406\u67e5\u8a62\u5931\u6557' });
+    res.status(500).json({ error: 'Failed to process query' });
   }
 });
+
+// DELETE /conversations/:id - Delete a conversation
+router.delete('/conversations/:id', authenticateToken, checkBossPermission, async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = req.user.id;
+    const { id } = req.params;
+    
+    await db.run(
+      'DELETE FROM ai_conversations WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete conversation error:', error);
+    res.status(500).json({ error: 'Failed to delete conversation' });
+  }
+});
+
+// DELETE /conversations - Clear all conversations
+router.delete('/conversations', authenticateToken, checkBossPermission, async (req, res) => {
+  try {
+    const db = req.db;
+    const userId = req.user.id;
+    
+    await db.run(
+      'DELETE FROM ai_conversations WHERE user_id = ?',
+      [userId]
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Clear conversations error:', error);
+    res.status(500).json({ error: 'Failed to clear conversations' });
+  }
+});
+
+// Helper: Get system context
+async function getSystemContext(db) {
+  const users = await db.all('SELECT id, name, role, department FROM users');
+  const departments = await db.all('SELECT id, name FROM departments');
+  const tasks = await db.all(`SELECT id, title, status, urgency FROM tasks WHERE status != 'Completed' LIMIT 20`);
+  const recentAnnouncements = await db.all('SELECT id, title, created_at FROM announcements ORDER BY created_at DESC LIMIT 5');
+  
+  return {
+    users,
+    departments,
+    tasks,
+    recentAnnouncements
+  };
+}
+
+// Helper: Build system prompt
+function buildSystemPrompt(context) {
+  return `You are an AI assistant for a company management system. You help the boss manage the company.
+
+Current system data:
+- Total users: ${context.users.length}
+- Departments: ${context.departments.map(d => d.name).join(', ')}
+- Active tasks: ${context.tasks.length}
+
+You can help with:
+1. Creating tasks, memos, announcements
+2. Querying data (attendance, finance, reports)
+3. Analyzing company status
+4. Providing insights and recommendations
+
+When the boss asks you to create something or take action, respond with clear confirmation and details.
+Always be professional, concise, and helpful.`;
+}
+
+// Helper: Analyze intent
+function analyzeIntent(userMessage, aiResponse) {
+  const msg = userMessage.toLowerCase();
+  
+  // Check for action keywords (using Unicode escape for Chinese characters)
+  if (msg.includes('create') || msg.includes('add') || msg.includes('\u5275\u5efa') || msg.includes('\u65b0\u589e')) {
+    if (msg.includes('task') || msg.includes('\u4efb\u52d9')) {
+      return { needsAction: true, intent: 'create_task', action: 'create_task' };
+    }
+    if (msg.includes('memo') || msg.includes('\u5099\u5fd8\u9304')) {
+      return { needsAction: true, intent: 'create_memo', action: 'create_memo' };
+    }
+    if (msg.includes('announcement') || msg.includes('\u516c\u544a')) {
+      return { needsAction: true, intent: 'create_announcement', action: 'create_announcement' };
+    }
+  }
+  
+  // Query intents
+  if (msg.includes('how') || msg.includes('what') || msg.includes('\u5982\u4f55') || msg.includes('\u4ec0\u9ebc')) {
+    return { needsAction: false, intent: 'query' };
+  }
+  
+  return { needsAction: false, intent: 'general' };
+}
+
+// Helper: Execute action
+async function executeAction(db, userId, intentAnalysis, req) {
+  try {
+    switch (intentAnalysis.action) {
+      case 'create_task':
+        return { success: true, message: 'Task creation requires more details. Please use the task management interface.' };
+      
+      case 'create_memo':
+        return { success: true, message: 'Memo creation requires more details. Please use the memo interface.' };
+      
+      case 'create_announcement':
+        return { success: true, message: 'Announcement creation requires more details. Please use the announcement interface.' };
+      
+      default:
+        return null;
+    }
+  } catch (error) {
+    console.error('Execute action error:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 module.exports = router;
