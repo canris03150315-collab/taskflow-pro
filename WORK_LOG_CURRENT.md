@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-19 23:20  
-**版本**: v8.9.138-ai-fixed  
-**狀態**: ✅ AI 智能助理功能已完全修復並上線 (Gemini 2.0 Flash)
+**最後更新**: 2026-01-20 14:30  
+**版本**: v8.9.139-ai-privacy-removed  
+**狀態**: ✅ AI 智能助理已解除隱私限制，可存取完整員工數據
 
 ---
 
@@ -17,23 +17,54 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.136-ai-temp-disabled`
+- **Docker 映像**: `taskflow-pro:v8.9.139-ai-privacy-removed`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 12 個用戶，完整 KOL 管理表結構，AI conversations 表
-- **快照**: `taskflow-snapshot-v8.9.136-ai-temp-disabled-20260119_133416.tar.gz` (213MB)
+- **資料庫**: 13 個用戶，完整 KOL 管理表結構，AI conversations 表
+- **快照**: (即將創建)
 - **環境變數**: GEMINI_API_KEY 已設置
-- **狀態**: ✅ 正常運行（AI 助理功能暫時停用）
+- **狀態**: ✅ 正常運行（AI 擁有完整數據權限）
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `7038cc2` - temp: AI 助理暫時停用 - 等待 Gemini API Key 問題解決
+- **Git Commit**: `ee77afb` (待提交)
 - **狀態**: ✅ 與生產環境同步
-- **交接文檔**: `HANDOFF-TO-GEMINI-20260119.md`
 
 ---
 
-## 🎯 2026-01-19 更新記錄
+## 🎯 2026-01-20 更新記錄
+
+### 29. AI 智能助理隱私限制解除 ⭐⭐⭐
+**完成時間**: 2026-01-20 下午 14:30
+**狀態**: ✅ 已上線
+
+#### 需求描述
+用戶確認系統為內部使用，BOSS 對所有員工資料都一清二楚，因此不需要 AI 的隱私保護機制，AI 應能存取並回答所有員工的詳細資料。
+
+#### 修改內容
+1.  **資料查詢範圍擴大** (`getSystemContext`):
+    - 用戶資料：增加查詢 `username`, `role`, `department`, `created_at` (仍排除密碼)。
+    - 任務資料：增加查詢 `assigned_to_user_id`, `deadline`, `urgency`。
+    
+2.  **System Prompt 優化** (`buildSystemPrompt`):
+    - 明確告知 AI：「這是內部系統，您擁有所有數據的完全訪問權限。沒有隱私限制。」
+    - 在 Prompt 中提供完整的員工目錄（姓名、職位、部門、用戶名）。
+    - 在任務列表中解析並顯示負責人姓名。
+
+3.  **Bug 修復**:
+    - 修正了 `tasks` 表查詢時使用不存在的 `assignees` 欄位導致的 SQL 錯誤，改為正確的 `assigned_to_user_id`。
+
+#### 驗證結果
+- 使用 `verify-privacy-removal.js` 測試。
+- AI 成功列出所有員工（包括測試用的 `Seven`, `錢來也`, `大俠` 等）及其部門。
+- AI 確認可以回答關於員工的詳細問題。
+
+#### 部署信息
+- **後端版本**: `taskflow-pro:v8.9.139-ai-privacy-removed`
+- **Docker 運行命令**: `docker restart taskflow-pro` (代碼已熱更新)
+- **快照**: (即將創建)
+
+---
 
 ### 28. AI 智能助理完全修復與上線 ⭐⭐⭐
 **完成時間**: 2026-01-19 晚上 23:20

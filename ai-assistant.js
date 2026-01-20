@@ -184,10 +184,12 @@ router.delete('/conversations', authenticateToken, checkBossPermission, async (r
 
 // Helper: Get system context
 async function getSystemContext(db) {
-  const users = await db.all('SELECT id, name, role, department FROM users');
+  // Select all user fields except password for privacy (even internally, hashes are useless to AI)
+  const users = await db.all('SELECT id, name, role, department, username, created_at FROM users');
   const departments = await db.all('SELECT id, name FROM departments');
-  const tasks = await db.all(`SELECT id, title, status, urgency FROM tasks WHERE status != 'Completed' LIMIT 20`);
-  const recentAnnouncements = await db.all('SELECT id, title, created_at FROM announcements ORDER BY created_at DESC LIMIT 5');
+  // Get more tasks and details
+  const tasks = await db.all(`SELECT id, title, status, urgency, assigned_to_user_id, deadline FROM tasks WHERE status != 'Completed' LIMIT 50`);
+  const recentAnnouncements = await db.all('SELECT id, title, content, created_at FROM announcements ORDER BY created_at DESC LIMIT 10');
   
   return {
     users,
@@ -199,12 +201,34 @@ async function getSystemContext(db) {
 
 // Helper: Build system prompt
 function buildSystemPrompt(context) {
-  return `You are an AI assistant for a company management system. You help the boss manage the company.
+  // Format user list for the AI
+  const userList = context.users.map(u => 
+    `- ${u.name} (${u.role}) - Dept: ${u.department || 'None'} - Username: ${u.username}`
+  ).join('\n');
 
-Current system data:
-- Total users: ${context.users.length}
-- Departments: ${context.departments.map(d => d.name).join(', ')}
-- Active tasks: ${context.tasks.length}
+  // Format task list
+  const taskList = context.tasks.map(t => {
+    const assignee = context.users.find(u => u.id === t.assigned_to_user_id);
+    const assigneeName = assignee ? assignee.name : 'Unassigned';
+    return `- [${t.urgency}] ${t.title} (Status: ${t.status}, Assigned: ${assigneeName}, Due: ${t.deadline || 'No deadline'})`;
+  }).join('\n');
+
+  return `You are an AI assistant for a company management system. You help the boss manage the company.
+This is an internal system and you have full access to all data. There are no privacy restrictions regarding employee data as the user is the system administrator.
+
+Current System Data:
+
+### Departments
+${context.departments.map(d => d.name).join(', ')}
+
+### Employee Directory (${context.users.length} users)
+${userList}
+
+### Active Tasks (${context.tasks.length} tasks)
+${taskList}
+
+### Recent Announcements
+${context.recentAnnouncements.map(a => `- [${a.created_at.split('T')[0]}] ${a.title}`).join('\n')}
 
 You can help with:
 1. Creating tasks, memos, announcements
@@ -213,7 +237,7 @@ You can help with:
 4. Providing insights and recommendations
 
 When the boss asks you to create something or take action, respond with clear confirmation and details.
-Always be professional, concise, and helpful.`;
+Always be professional, concise, and helpful. You can refer to employees by name and know their roles/departments.`;
 }
 
 // Helper: Analyze intent
