@@ -24,8 +24,9 @@ router.get('/conversations', authenticateToken, checkBossPermission, async (req,
     const userId = req.user.id;
     const limit = parseInt(req.query.limit) || 50;
     
+    // Add rowid DESC to ensure correct order when timestamps are identical
     const conversations = await db.all(
-      'SELECT * FROM ai_conversations WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+      'SELECT * FROM ai_conversations WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?',
       [userId, limit]
     );
     
@@ -123,13 +124,15 @@ router.post('/query', authenticateToken, checkBossPermission, async (req, res) =
     
     // Save AI response
     const aiMsgId = uuidv4();
+    const aiResponseTime = new Date().toISOString();
+    
     await db.run(
       'INSERT INTO ai_conversations (id, user_id, role, message, intent, action_taken, action_result, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [aiMsgId, userId, 'assistant', aiResponse, 
         intentAnalysis.intent || null,
         intentAnalysis.action || null,
         actionResult ? JSON.stringify(actionResult) : null,
-        now]
+        aiResponseTime]
     );
     
     res.json({ 
