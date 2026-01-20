@@ -197,6 +197,12 @@ async function getSystemContext(db) {
   const recentFinance = await db.all('SELECT type, amount, category, description, date, status, department_id FROM finance ORDER BY date DESC LIMIT 20');
   const recentKolPayments = await db.all('SELECT amount, payment_date, payment_type, notes FROM kol_payments ORDER BY payment_date DESC LIMIT 10');
   
+  // Max Permission: Fetch Attendance, Leave, Reports, Contracts
+  const recentAttendance = await db.all("SELECT user_id, date, clock_in, clock_out, status FROM attendance_records ORDER BY date DESC LIMIT 20");
+  const recentLeaves = await db.all("SELECT user_id, leave_type, start_date, end_date, status, reason FROM leave_requests ORDER BY created_at DESC LIMIT 10");
+  const recentReports = await db.all("SELECT user_id, type, content, created_at FROM reports ORDER BY created_at DESC LIMIT 10");
+  const activeContracts = await db.all("SELECT kol_id, start_date, end_date, salary_amount, contract_type FROM kol_contracts ORDER BY created_at DESC LIMIT 10");
+
   return {
     users,
     departments,
@@ -204,7 +210,11 @@ async function getSystemContext(db) {
     recentAnnouncements,
     memories,
     recentFinance,
-    recentKolPayments
+    recentKolPayments,
+    recentAttendance,
+    recentLeaves,
+    recentReports,
+    activeContracts
   };
 }
 
@@ -243,6 +253,42 @@ function buildSystemPrompt(context) {
       ? context.recentKolPayments.map(k => `- [${k.payment_date}] ${k.payment_type} $${k.amount} (Note: ${k.notes || 'None'})`).join('\n')
       : 'No recent KOL payments.';
 
+  // Format Attendance
+  const attendanceList = context.recentAttendance && context.recentAttendance.length > 0
+      ? context.recentAttendance.map(a => {
+          const user = context.users.find(u => u.id === a.user_id);
+          const userName = user ? user.name : 'Unknown';
+          return `- [${a.date}] ${userName}: ${a.clock_in || '--'} to ${a.clock_out || '--'} (${a.status})`;
+      }).join('\n')
+      : 'No recent attendance records.';
+
+  // Format Leaves
+  const leaveList = context.recentLeaves && context.recentLeaves.length > 0
+      ? context.recentLeaves.map(l => {
+          const user = context.users.find(u => u.id === l.user_id);
+          const userName = user ? user.name : 'Unknown';
+          return `- ${userName}: ${l.leave_type} (${l.start_date} to ${l.end_date}) - ${l.status} (Reason: ${l.reason || 'None'})`;
+      }).join('\n')
+      : 'No recent leave requests.';
+
+  // Format Reports
+  const reportList = context.recentReports && context.recentReports.length > 0
+      ? context.recentReports.map(r => {
+          const user = context.users.find(u => u.id === r.user_id);
+          const userName = user ? user.name : 'Unknown';
+          return `- [${r.created_at.split('T')[0]}] ${userName} (${r.type}): ${r.content.substring(0, 50)}...`;
+      }).join('\n')
+      : 'No recent reports.';
+
+  // Format Contracts
+  const contractList = context.activeContracts && context.activeContracts.length > 0
+      ? context.activeContracts.map(c => {
+           // Try to find KOL name if possible, assuming kol_id might be in users or kol_profiles (not loaded here but we have id)
+           // For now just show ID
+           return `- KOL ID ${c.kol_id}: ${c.contract_type} ($${c.salary_amount}) ${c.start_date} ~ ${c.end_date}`;
+      }).join('\n')
+      : 'No active contracts.';
+
   return `You are an AI assistant for a company management system. You help the boss manage the company.
 This is an internal system and you have full access to all data. There are no privacy restrictions regarding employee data as the user is the system administrator.
 
@@ -260,11 +306,22 @@ ${userList}
 ### Active Tasks (${context.tasks.length} tasks)
 ${taskList}
 
-### Recent Financial Records (Expenses & Income)
-${financeList}
+### Attendance & Leaves
+#### Recent Attendance
+${attendanceList}
+#### Recent Leave Requests
+${leaveList}
 
-### Recent KOL Payments
+### Work Reports (Daily Logs)
+${reportList}
+
+### Financials & Contracts
+#### Recent Expenses
+${financeList}
+#### KOL Payments
 ${kolPaymentList}
+#### Active Contracts
+${contractList}
 
 ### Recent Announcements
 ${context.recentAnnouncements.map(a => `- [${a.created_at.split('T')[0]}] ${a.title}`).join('\n')}
