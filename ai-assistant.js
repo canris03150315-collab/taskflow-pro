@@ -193,12 +193,14 @@ async function getSystemContext(db) {
   // Get more tasks and details
   const tasks = await db.all(`SELECT id, title, status, urgency, assigned_to_user_id, deadline FROM tasks WHERE status != 'Completed' LIMIT 50`);
   const recentAnnouncements = await db.all('SELECT id, title, content, created_at FROM announcements ORDER BY created_at DESC LIMIT 10');
+  const memories = await db.all('SELECT content, created_at FROM ai_memories ORDER BY created_at DESC LIMIT 20');
   
   return {
     users,
     departments,
     tasks,
-    recentAnnouncements
+    recentAnnouncements,
+    memories
   };
 }
 
@@ -218,8 +220,16 @@ function buildSystemPrompt(context) {
     return `- [${t.urgency}] ${t.title} (Status: ${t.status}, Assigned: ${assigneeName}, Due: ${t.deadline || 'No deadline'})`;
   }).join('\n');
 
+  // Format memories
+  const memoryList = context.memories && context.memories.length > 0 
+    ? context.memories.map(m => `- ${m.content}`).join('\n') 
+    : 'No long-term memories yet.';
+
   return `You are an AI assistant for a company management system. You help the boss manage the company.
 This is an internal system and you have full access to all data. There are no privacy restrictions regarding employee data as the user is the system administrator.
+
+### Long-term Memories (Rules & Facts you must remember)
+${memoryList}
 
 Current System Data:
 
@@ -249,6 +259,12 @@ Always be professional, concise, and helpful. You can refer to employees by name
 function analyzeIntent(userMessage, aiResponse) {
   const msg = userMessage.toLowerCase();
   
+  // Check for memory storage intent
+  // "Remember", "Note", "記住" (\u8a18\u4f4f), "筆記" (\u7b46\u8a18)
+  if (msg.startsWith('remember') || msg.startsWith('note') || msg.includes('\u8a18\u4f4f') || msg.includes('\u7b46\u8a18')) {
+    return { needsAction: true, intent: 'save_memory', action: 'save_memory', originalMessage: userMessage };
+  }
+  
   // Check for action keywords (using Unicode escape for Chinese characters)
   if (msg.includes('create') || msg.includes('add') || msg.includes('\u5275\u5efa') || msg.includes('\u65b0\u589e')) {
     if (msg.includes('task') || msg.includes('\u4efb\u52d9')) {
@@ -274,6 +290,16 @@ function analyzeIntent(userMessage, aiResponse) {
 async function executeAction(db, userId, intentAnalysis, req) {
   try {
     switch (intentAnalysis.action) {
+      case 'save_memory':
+        const { v4: uuidv4 } = require('uuid');
+        const memoryId = uuidv4();
+        const now = new Date().toISOString();
+        await db.run(
+          'INSERT INTO ai_memories (id, content, type, created_at) VALUES (?, ?, ?, ?)',
+          [memoryId, intentAnalysis.originalMessage, 'general', now]
+        );
+        return { success: true, message: 'Memory saved successfully.' };
+
       case 'create_task':
         return { success: true, message: 'Task creation requires more details. Please use the task management interface.' };
       
