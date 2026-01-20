@@ -276,7 +276,24 @@ function buildSystemPrompt(context) {
       ? context.recentReports.map(r => {
           const user = context.users.find(u => u.id === r.user_id);
           const userName = user ? user.name : 'Unknown';
-          return `- [${r.created_at.split('T')[0]}] ${userName} (${r.type}): ${r.content.substring(0, 50)}...`;
+          
+          let content = r.content;
+          // Try to parse JSON content (Operational Report)
+          try {
+            if (content.trim().startsWith('{')) {
+              const data = JSON.parse(content);
+              if (data.depositAmount !== undefined || data.netIncome !== undefined) {
+                // It's an operational report
+                content = `[Operational Data] Net Income: $${data.netIncome}, Deposit: $${data.depositAmount}, Withdrawal: $${data.withdrawalAmount}, Leads: ${data.lineLeads}, Regs: ${data.registrations}`;
+                if (data.notes) content += ` (Note: ${data.notes})`;
+              }
+            }
+          } catch (e) {
+            // Ignore parse error, use raw content
+            content = r.content.substring(0, 100);
+          }
+
+          return `- [${r.created_at.split('T')[0]}] ${userName} (${r.type}): ${content}`;
       }).join('\n')
       : 'No recent reports.';
 
@@ -312,7 +329,7 @@ ${attendanceList}
 #### Recent Leave Requests
 ${leaveList}
 
-### Work Reports (Daily Logs)
+### Operational Reports & Daily Logs
 ${reportList}
 
 ### Financials & Contracts
