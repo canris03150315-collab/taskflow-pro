@@ -205,9 +205,11 @@ async function getSystemContext(db) {
 // Helper: Build system prompt
 function buildSystemPrompt(context) {
   // Format user list for the AI
-  const userList = context.users.map(u => 
-    `- ${u.name} (${u.role}) - Dept: ${u.department || 'None'} - Username: ${u.username}`
-  ).join('\n');
+  const userList = context.users.map(u => {
+    const dept = context.departments.find(d => d.id === u.department);
+    const deptName = dept ? dept.name : (u.department || 'None');
+    return `- ${u.name} (${u.role}) - Dept: ${deptName} - Username: ${u.username}`;
+  }).join('\n');
 
   // Format task list
   const taskList = context.tasks.map(t => {
