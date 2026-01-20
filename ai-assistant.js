@@ -194,13 +194,17 @@ async function getSystemContext(db) {
   const tasks = await db.all(`SELECT id, title, status, urgency, assigned_to_user_id, deadline FROM tasks WHERE status != 'Completed' LIMIT 50`);
   const recentAnnouncements = await db.all('SELECT id, title, content, created_at FROM announcements ORDER BY created_at DESC LIMIT 10');
   const memories = await db.all('SELECT content, created_at FROM ai_memories ORDER BY created_at DESC LIMIT 20');
+  const recentFinance = await db.all('SELECT type, amount, category, description, date, status, department_id FROM finance ORDER BY date DESC LIMIT 20');
+  const recentKolPayments = await db.all('SELECT amount, payment_date, payment_type, notes FROM kol_payments ORDER BY payment_date DESC LIMIT 10');
   
   return {
     users,
     departments,
     tasks,
     recentAnnouncements,
-    memories
+    memories,
+    recentFinance,
+    recentKolPayments
   };
 }
 
@@ -225,6 +229,20 @@ function buildSystemPrompt(context) {
     ? context.memories.map(m => `- ${m.content}`).join('\n') 
     : 'No long-term memories yet.';
 
+  // Format finance records
+  const financeList = context.recentFinance && context.recentFinance.length > 0
+    ? context.recentFinance.map(f => {
+        const dept = context.departments.find(d => d.id === f.department_id);
+        const deptName = dept ? dept.name : (f.department_id || 'General');
+        return `- [${f.date}] ${f.type} $${f.amount} (${f.category}): ${f.description || 'No desc'} (Dept: ${deptName}, Status: ${f.status})`;
+      }).join('\n')
+    : 'No recent financial records.';
+
+  // Format KOL payments
+  const kolPaymentList = context.recentKolPayments && context.recentKolPayments.length > 0
+      ? context.recentKolPayments.map(k => `- [${k.payment_date}] ${k.payment_type} $${k.amount} (Note: ${k.notes || 'None'})`).join('\n')
+      : 'No recent KOL payments.';
+
   return `You are an AI assistant for a company management system. You help the boss manage the company.
 This is an internal system and you have full access to all data. There are no privacy restrictions regarding employee data as the user is the system administrator.
 
@@ -241,6 +259,12 @@ ${userList}
 
 ### Active Tasks (${context.tasks.length} tasks)
 ${taskList}
+
+### Recent Financial Records (Expenses & Income)
+${financeList}
+
+### Recent KOL Payments
+${kolPaymentList}
 
 ### Recent Announcements
 ${context.recentAnnouncements.map(a => `- [${a.created_at.split('T')[0]}] ${a.title}`).join('\n')}
