@@ -1,5 +1,6 @@
 # 禁用自動構建，使用手動部署
 [build]
+  command = "echo build skipped"
   publish = "dist"
 
 # 靜態資源緩存設定

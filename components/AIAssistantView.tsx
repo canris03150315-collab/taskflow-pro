@@ -21,7 +21,7 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // 載入對話歷史
   useEffect(() => {
@@ -34,7 +34,13 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
   }, [messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      const { scrollHeight, clientHeight } = messagesContainerRef.current;
+      messagesContainerRef.current.scrollTo({
+        top: scrollHeight,
+        behavior: 'smooth'
+      });
+    }
   };
 
   const loadConversations = async () => {
@@ -168,7 +174,10 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
       </div>
 
       {/* 對話區域 */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+      >
         {isLoadingHistory ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -236,7 +245,6 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
             </div>
           ))
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* 輸入區域 */}
