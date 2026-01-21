@@ -903,6 +903,16 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">狀態</label>
+            <input
+              type="text"
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="例如：正常合作、停止合作、協議中等"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
             <textarea
               value={formData.notes}
@@ -987,18 +997,14 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">狀態 *</label>
-            <select
-              required
+            <label className="block text-sm font-medium text-gray-700 mb-1">狀態</label>
+            <input
+              type="text"
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="ACTIVE">正常合作</option>
-              <option value="STOPPED">停止合作</option>
-              <option value="NEGOTIATING">協議中</option>
-              <option value="LOST_CONTACT">失聯</option>
-            </select>
+              placeholder="例如：正常合作、停止合作、協議中等"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
