@@ -621,7 +621,13 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   </td>
                   <td className="px-4 py-3 font-medium text-green-600">${contract.salaryAmount}</td>
                   <td className="px-4 py-3">${contract.depositAmount}</td>
-                  <td className="px-4 py-3 font-medium text-orange-600">${contract.unpaidAmount}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {contract.unpaidAmount > 0 ? (
+                      <span className="text-orange-600">${contract.unpaidAmount}</span>
+                    ) : (
+                      <span className="text-green-600">✓ 結清</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">${contract.totalPaid}</td>
                   <td className="px-4 py-3 text-sm">{contract.endDate || '-'}</td>
                   <td className="px-4 py-3">
