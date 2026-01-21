@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 19:47  
-**版本**: v8.9.145-kol-weekly-pay-complete  
-**狀態**: ✅ KOL 管理功能完整（週薪備註+狀態顏色完整支援）
+**最後更新**: 2026-01-21 20:10  
+**版本**: v8.9.146-kol-weekly-pay-fixed  
+**狀態**: ✅ KOL 管理功能完整（週薪備註+狀態顏色完整修復）
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.145-kol-weekly-pay-complete`
+- **Docker 映像**: `taskflow-pro:v8.9.146-kol-weekly-pay-fixed`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -34,6 +34,59 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 52. 第三次修復：req.body 解構遺漏欄位 ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 20:10
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶測試編輯 KOL 功能時仍然出現 500 錯誤：`ReferenceError: statusColor is not defined`。
+
+#### 根本原因
+後端 PUT 路由的 `req.body` 解構時沒有提取 `statusColor` 和 `weeklyPayNote` 欄位，導致這兩個變數在後續使用時未定義。
+
+#### 錯誤代碼
+```javascript
+// 錯誤：只解構了舊欄位
+const { facebookId, platformAccount, contactInfo, status, notes } = req.body;
+
+// 但在 UPDATE 語句中使用了新欄位
+.run(facebookId, platformAccount, contactInfo || null, status, statusColor || null, weeklyPayNote || null, notes || null, now, id);
+// ❌ statusColor 和 weeklyPayNote 未定義
+```
+
+#### 修復方案
+```javascript
+// fix-kol-put-route.js
+// 修復後：添加 statusColor 和 weeklyPayNote 到解構
+const { facebookId, platformAccount, contactInfo, status, statusColor, weeklyPayNote, notes } = req.body;
+```
+
+#### 部署步驟
+```powershell
+Get-Content "fix-kol-put-route.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-kol-put-route.js"
+ssh root@165.227.147.40 "docker cp /tmp/fix-kol-put-route.js taskflow-pro:/app/ && docker exec taskflow-pro node /app/fix-kol-put-route.js"
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.146-kol-weekly-pay-fixed"
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970b3d24602207b52ce103f`（無需修改）
+- **後端 Docker 映像**: `taskflow-pro:v8.9.146-kol-weekly-pay-fixed`
+- **狀態**: ✅ 已完成，編輯 KOL 功能應該正常
+
+#### 完整修復歷程
+1. **19:05** - 前端添加週薪備註功能
+2. **19:20** - 後端添加 `weekly_pay_note` 欄位和 API 支援
+3. **19:47** - 補充添加遺漏的 `status_color` 欄位
+4. **20:10** - 修復 `req.body` 解構遺漏新欄位
+
+#### 關鍵教訓
+1. **完整性檢查**：修改 SQL 語句時，必須同步檢查變數來源
+2. **分步驟測試**：每次修改後應立即測試，避免累積問題
+3. **代碼審查**：修改多處相關代碼時，需要確保所有地方都同步更新
+
+---
 
 ### 51. 緊急修復：KOL 週薪備註後端支援 ⭐⭐⭐
 **完成時間**: 2026-01-21 下午 19:20
