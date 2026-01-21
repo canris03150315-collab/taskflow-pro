@@ -21,8 +21,9 @@
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 13 個用戶，99 筆打卡記錄，完整 KOL 管理表結構
-- **快照**: `taskflow-snapshot-v8.9.144-kol-insert-fix-20260121_092740.tar.gz` (213MB)
+- **資料庫**: 13 個用戶，99 筆打卡記錄，25 筆工作日誌，完整 KOL 管理表結構
+- **快照**: `taskflow-snapshot-v8.9.152-work-logs-complete-20260121_145446.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-21T14-56-15-345Z.db` (3.20MB)
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 正常運行（包含所有最新功能）
 
