@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 18:48  
+**最後更新**: 2026-01-21 18:53  
 **版本**: v8.9.144-kol-insert-fix  
-**狀態**: ✅ KOL 管理功能完整（自由輸入狀態+顏色選擇+滾動修復）
+**狀態**: ✅ KOL 管理功能完整（中文化+顏色選擇+滾動修復）
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6970af1b5ccef587d06b6132`
+- **生產環境 Deploy ID**: `6970b05fc990498cf4b3c3fb`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -34,6 +34,45 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 48. KOL 預設狀態中文化 ⭐
+**完成時間**: 2026-01-21 下午 18:53
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反饋：新增 KOL 時預設狀態為 'ACTIVE'，希望改為中文。
+
+#### 解決方案
+將新增 KOL Modal 的預設狀態從 'ACTIVE' 改為 '正常合作'。
+
+#### 修改內容
+```tsx
+// 修改前
+status: 'ACTIVE',
+
+// 修改後
+status: '正常合作',
+```
+
+#### 部署步驟
+```powershell
+Remove-Item -Recurse -Force dist
+npm run build
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970b05fc990498cf4b3c3fb`
+- **後端**: 無需修改
+- **狀態**: ✅ 已完成
+
+#### 優化效果
+- ✅ 新增 KOL 時預設狀態為中文「正常合作」
+- ✅ 更符合中文使用習慣
+- ✅ 用戶可直接看懂預設值
+
+---
 
 ### 47. KOL Modal 滾動修復 ⭐⭐
 **完成時間**: 2026-01-21 下午 18:48

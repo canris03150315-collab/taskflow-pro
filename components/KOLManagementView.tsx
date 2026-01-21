@@ -833,7 +833,7 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
     platformId: '',
     platformAccount: '',
     contactInfo: '',
-    status: 'ACTIVE',
+    status: '正常合作',
     statusColor: 'green' as 'green' | 'yellow' | 'red',
     notes: ''
   });
