@@ -18,6 +18,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<KOLProfile | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddContractModal, setShowAddContractModal] = useState(false);
   const [showEditContractModal, setShowEditContractModal] = useState(false);
@@ -138,7 +139,21 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       loadData();
     } catch (error) {
       console.error('Add profile error:', error);
-      alert('新增失敗');
+      alert('新增 KOL 失敗');
+    }
+  };
+
+  const handleEditProfile = async (data: any) => {
+    if (!selectedProfile) return;
+    try {
+      await api.kol.updateProfile(selectedProfile.id, data);
+      setShowEditModal(false);
+      setSelectedProfile(null);
+      alert('KOL 資料更新成功！');
+      loadData();
+    } catch (error) {
+      console.error('Edit profile error:', error);
+      alert('更新 KOL 資料失敗');
     }
   };
 
@@ -563,6 +578,16 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                       <button
                         onClick={() => {
                           setSelectedProfile(profile);
+                          setShowEditModal(true);
+                        }}
+                        className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        title="編輯 KOL"
+                      >
+                        ✏️ 編輯
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedProfile(profile);
                           setShowAddContractModal(true);
                         }}
                         className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600"
@@ -749,6 +774,18 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         />
       )}
 
+      {/* 編輯 KOL Modal */}
+      {showEditModal && selectedProfile && (
+        <EditKOLModal
+          profile={selectedProfile}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedProfile(null);
+          }}
+          onSubmit={handleEditProfile}
+        />
+      )}
+
       {/* KOL 詳情 Modal */}
       {showDetailModal && selectedProfile && (
         <KOLDetailModal
@@ -877,6 +914,104 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg">新增</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// 編輯 KOL Modal
+const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmit: (data: any) => void }> = ({ profile, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    platform: profile.platform,
+    platformId: profile.platformId,
+    platformAccount: profile.platformAccount,
+    contactInfo: profile.contactInfo || '',
+    status: profile.status,
+    notes: profile.notes || ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold">編輯 KOL</h2>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">平台 *</label>
+            <select
+              required
+              value={formData.platform}
+              onChange={(e) => setFormData({ ...formData, platform: e.target.value as KOLPlatform })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              {KOL_PLATFORMS.map(p => (
+                <option key={p.value} value={p.value}>{p.icon} {p.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">平台 ID *</label>
+            <input
+              type="text"
+              required
+              value={formData.platformId}
+              onChange={(e) => setFormData({ ...formData, platformId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">平台帳號 *</label>
+            <input
+              type="text"
+              required
+              value={formData.platformAccount}
+              onChange={(e) => setFormData({ ...formData, platformAccount: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">聯絡方式</label>
+            <input
+              type="text"
+              value={formData.contactInfo}
+              onChange={(e) => setFormData({ ...formData, contactInfo: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">狀態 *</label>
+            <select
+              required
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="ACTIVE">正常合作</option>
+              <option value="STOPPED">停止合作</option>
+              <option value="NEGOTIATING">協議中</option>
+              <option value="LOST_CONTACT">失聯</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
+            <button type="submit" className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg">更新</button>
           </div>
         </form>
       </div>
