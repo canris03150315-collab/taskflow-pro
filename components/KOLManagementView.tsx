@@ -845,11 +845,11 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold">新增 KOL</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">平台 *</label>
             <select
@@ -979,11 +979,11 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold">編輯 KOL</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">平台 *</label>
             <select

@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 18:40  
+**最後更新**: 2026-01-21 18:48  
 **版本**: v8.9.144-kol-insert-fix  
-**狀態**: ✅ KOL 管理功能完整（自由輸入狀態+顏色選擇）
+**狀態**: ✅ KOL 管理功能完整（自由輸入狀態+顏色選擇+滾動修復）
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6970adbd8040b38054699e02`
+- **生產環境 Deploy ID**: `6970af1b5ccef587d06b6132`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -34,6 +34,72 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 47. KOL Modal 滾動修復 ⭐⭐
+**完成時間**: 2026-01-21 下午 18:48
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反饋：編輯 KOL Modal 無法上下滾動，導致無法看到底部的儲存按鈕。
+
+#### 根本原因
+Modal 內容過多（添加了狀態顏色選擇器後），但 Modal 容器沒有設置最大高度和滾動功能，導致內容超出視窗範圍時無法滾動。
+
+#### 解決方案
+為 Modal 添加最大高度限制和滾動容器。
+
+#### 修改內容
+1. **EditKOLModal 滾動修復**
+   - Modal 容器添加 `max-h-[90vh]` 限制最大高度為視窗的 90%
+   - 添加 `flex flex-col` 使用 Flexbox 佈局
+   - Form 容器添加 `flex-1 overflow-y-auto` 使內容可滾動
+
+2. **AddKOLModal 滾動修復**
+   - 應用相同的修復方案
+   - 確保新增和編輯 Modal 體驗一致
+
+#### 技術實現
+```tsx
+// 修復前
+<div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+  <form className="p-6 space-y-4">
+
+// 修復後
+<div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
+  <form className="flex-1 overflow-y-auto p-6 space-y-4">
+```
+
+#### 部署步驟
+```powershell
+# 1. 清除舊構建
+Remove-Item -Recurse -Force dist
+
+# 2. 構建前端
+npm run build
+
+# 3. 部署到生產環境
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970af1b5ccef587d06b6132`
+- **後端**: 無需修改
+- **狀態**: ✅ 已完成，Modal 可正常滾動
+
+#### 修復效果
+- ✅ Modal 內容可以上下滾動
+- ✅ 所有欄位和按鈕都可見
+- ✅ 最大高度限制為視窗的 90%，避免超出螢幕
+- ✅ 新增和編輯 Modal 都已修復
+
+#### 關鍵教訓
+1. **Modal 高度管理**：內容較多的 Modal 必須設置最大高度和滾動
+2. **Flexbox 佈局**：使用 `flex flex-col` 可以更好地控制 Modal 內部佈局
+3. **用戶體驗**：確保所有操作按鈕都可見和可訪問
+4. **一致性**：新增和編輯 Modal 應該有相同的佈局和滾動行為
+
+---
 
 ### 46. KOL 狀態顏色選擇功能 ⭐⭐⭐
 **完成時間**: 2026-01-21 下午 18:40
