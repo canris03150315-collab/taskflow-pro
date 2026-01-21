@@ -520,6 +520,7 @@ export interface KOLProfile {
   contactInfo?: string;
   status: KOLStatus;
   statusColor?: 'green' | 'yellow' | 'red';  // 狀態顯示顏色
+  weeklyPayNote?: string;  // 週薪備註
   notes?: string;
   createdAt: string;
   updatedAt: string;

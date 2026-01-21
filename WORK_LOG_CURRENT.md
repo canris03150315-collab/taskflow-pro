@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 18:59  
+**最後更新**: 2026-01-21 19:05  
 **版本**: v8.9.144-kol-insert-fix  
-**狀態**: ✅ KOL 管理功能完整（完全中文化+顏色選擇+滾動修復）
+**狀態**: ✅ KOL 管理功能完整（週薪備註+完全中文化+顏色選擇）
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6970b19994b9749c7f268548`
+- **生產環境 Deploy ID**: `6970b3d24602207b52ce103f`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -34,6 +34,72 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 50. KOL 週薪備註功能 ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 19:05
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反饋：希望在新增和編輯 KOL 時添加「週薪備註」欄位，並將列表中的「合約數」改為顯示「週薪備註」，以便更快知道 KOL 的週薪。
+
+#### 解決方案
+添加週薪備註欄位到 KOL 資料，並修改列表顯示。
+
+#### 修改內容
+1. **types.ts - 添加 weeklyPayNote 欄位**
+   ```tsx
+   export interface KOLProfile {
+     // ...
+     weeklyPayNote?: string;  // 週薪備註
+     // ...
+   }
+   ```
+
+2. **AddKOLModal - 添加週薪備註輸入框**
+   - 在狀態顏色和備註之間添加週薪備註欄位
+   - Placeholder: "例如：每週 $500"
+
+3. **EditKOLModal - 添加週薪備註輸入框**
+   - 從 profile 讀取現有的 weeklyPayNote
+   - 可編輯修改週薪備註
+
+4. **KOL 列表 - 將合約數改為週薪備註**
+   - 表頭：「合約數」→「週薪備註」
+   - 內容：顯示 `profile.weeklyPayNote`，無資料時顯示 `-`
+
+5. **數據轉換 - 支援 weeklyPayNote**
+   - 在 transformedProfiles 中添加 weeklyPayNote 欄位轉換
+   - 支援 snake_case (`weekly_pay_note`) 和 camelCase (`weeklyPayNote`)
+
+#### 部署步驟
+```powershell
+Remove-Item -Recurse -Force dist
+npm run build
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970b3d24602207b52ce103f`
+- **後端**: 需要添加 `weekly_pay_note` 欄位到資料庫（待實現）
+- **狀態**: ✅ 前端已完成，後端需配合
+
+#### 功能效果
+- ✅ 新增 KOL 時可填寫週薪備註
+- ✅ 編輯 KOL 時可修改週薪備註
+- ✅ 列表中直接顯示週薪備註，一目了然
+- ✅ 取代原本的合約數欄位，更實用
+
+#### 關鍵教訓
+1. **實用性優先**：週薪備註比合約數更常用，直接顯示更方便
+2. **靈活的備註欄位**：使用文字輸入框，可填寫任何格式的週薪資訊
+3. **前後端協作**：前端先實現，後端需配合添加資料庫欄位
+
+#### 後續工作
+- ⚠️ 後端需要添加 `weekly_pay_note` 欄位到 `kol_profiles` 表
+- ⚠️ 後端 API 需要支援 `weeklyPayNote` 欄位的讀寫
+
+---
 
 ### 49. KOL 狀態顯示完全中文化 ⭐⭐
 **完成時間**: 2026-01-21 下午 18:59

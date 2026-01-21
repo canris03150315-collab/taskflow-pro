@@ -50,6 +50,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         contactInfo: p.contact_info || p.contactInfo,
         status: p.status,
         statusColor: (p.status_color || p.statusColor || 'green') as 'green' | 'yellow' | 'red',
+        weeklyPayNote: p.weekly_pay_note || p.weeklyPayNote,
         notes: p.notes,
         createdAt: p.created_at || p.createdAt,
         updatedAt: p.updated_at || p.updatedAt,
@@ -522,7 +523,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">平台</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">平台 ID / 帳號</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">狀態</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">合約數</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">週薪備註</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">未付金額</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">操作</th>
               </tr>
@@ -553,11 +554,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   </td>
                   <td className="px-4 py-3">
                     <div className="text-sm">
-                      <span className="font-medium">{profile.contractCount || 0}</span>
-                      <span className="text-gray-500"> 筆</span>
-                      {(profile.activeContracts || 0) > 0 && (
-                        <span className="ml-1 text-green-600">({profile.activeContracts} 活躍)</span>
-                      )}
+                      <span className="font-medium text-gray-700">
+                        {profile.weeklyPayNote || '-'}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -846,6 +845,7 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
     contactInfo: '',
     status: '正常合作',
     statusColor: 'green' as 'green' | 'yellow' | 'red',
+    weeklyPayNote: '',
     notes: ''
   });
 
@@ -953,6 +953,16 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
             </div>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">週薪備註</label>
+            <input
+              type="text"
+              value={formData.weeklyPayNote}
+              onChange={(e) => setFormData({ ...formData, weeklyPayNote: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="例如：每週 $500"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
             <textarea
               value={formData.notes}
@@ -980,6 +990,7 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
     contactInfo: profile.contactInfo || '',
     status: profile.status,
     statusColor: (profile.statusColor || 'green') as 'green' | 'yellow' | 'red',
+    weeklyPayNote: profile.weeklyPayNote || '',
     notes: profile.notes || ''
   });
 
@@ -1084,6 +1095,16 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
                 🔴 紅色
               </button>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">週薪備註</label>
+            <input
+              type="text"
+              value={formData.weeklyPayNote}
+              onChange={(e) => setFormData({ ...formData, weeklyPayNote: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="例如：每週 $500"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
