@@ -634,20 +634,31 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                     <div className="flex items-center gap-2">
                       <button
                         onClick={async () => {
-                          const amount = prompt('記錄支付金額：');
-                          if (amount && !isNaN(parseFloat(amount))) {
-                            try {
-                              await api.kol.createPayment({
-                                contractId: contract.id,
-                                paymentDate: new Date().toISOString().split('T')[0],
-                                amount: parseFloat(amount),
-                                paymentType: 'SALARY'
-                              });
-                              alert('支付記錄成功！');
-                              loadData();
-                            } catch (error) {
-                              alert('支付記錄失敗');
-                            }
+                          const remainingAmount = contract.unpaidAmount;
+                          const amount = prompt(`記錄支付金額（未付金額：$${remainingAmount}）：`);
+                          if (!amount || isNaN(parseFloat(amount))) return;
+                          
+                          const paymentAmount = parseFloat(amount);
+                          if (paymentAmount <= 0) {
+                            alert('支付金額必須大於 0');
+                            return;
+                          }
+                          if (paymentAmount > remainingAmount) {
+                            alert(`支付金額不能超過未付金額！\n未付金額：$${remainingAmount}\n輸入金額：$${paymentAmount}`);
+                            return;
+                          }
+                          
+                          try {
+                            await api.kol.createPayment({
+                              contractId: contract.id,
+                              paymentDate: new Date().toISOString().split('T')[0],
+                              amount: paymentAmount,
+                              paymentType: 'SALARY'
+                            });
+                            alert('支付記錄成功！');
+                            loadData();
+                          } catch (error) {
+                            alert('支付記錄失敗');
                           }
                         }}
                         className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
@@ -1293,9 +1304,22 @@ const AddPaymentModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const paymentAmount = parseFloat(formData.amount);
+    if (paymentAmount <= 0) {
+      alert('支付金額必須大於 0');
+      return;
+    }
+    
+    const selectedContract = contracts.find(c => c.id === formData.contractId);
+    if (selectedContract && paymentAmount > selectedContract.unpaidAmount) {
+      alert(`支付金額不能超過未付金額！\n未付金額：$${selectedContract.unpaidAmount}\n輸入金額：$${paymentAmount}`);
+      return;
+    }
+    
     onSubmit({
       ...formData,
-      amount: parseFloat(formData.amount)
+      amount: paymentAmount
     });
   };
 
