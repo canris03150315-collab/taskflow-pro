@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 21:45  
-**版本**: v8.9.149-work-logs-db-fixed  
-**狀態**: ✅ 工作日誌功能完全修復
+**最後更新**: 2026-01-21 21:50  
+**版本**: v8.9.150-work-logs-auth-fixed  
+**狀態**: ✅ 工作日誌功能修復（使用統一認證中間件）
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.149-work-logs-db-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.150-work-logs-auth-fixed`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -124,8 +124,33 @@ docker restart taskflow-pro
 docker commit taskflow-pro taskflow-pro:v8.9.149-work-logs-db-fixed
 ```
 
+#### 第三次修復（21:50）
+**問題**: db 調用修復後，API 仍然返回 500 錯誤：`認證錯誤 - TypeError: db.prepare is not a function`
+
+**原因**: `work-logs.js` 自己實現了 `authenticateToken` 函數，而不是使用項目統一的認證中間件。自定義的認證函數中 `db` 對象類型不正確。
+
+**修復**:
+```javascript
+// 錯誤：自己實現認證函數
+function authenticateToken(req, res, next) {
+  const db = req.db;
+  const auth = db.prepare('SELECT...').get(...);  // ❌ db.prepare 不存在
+}
+
+// 正確：使用項目統一的認證中間件
+const { authenticateToken } = require('../middleware/auth');  // ✅ 使用統一中間件
+```
+
+**部署**:
+```bash
+# 修復認證中間件
+docker exec taskflow-pro node /app/fix-work-logs-use-auth-middleware.js
+docker restart taskflow-pro
+docker commit taskflow-pro taskflow-pro:v8.9.150-work-logs-auth-fixed
+```
+
 #### 最終版本
-- **後端 Docker 映像**: `taskflow-pro:v8.9.149-work-logs-db-fixed`
+- **後端 Docker 映像**: `taskflow-pro:v8.9.150-work-logs-auth-fixed`
 - **狀態**: ✅ 完全修復，工作日誌功能正常
 
 #### 關鍵教訓
@@ -134,6 +159,7 @@ docker commit taskflow-pro taskflow-pro:v8.9.149-work-logs-db-fixed
 3. **遵循流程**：按照工作日誌記錄的成功方法執行操作
 4. **完整修復**：不僅要添加文件，還要確保正確註冊路由
 5. **代碼一致性**：新添加的路由文件必須遵循項目現有的代碼模式（直接使用 db 方法而非 dbCall）
+6. **使用統一中間件**：不要自己實現認證邏輯，使用項目現有的認證中間件
 
 ---
 
