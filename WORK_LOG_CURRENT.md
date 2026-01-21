@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 21:50  
-**版本**: v8.9.150-work-logs-auth-fixed  
-**狀態**: ✅ 工作日誌功能修復（使用統一認證中間件）
+**最後更新**: 2026-01-21 21:55  
+**版本**: v8.9.151-work-logs-all-db-fixed  
+**狀態**: ✅ 工作日誌功能完全修復（所有 db 調用方法已修正）
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.150-work-logs-auth-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.151-work-logs-all-db-fixed`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -149,8 +149,30 @@ docker restart taskflow-pro
 docker commit taskflow-pro taskflow-pro:v8.9.150-work-logs-auth-fixed
 ```
 
+#### 第四次修復（21:55）
+**問題**: 使用統一認證中間件後，API 仍然返回 500 錯誤：`獲取工作日誌失敗 - TypeError: db.prepare is not a function at line 46`
+
+**原因**: `work-logs.js` 中所有的 db 調用都使用了 `db.prepare(query).all()`、`db.prepare(query).get()` 等 better-sqlite3 的模式，但該項目使用的是 async/await 模式的 `db.all(query, params)` 和 `db.get(query, params)`。
+
+**修復**:
+```javascript
+// 錯誤：使用 better-sqlite3 的同步模式
+const logs = db.prepare(query).all(...params);  // ❌ db.prepare 不存在
+
+// 正確：使用項目的 async/await 模式
+const logs = await db.all(query, params);  // ✅ 正確的異步調用
+```
+
+**部署**:
+```bash
+# 修復所有 db 調用
+docker exec taskflow-pro node /app/fix-work-logs-final.js
+docker restart taskflow-pro
+docker commit taskflow-pro taskflow-pro:v8.9.151-work-logs-all-db-fixed
+```
+
 #### 最終版本
-- **後端 Docker 映像**: `taskflow-pro:v8.9.150-work-logs-auth-fixed`
+- **後端 Docker 映像**: `taskflow-pro:v8.9.151-work-logs-all-db-fixed`
 - **狀態**: ✅ 完全修復，工作日誌功能正常
 
 #### 關鍵教訓
@@ -158,8 +180,9 @@ docker commit taskflow-pro taskflow-pro:v8.9.150-work-logs-auth-fixed
 2. **診斷先行**：使用 Node.js 腳本在容器內精確診斷問題
 3. **遵循流程**：按照工作日誌記錄的成功方法執行操作
 4. **完整修復**：不僅要添加文件，還要確保正確註冊路由
-5. **代碼一致性**：新添加的路由文件必須遵循項目現有的代碼模式（直接使用 db 方法而非 dbCall）
+5. **代碼一致性**：新添加的路由文件必須遵循項目現有的代碼模式
 6. **使用統一中間件**：不要自己實現認證邏輯，使用項目現有的認證中間件
+7. **正確的 db 調用模式**：該項目使用 async/await 模式的 `db.all()`, `db.get()`, `db.run()`，而非 better-sqlite3 的 `db.prepare().all()` 同步模式
 
 ---
 
