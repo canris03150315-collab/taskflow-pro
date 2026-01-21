@@ -150,8 +150,8 @@ TaskFlow Pro 是一個企業內部的任務與溝通管理系統，包含後端 
 - **快照**: `taskflow-snapshot-v8.9.139-report-fix-20260120_180000.tar.gz` (預計)
 
 ---
-最後修改日期: 2026-01-20
-版本: 8.9.139 (AI 全知修復版)
+最後修改日期: 2026-01-21
+版本: 8.9.152 (工作日誌完整修復版)
 
 ### 7. 前端記憶體優化 (2026-01-01)
 - **版本**: v2.2.6
@@ -177,4 +177,163 @@ TaskFlow Pro 是一個企業內部的任務與溝通管理系統，包含後端 
     - 使用本地 `attendance-v37-3.js` (Pure ASCII) 恢復
     - 最終映像：`taskflow-pro:v3.9.0-attendance-v37-restored`
     - 教訓：先查記憶倉庫，使用 `Get-Content | ssh` 上傳文件避免 PowerShell 引號問題
+
+### 11. 工作日誌功能完整修復 (2026-01-21) ⭐⭐⭐
+- **版本**: v8.9.152-work-logs-correct-fields
+- **修復次數**: 5次修復才找到根本問題
+- **最終狀態**: ✅ 完全修復，25 筆工作日誌正常顯示
+
+#### 5次修復歷程
+
+**第一次（21:40）- 路由缺失**
+- 問題: GET /api/work-logs 返回 404
+- 原因: 容器中缺少 work-logs.js 文件
+- 解決: 創建路由文件並在 server.js 註冊
+- 教訓: 新功能必須確保路由文件存在且正確註冊
+
+**第二次（21:45）- dbCall 函數錯誤**
+- 問題: TypeError: db[method] is not a function
+- 原因: 自定義 dbCall 函數實現錯誤
+- 解決: 使用項目的 dbCall 適配器
+- 教訓: 不要重新實現已有工具函數
+
+**第三次（21:50）- 自定義認證函數**
+- 問題: TypeError: db.prepare is not a function in authenticateToken
+- 原因: 自己實現 authenticateToken 而非使用統一中間件
+- 解決: `const { authenticateToken } = require('../middleware/auth');`
+- 教訓: 必須使用項目統一的認證中間件
+
+**第四次（21:55）- db 調用模式錯誤**
+- 問題: db.prepare is not a function at line 46
+- 原因: 使用 better-sqlite3 同步模式 `db.prepare().all()`
+- 解決: 改用項目 async/await 模式 `await db.all(query, params)`
+- 教訓: 項目使用 async/await，不是 better-sqlite3 同步模式
+
+**第五次（22:15）⭐ 根本問題**
+- 問題: API 不報錯但返回空數據（資料庫有 25 筆記錄）
+- 診斷: 容器中的 work-logs.js 使用了完全錯誤的欄位名稱
+- 根本原因: 
+  - 容器版本: `content`, `department`, `user_name`（直接欄位）
+  - 資料庫實際: `today_tasks`, `tomorrow_tasks`, `department_id`
+- 解決: 使用本地正確版本 `work-logs-backend.js` 替換容器文件
+- 教訓: ⭐⭐⭐ **欄位名稱必須與資料庫表結構完全一致，否則即使沒有錯誤也會返回空數據**
+
+#### 關鍵診斷方法
+```javascript
+// 1. 檢查資料庫表結構
+const tableInfo = db.prepare("PRAGMA table_info(work_logs)").all();
+
+// 2. 測試查詢邏輯
+const query = `SELECT wl.*, u.name as user_name FROM work_logs wl LEFT JOIN users u ON wl.user_id = u.id`;
+const logs = db.prepare(query).all();
+
+// 3. 檢查容器內文件
+docker exec taskflow-pro cat /app/dist/routes/work-logs.js | head -100
+```
+
+#### 正確實現模式
+```javascript
+const express = require('express');
+const router = express.Router();
+const { authenticateToken } = require('../middleware/auth');
+
+// dbCall 適配器（相容 SecureDatabase 和 better-sqlite3）
+async function dbCall(db, method, query, params = []) {
+  if (db.prepare) {
+    const stmt = db.prepare(query);
+    if (method === 'get') return stmt.get(...params);
+    if (method === 'all') return stmt.all(...params);
+    if (method === 'run') return stmt.run(...params);
+  } else {
+    if (method === 'get') return await db.get(query, params);
+    if (method === 'all') return await db.all(query, params);
+    if (method === 'run') return await db.run(query, params);
+  }
+}
+
+// GET 路由
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    
+    // 使用 LEFT JOIN 取得關聯數據
+    let query = `
+      SELECT 
+        wl.*,
+        u.name as user_name,
+        d.name as department_name
+      FROM work_logs wl
+      LEFT JOIN users u ON wl.user_id = u.id
+      LEFT JOIN departments d ON wl.department_id = d.id
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    // 權限過濾
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
+      query += ' AND wl.user_id = ?';
+      params.push(currentUser.id);
+    }
+    
+    const logs = await dbCall(db, 'all', query, params);
+    
+    // 映射為 camelCase（關鍵！欄位名稱必須匹配）
+    const mappedLogs = logs.map(log => ({
+      id: log.id,
+      userId: log.user_id,
+      userName: log.user_name,
+      departmentId: log.department_id,
+      departmentName: log.department_name,
+      date: log.date,
+      todayTasks: log.today_tasks,        // ✅ 正確欄位
+      tomorrowTasks: log.tomorrow_tasks,  // ✅ 正確欄位
+      notes: log.notes || '',
+      createdAt: log.created_at,
+      updatedAt: log.updated_at
+    }));
+    
+    res.json({ logs: mappedLogs });
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+module.exports = router;  // ✅ 直接導出 router
+```
+
+#### 關鍵教訓總結（AI 必讀）
+1. **新路由檢查清單**:
+   - ✅ 路由文件存在於容器內
+   - ✅ 在 server.js 中正確註冊
+   - ✅ 使用項目統一的認證中間件
+   - ✅ 使用項目的 db 調用模式（async/await）
+   - ✅ **欄位名稱與資料庫表結構完全一致**（最重要）
+
+2. **遇到空數據問題時的診斷順序**:
+   - 先檢查資料庫是否有記錄
+   - 檢查 API 查詢邏輯
+   - **檢查欄位名稱是否匹配**（關鍵步驟）
+   - 使用容器內 Node.js 腳本進行精確診斷
+
+3. **部署流程**:
+   ```bash
+   # 使用 Get-Content | ssh 管道上傳（避免 PowerShell 引號問題）
+   Get-Content "work-logs-backend.js" -Raw | ssh root@host "cat > /tmp/work-logs.js"
+   docker cp /tmp/work-logs.js taskflow-pro:/app/dist/routes/work-logs.js
+   docker restart taskflow-pro
+   docker commit taskflow-pro taskflow-pro:v版本號
+   /root/create-snapshot.sh v版本號
+   ```
+
+4. **資料庫欄位檢查必要性**:
+   - 任何新路由開發前，必須先執行 `PRAGMA table_info(table_name)` 確認欄位
+   - LEFT JOIN 時，使用 `table.column` 完整語法避免歧義
+   - snake_case (資料庫) → camelCase (API) 映射必須正確
+
+- **快照**: `taskflow-snapshot-v8.9.152-work-logs-complete-20260121_145446.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-21T14-56-15-345Z.db` (3.20MB)
+- **資料庫記錄**: 25 筆工作日誌
+- **本地正確文件**: `work-logs-backend.js`（已驗證）
 
