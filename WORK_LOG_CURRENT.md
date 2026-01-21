@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 21:40  
-**版本**: v8.9.148-work-logs-fixed  
-**狀態**: ✅ 工作日誌功能已修復
+**最後更新**: 2026-01-21 21:45  
+**版本**: v8.9.149-work-logs-db-fixed  
+**狀態**: ✅ 工作日誌功能完全修復
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.148-work-logs-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.149-work-logs-db-fixed`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -99,11 +99,41 @@ docker commit taskflow-pro taskflow-pro:v8.9.148-work-logs-fixed
 - ✅ 容器正常啟動並運行
 - ✅ 工作日誌 API 端點 `/api/work-logs` 現在可正常訪問
 
+#### 第二次修復（21:45）
+**問題**: 路由註冊成功後，API 返回 500 錯誤：`認證錯誤 - TypeError: db[method] is not a function`
+
+**原因**: `work-logs.js` 中的 `dbCall` 函數實現錯誤。該項目使用 `db.prepare()`, `db.get()`, `db.run()` 等直接方法，而不是通過 `dbCall` 適配器。
+
+**修復**:
+```javascript
+// 錯誤的實現
+function dbCall(db, method, ...args) {
+  return db[method](...args);  // ❌ 不正確
+}
+const auth = dbCall(db, 'prepare', 'SELECT...').get(...);
+
+// 正確的實現
+const auth = db.prepare('SELECT...').get(...);  // ✅ 直接使用 db 方法
+```
+
+**部署**:
+```bash
+# 修復 db 調用
+docker exec taskflow-pro node /app/fix-work-logs-db-calls.js
+docker restart taskflow-pro
+docker commit taskflow-pro taskflow-pro:v8.9.149-work-logs-db-fixed
+```
+
+#### 最終版本
+- **後端 Docker 映像**: `taskflow-pro:v8.9.149-work-logs-db-fixed`
+- **狀態**: ✅ 完全修復，工作日誌功能正常
+
 #### 關鍵教訓
 1. **容器持久化**：修改容器內文件後必須 `docker commit` 創建新映像
 2. **診斷先行**：使用 Node.js 腳本在容器內精確診斷問題
 3. **遵循流程**：按照工作日誌記錄的成功方法執行操作
 4. **完整修復**：不僅要添加文件，還要確保正確註冊路由
+5. **代碼一致性**：新添加的路由文件必須遵循項目現有的代碼模式（直接使用 db 方法而非 dbCall）
 
 ---
 
