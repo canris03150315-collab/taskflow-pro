@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 20:10  
-**版本**: v8.9.146-kol-weekly-pay-fixed  
-**狀態**: ✅ KOL 管理功能完整（週薪備註+狀態顏色完整修復）
+**最後更新**: 2026-01-21 20:20  
+**版本**: v8.9.147-kol-field-names-fixed  
+**狀態**: ✅ KOL 管理功能完整（欄位名稱兼容性修復）
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.146-kol-weekly-pay-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.147-kol-field-names-fixed`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -34,6 +34,68 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 53. 第四次修復：欄位名稱不匹配 (platformId vs facebookId) ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 20:20
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶測試編輯 KOL 功能時仍然出現 500 錯誤：`NOT NULL constraint failed: kol_profiles.facebook_id`。
+
+#### 根本原因
+前端發送的欄位名稱是 `platformId`，但後端期望的是 `facebookId`。這是因為系統升級時欄位名稱改變，但前後端沒有同步。
+
+#### 錯誤分析
+```javascript
+// 前端 EditKOLModal 發送
+{
+  platformId: '...',        // ✅ 前端使用新名稱
+  platformAccount: '...',
+  ...
+}
+
+// 後端 PUT 路由期望
+const { facebookId, ... } = req.body;  // ❌ 後端期望舊名稱
+// facebookId 為 undefined，導致 NOT NULL 錯誤
+```
+
+#### 修復方案
+修改後端支援兩種欄位名稱（向後兼容）：
+```javascript
+// fix-kol-field-names.js
+const { platformId, facebookId, platformAccount, contactInfo, status, statusColor, weeklyPayNote, notes } = req.body;
+const actualFacebookId = platformId || facebookId;  // 優先使用 platformId，回退到 facebookId
+
+// 使用 actualFacebookId
+.run(actualFacebookId, platformAccount, ...)
+```
+
+#### 部署步驟
+```powershell
+Get-Content "fix-kol-field-names.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-kol-field-names.js"
+ssh root@165.227.147.40 "docker cp /tmp/fix-kol-field-names.js taskflow-pro:/app/ && docker exec taskflow-pro node /app/fix-kol-field-names.js"
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.147-kol-field-names-fixed"
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970b3d24602207b52ce103f`（無需修改）
+- **後端 Docker 映像**: `taskflow-pro:v8.9.147-kol-field-names-fixed`
+- **狀態**: ✅ 已完成，編輯 KOL 功能應該正常
+
+#### 完整修復歷程
+1. **19:05** - 前端添加週薪備註功能
+2. **19:20** - 後端添加 `weekly_pay_note` 欄位和 UPDATE 語句
+3. **19:47** - 補充添加遺漏的 `status_color` 欄位
+4. **20:10** - 修復 `req.body` 解構遺漏新欄位
+5. **20:20** - 修復欄位名稱不匹配（platformId vs facebookId）✅
+
+#### 關鍵教訓
+1. **前後端一致性**：欄位名稱必須保持一致，或提供向後兼容
+2. **錯誤信息分析**：NOT NULL 錯誤通常表示必填欄位為 undefined
+3. **漸進式修復**：每次修復一個問題，立即測試，避免累積錯誤
+
+---
 
 ### 52. 第三次修復：req.body 解構遺漏欄位 ⭐⭐⭐
 **完成時間**: 2026-01-21 下午 20:10
