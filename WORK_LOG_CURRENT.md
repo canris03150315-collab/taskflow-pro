@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 20:20  
-**版本**: v8.9.147-kol-field-names-fixed  
-**狀態**: ✅ KOL 管理功能完整（欄位名稱兼容性修復）
+**最後更新**: 2026-01-21 21:40  
+**版本**: v8.9.148-work-logs-fixed  
+**狀態**: ✅ 工作日誌功能已修復
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.147-kol-field-names-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.148-work-logs-fixed`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -34,6 +34,78 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 54. 工作日誌功能修復 ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 21:40
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反饋工作日誌功能無法載入，前端控制台顯示 `404 (Not Found)` 和 `前端應用未找到` 錯誤。
+
+#### 根本原因
+1. `work-logs.js` 路由文件存在於之前的容器中，但當前使用的 Docker 映像版本中缺失
+2. 即使路由文件存在，也沒有在 `server.js` 中正確註冊
+
+#### 診斷過程
+按照工作日誌和全域規則的要求，使用 Node.js 診斷腳本進行精確診斷：
+
+1. **檢查資料庫**: ✅ `work_logs` 表存在，有 25 筆記錄
+2. **檢查路由文件**: ❌ `work-logs.js` 文件在當前映像中不存在
+3. **檢查路由註冊**: ❌ 即使文件存在，也未在 `server.js` 中註冊
+
+#### 修復步驟
+
+**1. 上傳路由文件**
+```bash
+docker cp /tmp/work-logs.js taskflow-pro:/app/dist/routes/work-logs.js
+```
+
+**2. 修改 server.js 註冊路由**
+使用 sed 命令在正確位置添加：
+```javascript
+// Line 33: 添加 require 語句
+const workLogsRoutes = require("./routes/work-logs");
+
+// 在 reports 路由後添加註冊
+this.app.use('/api/work-logs', workLogsRoutes);
+```
+
+**3. 部署流程**
+```bash
+# 停止容器
+docker stop taskflow-pro
+
+# 複製並修改 server.js
+docker cp taskflow-pro:/app/dist/server.js /tmp/server.js
+sed -i '33 a const workLogsRoutes = require("./routes/work-logs");' /tmp/server.js
+# 找到 reports 路由行並在其後添加 work-logs 路由
+docker cp /tmp/server.js taskflow-pro:/app/dist/server.js
+
+# 啟動容器
+docker start taskflow-pro
+
+# 創建新映像
+docker commit taskflow-pro taskflow-pro:v8.9.148-work-logs-fixed
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970b3d24602207b52ce103f`（無需修改）
+- **後端 Docker 映像**: `taskflow-pro:v8.9.148-work-logs-fixed`
+- **狀態**: ✅ 已完成，工作日誌功能正常
+
+#### 修復效果
+- ✅ `work-logs.js` 路由文件已添加到容器
+- ✅ 路由已在 `server.js` 中正確註冊
+- ✅ 容器正常啟動並運行
+- ✅ 工作日誌 API 端點 `/api/work-logs` 現在可正常訪問
+
+#### 關鍵教訓
+1. **容器持久化**：修改容器內文件後必須 `docker commit` 創建新映像
+2. **診斷先行**：使用 Node.js 腳本在容器內精確診斷問題
+3. **遵循流程**：按照工作日誌記錄的成功方法執行操作
+4. **完整修復**：不僅要添加文件，還要確保正確註冊路由
+
+---
 
 ### 53. 第四次修復：欄位名稱不匹配 (platformId vs facebookId) ⭐⭐⭐
 **完成時間**: 2026-01-21 下午 20:20
