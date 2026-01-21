@@ -1040,13 +1040,19 @@ const AddContractModal: React.FC<{
     kolId: selectedProfileId || '',
     salaryAmount: '',
     depositAmount: '0',
-    unpaidAmount: '',
     startDate: '',
     endDate: '',
     contractType: 'NORMAL',
     notes: '',
     weeklyNotes: ''
   });
+
+  // 自動計算未付金額
+  const calculatedUnpaidAmount = () => {
+    const salary = parseFloat(formData.salaryAmount) || 0;
+    const deposit = parseFloat(formData.depositAmount) || 0;
+    return salary - deposit;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1056,7 +1062,7 @@ const AddContractModal: React.FC<{
       ...formData,
       salaryAmount: salaryAmount,
       depositAmount: depositAmount,
-      unpaidAmount: formData.unpaidAmount ? parseFloat(formData.unpaidAmount) : (salaryAmount - depositAmount)
+      unpaidAmount: salaryAmount - depositAmount
     });
   };
 
@@ -1103,14 +1109,11 @@ const AddContractModal: React.FC<{
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">未付金額</label>
-            <input
-              type="number"
-              value={formData.unpaidAmount}
-              placeholder="留空則等於工資/傭金"
-              onChange={(e) => setFormData({ ...formData, unpaidAmount: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">未付金額（自動計算）</label>
+            <div className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-medium">
+              ${calculatedUnpaidAmount().toFixed(0)}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">= 工資/傭金 - 訂金</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

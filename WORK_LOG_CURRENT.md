@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 17:43  
+**最後更新**: 2026-01-21 17:49  
 **版本**: v8.9.144-kol-insert-fix  
-**狀態**: ✅ KOL 合約功能完整優化（含支付驗證）
+**狀態**: ✅ KOL 合約功能完整優化（含自動計算）
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `69709faf8040b35599699cf0`
+- **生產環境 Deploy ID**: `6970a101b0a8a3591ad544c9`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -34,6 +34,72 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 42. KOL 新增合約未付金額自動計算 ⭐⭐
+**完成時間**: 2026-01-21 下午 17:49
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反饋：新增合約時，「未付金額」欄位需要手動填寫，但實際上應該自動計算（工資/傭金 - 訂金），邏輯不符合使用習慣。
+
+#### 優化方案
+修改 `AddContractModal` 組件，將「未付金額」改為自動計算並顯示，不可編輯。
+
+#### 修改內容
+1. **移除 `unpaidAmount` 狀態**
+   - 從 `formData` 中移除 `unpaidAmount` 欄位
+   - 不再需要用戶手動輸入
+
+2. **添加自動計算函數**
+   ```tsx
+   const calculatedUnpaidAmount = () => {
+     const salary = parseFloat(formData.salaryAmount) || 0;
+     const deposit = parseFloat(formData.depositAmount) || 0;
+     return salary - deposit;
+   };
+   ```
+
+3. **修改表單欄位**
+   - 將輸入框改為只讀顯示區域
+   - 顯示自動計算結果：`${calculatedUnpaidAmount().toFixed(0)}`
+   - 添加說明文字：「= 工資/傭金 - 訂金」
+
+4. **提交時自動計算**
+   ```tsx
+   unpaidAmount: salaryAmount - depositAmount
+   ```
+
+#### 部署步驟
+```powershell
+# 1. 清除舊構建
+Remove-Item -Recurse -Force dist
+
+# 2. 構建前端
+npm run build
+
+# 3. 部署到生產環境
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970a101b0a8a3591ad544c9`
+- **後端**: 無需修改
+- **狀態**: ✅ 已完成，自動計算未付金額
+
+#### 優化效果
+- ✅ 未付金額自動計算，無需手動輸入
+- ✅ 實時顯示計算結果（工資 - 訂金）
+- ✅ 避免輸入錯誤，確保數據一致性
+- ✅ 更符合實際使用邏輯
+
+#### 關鍵教訓
+1. **自動化計算**：能自動計算的數據不應該讓用戶手動輸入
+2. **用戶體驗**：減少不必要的輸入步驟，提高效率
+3. **數據一致性**：自動計算確保數據邏輯正確
+4. **視覺反饋**：顯示計算公式幫助用戶理解
+
+---
 
 ### 41. KOL 支付金額驗證功能 ⭐⭐⭐
 **完成時間**: 2026-01-21 下午 17:43
