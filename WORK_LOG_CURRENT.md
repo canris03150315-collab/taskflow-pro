@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 19:20  
-**版本**: v8.9.145-kol-weekly-pay-note  
-**狀態**: ✅ KOL 管理功能完整（週薪備註完整支援+中文化+顏色選擇）
+**最後更新**: 2026-01-21 19:47  
+**版本**: v8.9.145-kol-weekly-pay-complete  
+**狀態**: ✅ KOL 管理功能完整（週薪備註+狀態顏色完整支援）
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.145-kol-weekly-pay-note`
+- **Docker 映像**: `taskflow-pro:v8.9.145-kol-weekly-pay-complete`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -55,6 +55,9 @@
 ```javascript
 // fix-kol-weekly-pay.js
 db.prepare('ALTER TABLE kol_profiles ADD COLUMN weekly_pay_note TEXT').run();
+
+// add-status-color-column.js (補充添加)
+db.prepare('ALTER TABLE kol_profiles ADD COLUMN status_color TEXT').run();
 ```
 
 **2. 修改後端 API 路由**
@@ -89,8 +92,9 @@ ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.145-kol-we
 
 #### 最終版本
 - **前端 Deploy ID**: `6970b3d24602207b52ce103f`（無需修改）
-- **後端 Docker 映像**: `taskflow-pro:v8.9.145-kol-weekly-pay-note`
+- **後端 Docker 映像**: `taskflow-pro:v8.9.145-kol-weekly-pay-complete`
 - **狀態**: ✅ 已完成，編輯 KOL 功能正常
+- **補充修復**: 19:47 添加遺漏的 `status_color` 欄位
 
 #### 修復效果
 - ✅ 資料庫已添加 `weekly_pay_note` 和 `status_color` 欄位
