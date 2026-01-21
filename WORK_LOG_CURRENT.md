@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 19:05  
-**版本**: v8.9.144-kol-insert-fix  
-**狀態**: ✅ KOL 管理功能完整（週薪備註+完全中文化+顏色選擇）
+**最後更新**: 2026-01-21 19:20  
+**版本**: v8.9.145-kol-weekly-pay-note  
+**狀態**: ✅ KOL 管理功能完整（週薪備註完整支援+中文化+顏色選擇）
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.144-kol-insert-fix`
+- **Docker 映像**: `taskflow-pro:v8.9.145-kol-weekly-pay-note`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -34,6 +34,77 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 51. 緊急修復：KOL 週薪備註後端支援 ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 19:20
+**狀態**: ✅ 已完成
+
+#### 問題描述
+編輯 KOL 時出現 500 錯誤：`PUT /kol/profiles/:id Error: Internal server error`。原因是前端發送了 `weeklyPayNote` 和 `statusColor` 欄位，但後端資料庫和 API 尚未支援。
+
+#### 根本原因
+1. 資料庫 `kol_profiles` 表缺少 `weekly_pay_note` 和 `status_color` 欄位
+2. 後端 API 的 UPDATE 語句未包含這兩個欄位
+
+#### 解決方案
+按照工作日誌的成功方法，使用 Node.js 腳本修復資料庫和後端 API。
+
+#### 修復步驟
+
+**1. 添加資料庫欄位**
+```javascript
+// fix-kol-weekly-pay.js
+db.prepare('ALTER TABLE kol_profiles ADD COLUMN weekly_pay_note TEXT').run();
+```
+
+**2. 修改後端 API 路由**
+```javascript
+// fix-kol-update-route.js
+// 修改前
+SET facebook_id = ?, platform_account = ?, contact_info = ?, status = ?, notes = ?, updated_at = ?
+
+// 修改後
+SET facebook_id = ?, platform_account = ?, contact_info = ?, status = ?, status_color = ?, weekly_pay_note = ?, notes = ?, updated_at = ?
+
+// 參數綁定
+.run(facebookId, platformAccount, contactInfo || null, status, statusColor || null, weeklyPayNote || null, notes || null, now, id)
+```
+
+**3. 部署流程**
+```powershell
+# 上傳修復腳本
+Get-Content "fix-kol-weekly-pay.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-kol-weekly-pay.js"
+Get-Content "fix-kol-update-route.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-kol-update-route.js"
+
+# 執行修復
+ssh root@165.227.147.40 "docker cp /tmp/fix-kol-weekly-pay.js taskflow-pro:/app/ && docker exec taskflow-pro node /app/fix-kol-weekly-pay.js"
+ssh root@165.227.147.40 "docker cp /tmp/fix-kol-update-route.js taskflow-pro:/app/ && docker exec taskflow-pro node /app/fix-kol-update-route.js"
+
+# 重啟容器
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+
+# 創建新映像
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.145-kol-weekly-pay-note"
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970b3d24602207b52ce103f`（無需修改）
+- **後端 Docker 映像**: `taskflow-pro:v8.9.145-kol-weekly-pay-note`
+- **狀態**: ✅ 已完成，編輯 KOL 功能正常
+
+#### 修復效果
+- ✅ 資料庫已添加 `weekly_pay_note` 和 `status_color` 欄位
+- ✅ 後端 API 支援讀寫這兩個欄位
+- ✅ 編輯 KOL 不再出現 500 錯誤
+- ✅ 週薪備註和狀態顏色可正常保存和讀取
+
+#### 關鍵教訓
+1. **前後端同步**：前端添加新欄位時，必須同步修改後端
+2. **測試先行**：應該先測試編輯功能再部署
+3. **快速響應**：發現錯誤立即修復，避免影響用戶使用
+4. **遵循流程**：使用 `Get-Content | ssh` 管道上傳，`docker commit` 創建新映像
+
+---
 
 ### 50. KOL 週薪備註功能 ⭐⭐⭐
 **完成時間**: 2026-01-21 下午 19:05
