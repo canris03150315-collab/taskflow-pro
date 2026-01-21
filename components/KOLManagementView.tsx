@@ -154,9 +154,6 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   };
 
   const handleQuickPayment = async (profile: KOLProfile) => {
-    const amount = prompt(`為 ${profile.platformId} 記錄支付金額：`);
-    if (!amount || isNaN(parseFloat(amount))) return;
-
     try {
       const contractsRes = await api.kol.getContracts({ kolId: profile.id });
       if (contractsRes.contracts.length === 0) {
@@ -167,10 +164,26 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       }
 
       const contract = contractsRes.contracts[0];
+      const remainingAmount = contract.unpaidAmount;
+      
+      const amount = prompt(`記錄支付金額（未付金額：$${remainingAmount}）：`);
+      if (!amount || isNaN(parseFloat(amount))) return;
+
+      const paymentAmount = parseFloat(amount);
+      if (paymentAmount > remainingAmount) {
+        alert(`支付金額不能超過未付金額！\n未付金額：$${remainingAmount}\n輸入金額：$${paymentAmount}`);
+        return;
+      }
+
+      if (paymentAmount <= 0) {
+        alert('支付金額必須大於 0');
+        return;
+      }
+
       await api.kol.createPayment({
         contractId: contract.id,
         paymentDate: new Date().toISOString().split('T')[0],
-        amount: parseFloat(amount),
+        amount: paymentAmount,
         paymentType: 'SALARY',
         notes: '快速支付'
       });
@@ -879,14 +892,29 @@ const KOLDetailModal: React.FC<{
   }, [profile.id]);
 
   const handleQuickPayment = async (contractId: string) => {
-    const amount = prompt('記錄支付金額：');
+    const contract = details?.contracts?.find((c: any) => c.id === contractId);
+    if (!contract) return;
+
+    const remainingAmount = contract.unpaid_amount;
+    const amount = prompt(`記錄支付金額（未付金額：$${remainingAmount}）：`);
     if (!amount || isNaN(parseFloat(amount))) return;
+
+    const paymentAmount = parseFloat(amount);
+    if (paymentAmount > remainingAmount) {
+      alert(`支付金額不能超過未付金額！\n未付金額：$${remainingAmount}\n輸入金額：$${paymentAmount}`);
+      return;
+    }
+
+    if (paymentAmount <= 0) {
+      alert('支付金額必須大於 0');
+      return;
+    }
 
     try {
       await api.kol.createPayment({
         contractId,
         paymentDate: new Date().toISOString().split('T')[0],
-        amount: parseFloat(amount),
+        amount: paymentAmount,
         paymentType: 'SALARY'
       });
       alert('支付記錄成功！');
@@ -999,26 +1027,29 @@ const AddContractModal: React.FC<{
     startDate: '',
     endDate: '',
     contractType: 'NORMAL',
-    notes: ''
+    notes: '',
+    weeklyNotes: ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const salaryAmount = parseFloat(formData.salaryAmount);
+    const depositAmount = parseFloat(formData.depositAmount) || 0;
     onSubmit({
       ...formData,
-      salaryAmount: parseFloat(formData.salaryAmount),
-      depositAmount: parseFloat(formData.depositAmount),
-      unpaidAmount: parseFloat(formData.unpaidAmount || formData.salaryAmount)
+      salaryAmount: salaryAmount,
+      depositAmount: depositAmount,
+      unpaidAmount: formData.unpaidAmount ? parseFloat(formData.unpaidAmount) : (salaryAmount - depositAmount)
     });
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold">新增合約</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">選擇 KOL *</label>
             <select
@@ -1084,6 +1115,26 @@ const AddContractModal: React.FC<{
               />
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={3}
+              placeholder="合約相關備註"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">週薪備註</label>
+            <textarea
+              value={formData.weeklyNotes}
+              onChange={(e) => setFormData({ ...formData, weeklyNotes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={3}
+              placeholder="週薪相關說明或備註"
+            />
+          </div>
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg">取消</button>
             <button type="submit" className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg">新增</button>
@@ -1109,7 +1160,8 @@ const EditContractModal: React.FC<{
     startDate: contract.startDate || '',
     endDate: contract.endDate || '',
     contractType: contract.contractType || 'NORMAL',
-    notes: contract.notes || ''
+    notes: contract.notes || '',
+    weeklyNotes: contract.weeklyNotes || ''
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1126,11 +1178,11 @@ const EditContractModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold">編輯合約</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">KOL</label>
             <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
@@ -1196,6 +1248,17 @@ const EditContractModal: React.FC<{
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               rows={3}
+              placeholder="合約相關備註"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">週薪備註</label>
+            <textarea
+              value={formData.weeklyNotes}
+              onChange={(e) => setFormData({ ...formData, weeklyNotes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={3}
+              placeholder="週薪相關說明或備註"
             />
           </div>
           <div className="flex gap-3 pt-4">

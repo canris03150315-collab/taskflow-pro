@@ -20,7 +20,7 @@
 # API 反向代理
 [[redirects]]
   from = "/api/*"
-  to = "https://robust-managing-stay-largely.trycloudflare.com/api/:splat"
+  to = "http://165.227.147.40:3001/api/:splat"
   status = 200
   force = true
   headers = {X-From = "Netlify"}

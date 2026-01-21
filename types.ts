@@ -540,6 +540,7 @@ export interface KOLContract {
   totalPaid: number;
   contractType: ContractType;
   notes?: string;
+  weeklyNotes?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;

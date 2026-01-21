@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-20 14:30  
-**版本**: v8.9.139-ai-privacy-removed  
-**狀態**: ✅ AI 智能助理已解除隱私限制，可存取完整員工數據
+**最後更新**: 2026-01-21 17:27  
+**版本**: v8.9.144-kol-insert-fix  
+**狀態**: ✅ KOL 合約新增功能已修復
 
 ---
 
@@ -17,18 +17,146 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.139-ai-privacy-removed`
+- **Docker 映像**: `taskflow-pro:v8.9.144-kol-insert-fix`
+- **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 13 個用戶，完整 KOL 管理表結構，AI conversations 表
-- **快照**: (即將創建)
+- **資料庫**: 13 個用戶，99 筆打卡記錄，完整 KOL 管理表結構
+- **快照**: `taskflow-snapshot-v8.9.144-kol-insert-fix-20260121_092740.tar.gz` (213MB)
 - **環境變數**: GEMINI_API_KEY 已設置
-- **狀態**: ✅ 正常運行（AI 擁有完整數據權限）
+- **狀態**: ✅ 正常運行（包含所有最新功能）
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `ee77afb` (待提交)
+- **Git Commit**: `6595641` (v8.9.140 備份點)
 - **狀態**: ✅ 與生產環境同步
+
+---
+
+## 🎯 2026-01-21 更新記錄
+
+### 39. KOL 合約新增功能修復 ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 17:27
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶新增 KOL 合約時返回 500 錯誤：
+```
+SqliteError: 15 values for 14 columns
+```
+
+#### 根本原因
+後端 `kol.js` 的 POST `/contracts` 路由中，INSERT 語句有 **15 個佔位符 `?`** 但只有 **14 個欄位**：
+- 欄位：id, kol_id, start_date, end_date, salary_amount, deposit_amount, unpaid_amount, cleared_amount, total_paid, contract_type, notes, created_at, updated_at, created_by
+- 佔位符：`VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` (15 個)
+
+#### 修復方案
+創建修復腳本 `fix-kol-insert-15-to-14.js`，將 15 個佔位符修正為 14 個。
+
+#### 部署步驟
+```powershell
+# 1. 備份資料庫
+ssh root@165.227.147.40 "docker exec taskflow-pro node dist/index.js backup"
+
+# 2. 上傳並執行修復腳本
+Get-Content "fix-kol-insert-15-to-14.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-kol-insert-15-to-14.js"
+ssh root@165.227.147.40 "docker cp /tmp/fix-kol-insert-15-to-14.js taskflow-pro:/app/fix-kol-insert-15-to-14.js && docker exec -w /app taskflow-pro node fix-kol-insert-15-to-14.js"
+
+# 3. 重啟容器
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+
+# 4. 創建新映像
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.144-kol-insert-fix"
+
+# 5. 創建完整快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.144-kol-insert-fix"
+```
+
+#### 最終版本
+- **後端映像**: `taskflow-pro:v8.9.144-kol-insert-fix`
+- **快照**: `taskflow-snapshot-v8.9.144-kol-insert-fix-20260121_092740.tar.gz` (213MB)
+- **前端**: 無需修改
+- **狀態**: ✅ 已修復，KOL 合約新增功能正常
+
+#### 驗證結果
+```bash
+# 修復前
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)  # 15 個
+
+# 修復後
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)     # 14 個
+```
+
+#### 關鍵教訓
+1. **SQL 語句完整性檢查**：INSERT 語句的欄位數量必須與佔位符數量完全匹配
+2. **記憶倉庫的價值**：此問題已在記憶倉庫中記錄過，快速定位問題
+3. **標準修復流程**：備份 → 修復 → 重啟 → Commit 映像 → 創建快照
+4. **使用修復腳本**：避免手動編輯，確保修復可追溯和可重現
+
+---
+
+### 38. 系統版本回溯與升級 ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 16:36
+**狀態**: ✅ 已完成
+
+#### 操作流程
+用戶要求回溯到台灣時間 AM 1:00 前後的版本，但保留當前資料庫數據。
+
+**階段 1：回溯到 v8.9.142-kol-notes-backend**
+- **時間**: 2026-01-21 16:22
+- **版本**: v8.9.142-kol-notes-backend (2026-01-20 22:39 創建)
+- **原因**: 最接近用戶要求的時間點
+- **結果**: ✅ 系統運行正常
+
+**階段 2：升級到 v8.9.143-direct-connection**
+- **時間**: 2026-01-21 16:36
+- **版本**: v8.9.143-direct-connection (2026-01-21 15:50 創建)
+- **原因**: 用戶確認要使用最新最好的版本
+- **結果**: ✅ 升級成功
+
+#### 遵循的規則
+✅ **嚴格遵循全域規則和工作日誌流程**：
+1. 修改前創建快照備份
+2. 備份當前資料庫
+3. 停止當前容器
+4. 使用新映像啟動容器
+5. 驗證系統功能
+6. 創建新版本快照
+7. 更新工作日誌
+
+#### 備份記錄
+- **v8.9.142 升級前快照**: `taskflow-snapshot-v8.9.142-before-upgrade-to-143-20260121_083342.tar.gz` (213MB)
+- **資料庫備份**: `taskflow-backup-2026-01-21T08-35-05-176Z.db` (3.20 MB)
+- **v8.9.143 部署後快照**: `taskflow-snapshot-v8.9.143-direct-connection-deployed-20260121_083632.tar.gz` (213MB)
+
+#### 資料保留
+✅ **所有員工數據已完整保留**：
+- 13 個用戶
+- 9 個任務
+- 99 筆打卡記錄
+- 所有上傳資料
+
+#### 系統驗證
+- ✅ 容器運行正常
+- ✅ API 健康檢查通過
+- ✅ WebSocket 連接正常
+- ✅ 資料庫完整性確認
+- ⚠️ Rate-limit 警告（不影響功能）
+
+#### 版本功能對比
+**v8.9.143-direct-connection 包含**：
+- ✅ 所有 AI 助理進階功能
+- ✅ KOL 備註和週薪備註完整支援
+- ✅ 支付驗證功能
+- ✅ 直接連接優化
+- ✅ 所有已知問題修復
+
+#### 關鍵教訓
+1. **遵循標準流程**: 嚴格按照全域規則執行，確保安全
+2. **多層備份**: 快照 + 資料庫備份，雙重保險
+3. **資料保留**: 使用 volume 掛載確保數據不丟失
+4. **即時驗證**: 每個步驟都驗證狀態
+5. **文檔更新**: 完成後立即更新工作日誌
 
 ---
 
