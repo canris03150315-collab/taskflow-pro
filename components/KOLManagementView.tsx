@@ -1058,6 +1058,13 @@ const AddContractModal: React.FC<{
     e.preventDefault();
     const salaryAmount = parseFloat(formData.salaryAmount);
     const depositAmount = parseFloat(formData.depositAmount) || 0;
+    
+    // 驗證訂金不能超過工資
+    if (depositAmount > salaryAmount) {
+      alert(`訂金不能超過工資/傭金！\n工資/傭金：$${salaryAmount}\n訂金：$${depositAmount}`);
+      return;
+    }
+    
     onSubmit({
       ...formData,
       salaryAmount: salaryAmount,
@@ -1186,10 +1193,19 @@ const EditContractModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const salaryAmount = parseFloat(formData.salaryAmount);
+    const depositAmount = parseFloat(formData.depositAmount);
+    
+    // 驗證訂金不能超過工資
+    if (depositAmount > salaryAmount) {
+      alert(`訂金不能超過工資/傭金！\n工資/傭金：$${salaryAmount}\n訂金：$${depositAmount}`);
+      return;
+    }
+    
     onSubmit({
       ...formData,
-      salaryAmount: parseFloat(formData.salaryAmount),
-      depositAmount: parseFloat(formData.depositAmount),
+      salaryAmount: salaryAmount,
+      depositAmount: depositAmount,
       unpaidAmount: parseFloat(formData.unpaidAmount),
       clearedAmount: contract.clearedAmount || 0,
       totalPaid: contract.totalPaid || 0
