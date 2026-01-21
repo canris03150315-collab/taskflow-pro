@@ -122,6 +122,17 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     }
   };
 
+  const getStatusText = (status: string) => {
+    // 將英文狀態轉換為中文
+    switch (status) {
+      case 'ACTIVE': return '正常合作';
+      case 'STOPPED': return '停止合作';
+      case 'NEGOTIATING': return '協議中';
+      case 'LOST_CONTACT': return '失聯';
+      default: return status; // 如果已經是中文或其他自定義文字，直接返回
+    }
+  };
+
   const handleAddProfile = async (data: any) => {
     try {
       await api.kol.createProfile({ ...data, departmentId: currentUser.department });
@@ -537,7 +548,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.statusColor)}`}>
-                      {profile.status}
+                      {getStatusText(profile.status)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
