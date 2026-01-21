@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 18:30  
+**最後更新**: 2026-01-21 18:40  
 **版本**: v8.9.144-kol-insert-fix  
-**狀態**: ✅ KOL 管理功能完整（自由輸入狀態）
+**狀態**: ✅ KOL 管理功能完整（自由輸入狀態+顏色選擇）
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6970ab03107de67cca253c99`
+- **生產環境 Deploy ID**: `6970adbd8040b38054699e02`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -34,6 +34,76 @@
 ---
 
 ## 🎯 2026-01-21 更新記錄
+
+### 46. KOL 狀態顏色選擇功能 ⭐⭐⭐
+**完成時間**: 2026-01-21 下午 18:40
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反饋：希望狀態可以自由輸入文字內容，同時可以選擇顏色（紅色、綠色、黃色）來顯示狀態，像備註一樣靈活。
+
+#### 解決方案
+添加狀態顏色選擇功能，讓用戶可以自由輸入狀態文字，並選擇顯示顏色。
+
+#### 修改內容
+1. **types.ts - 添加 statusColor 欄位**
+   - 在 `KOLProfile` 接口添加 `statusColor?: 'green' | 'yellow' | 'red'`
+
+2. **AddKOLModal - 添加顏色選擇器**
+   - 添加 `statusColor` 到 formData，預設為 'green'
+   - 添加三個顏色按鈕（🟢 綠色、🟡 黃色、🔴 紅色）
+   - 選中的顏色會高亮顯示
+
+3. **EditKOLModal - 添加顏色選擇器**
+   - 從 profile 讀取現有的 statusColor
+   - 添加相同的顏色選擇器 UI
+
+4. **KOL 列表顯示 - 使用自定義顏色**
+   - 修改 `getStatusColor` 函數，根據 `statusColor` 欄位返回對應的 Tailwind 類
+   - 狀態標籤直接顯示 `profile.status` 文字內容
+   - 背景顏色根據 `profile.statusColor` 動態變化
+
+5. **數據轉換 - 支援 statusColor**
+   - 在 `transformedProfiles` 中添加 statusColor 欄位轉換
+   - 支援 snake_case (`status_color`) 和 camelCase (`statusColor`)
+   - 預設值為 'green'
+
+#### 部署步驟
+```powershell
+# 1. 清除舊構建
+Remove-Item -Recurse -Force dist
+
+# 2. 構建前端
+npm run build
+
+# 3. 部署到生產環境
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6970adbd8040b38054699e02`
+- **後端**: 需要添加 `status_color` 欄位到資料庫（待實現）
+- **狀態**: ✅ 前端已完成，後端需配合
+
+#### 功能效果
+- ✅ 狀態文字可自由輸入
+- ✅ 可選擇綠色、黃色、紅色三種顯示顏色
+- ✅ 顏色選擇器有視覺反饋（選中高亮）
+- ✅ KOL 列表根據選擇的顏色顯示狀態標籤
+- ✅ 新增和編輯都支援顏色選擇
+
+#### 關鍵教訓
+1. **視覺化狀態管理**：顏色比文字更直觀，能快速識別狀態
+2. **靈活性與標準化結合**：文字自由輸入 + 顏色標準化選擇
+3. **用戶體驗**：顏色按鈕設計清晰，選中狀態明顯
+4. **前後端協作**：前端先實現，後端需配合添加資料庫欄位
+
+#### 後續工作
+- ⚠️ 後端需要添加 `status_color` 欄位到 `kol_profiles` 表
+- ⚠️ 後端 API 需要支援 `statusColor` 欄位的讀寫
+
+---
 
 ### 45. KOL 狀態改為自由輸入 ⭐⭐
 **完成時間**: 2026-01-21 下午 18:30

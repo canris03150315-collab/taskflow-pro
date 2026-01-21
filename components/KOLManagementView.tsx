@@ -49,6 +49,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         platformAccount: p.platform_account || p.platformAccount,
         contactInfo: p.contact_info || p.contactInfo,
         status: p.status,
+        statusColor: (p.status_color || p.statusColor || 'green') as 'green' | 'yellow' | 'red',
         notes: p.notes,
         createdAt: p.created_at || p.createdAt,
         updatedAt: p.updated_at || p.updatedAt,
@@ -112,23 +113,12 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     });
   }, [profiles, statusFilter, searchQuery]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return 'bg-green-100 text-green-800';
-      case 'STOPPED': return 'bg-red-100 text-red-800';
-      case 'NEGOTIATING': return 'bg-yellow-100 text-yellow-800';
-      case 'LOST_CONTACT': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'ACTIVE': return '正常合作';
-      case 'STOPPED': return '停止合作';
-      case 'NEGOTIATING': return '協議中';
-      case 'LOST_CONTACT': return '失聯';
-      default: return status;
+  const getStatusColor = (statusColor?: 'green' | 'yellow' | 'red') => {
+    switch (statusColor) {
+      case 'green': return 'bg-green-100 text-green-800';
+      case 'yellow': return 'bg-yellow-100 text-yellow-800';
+      case 'red': return 'bg-red-100 text-red-800';
+      default: return 'bg-green-100 text-green-800'; // 預設綠色
     }
   };
 
@@ -546,8 +536,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.status)}`}>
-                      {getStatusText(profile.status)}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.statusColor)}`}>
+                      {profile.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -844,6 +834,7 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
     platformAccount: '',
     contactInfo: '',
     status: 'ACTIVE',
+    statusColor: 'green' as 'green' | 'yellow' | 'red',
     notes: ''
   });
 
@@ -913,6 +904,44 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
             />
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">狀態顏色</label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, statusColor: 'green' })}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                  formData.statusColor === 'green'
+                    ? 'bg-green-100 border-green-500 text-green-800'
+                    : 'bg-green-50 border-green-200 text-green-600 hover:bg-green-100'
+                }`}
+              >
+                🟢 綠色
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, statusColor: 'yellow' })}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                  formData.statusColor === 'yellow'
+                    ? 'bg-yellow-100 border-yellow-500 text-yellow-800'
+                    : 'bg-yellow-50 border-yellow-200 text-yellow-600 hover:bg-yellow-100'
+                }`}
+              >
+                🟡 黃色
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, statusColor: 'red' })}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                  formData.statusColor === 'red'
+                    ? 'bg-red-100 border-red-500 text-red-800'
+                    : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+                }`}
+              >
+                🔴 紅色
+              </button>
+            </div>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>
             <textarea
               value={formData.notes}
@@ -939,6 +968,7 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
     platformAccount: profile.platformAccount,
     contactInfo: profile.contactInfo || '',
     status: profile.status,
+    statusColor: (profile.statusColor || 'green') as 'green' | 'yellow' | 'red',
     notes: profile.notes || ''
   });
 
@@ -1005,6 +1035,44 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               placeholder="例如：正常合作、停止合作、協議中等"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">狀態顏色</label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, statusColor: 'green' })}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                  formData.statusColor === 'green'
+                    ? 'bg-green-100 border-green-500 text-green-800'
+                    : 'bg-green-50 border-green-200 text-green-600 hover:bg-green-100'
+                }`}
+              >
+                🟢 綠色
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, statusColor: 'yellow' })}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                  formData.statusColor === 'yellow'
+                    ? 'bg-yellow-100 border-yellow-500 text-yellow-800'
+                    : 'bg-yellow-50 border-yellow-200 text-yellow-600 hover:bg-yellow-100'
+                }`}
+              >
+                🟡 黃色
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, statusColor: 'red' })}
+                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                  formData.statusColor === 'red'
+                    ? 'bg-red-100 border-red-500 text-red-800'
+                    : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+                }`}
+              >
+                🔴 紅色
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">備註</label>

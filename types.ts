@@ -519,6 +519,7 @@ export interface KOLProfile {
   platformAccount: string;
   contactInfo?: string;
   status: KOLStatus;
+  statusColor?: 'green' | 'yellow' | 'red';  // 狀態顯示顏色
   notes?: string;
   createdAt: string;
   updatedAt: string;
