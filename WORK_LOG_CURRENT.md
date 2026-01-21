@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 21:55  
-**版本**: v8.9.151-work-logs-all-db-fixed  
-**狀態**: ✅ 工作日誌功能完全修復（所有 db 調用方法已修正）
+**最後更新**: 2026-01-21 22:15  
+**版本**: v8.9.152-work-logs-correct-fields  
+**狀態**: ✅ 工作日誌功能完全修復（欄位名稱已修正）
 
 ---
 
@@ -17,7 +17,7 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.151-work-logs-all-db-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.152-work-logs-correct-fields`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
@@ -171,9 +171,48 @@ docker restart taskflow-pro
 docker commit taskflow-pro taskflow-pro:v8.9.151-work-logs-all-db-fixed
 ```
 
+#### 第五次修復（22:15）⭐ **根本問題**
+**問題**: 前面的修復雖然消除了錯誤，但數據仍然空白（顯示「今天還沒有工作日誌」）。診斷發現資料庫有 25 筆記錄，但 API 返回空數組。
+
+**根本原因**: 容器中的 `work-logs.js` 使用了**完全錯誤的欄位名稱**，與資料庫表結構不匹配：
+- ❌ 容器中使用：`content`, `department`, `user_name` 欄位
+- ✅ 資料庫實際：`today_tasks`, `tomorrow_tasks`, `department_id` 欄位
+
+**診斷過程**:
+```javascript
+// 1. 檢查資料庫表結構
+PRAGMA table_info(work_logs);
+// 欄位: id, user_id, department_id, date, today_tasks, tomorrow_tasks, notes, created_at, updated_at
+
+// 2. 檢查容器中的 work-logs.js
+SELECT * FROM work_logs WHERE department = ?  // ❌ 錯誤欄位
+INSERT INTO work_logs (user_name, content, ...)  // ❌ 錯誤欄位
+
+// 3. 使用本地正確的 work-logs-backend.js
+SELECT wl.*, u.name as user_name FROM work_logs wl  // ✅ LEFT JOIN 取得用戶名
+WHERE wl.department_id = ?  // ✅ 正確欄位
+```
+
+**修復**:
+```bash
+# 使用本地正確版本替換容器中的錯誤文件
+Get-Content "work-logs-backend.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/work-logs-correct.js"
+docker cp /tmp/work-logs-correct.js taskflow-pro:/app/dist/routes/work-logs.js
+docker restart taskflow-pro
+docker commit taskflow-pro taskflow-pro:v8.9.152-work-logs-correct-fields
+```
+
+**測試驗證**:
+```bash
+# 容器內測試查詢
+docker exec taskflow-pro node test-work-logs-api.js
+# 成功返回 3 筆記錄，欄位正確映射
+```
+
 #### 最終版本
-- **後端 Docker 映像**: `taskflow-pro:v8.9.151-work-logs-all-db-fixed`
-- **狀態**: ✅ 完全修復，工作日誌功能正常
+- **後端 Docker 映像**: `taskflow-pro:v8.9.152-work-logs-correct-fields`
+- **資料庫記錄**: 25 筆工作日誌
+- **狀態**: ✅ 完全修復，數據正常顯示
 
 #### 關鍵教訓
 1. **容器持久化**：修改容器內文件後必須 `docker commit` 創建新映像
@@ -183,6 +222,7 @@ docker commit taskflow-pro taskflow-pro:v8.9.151-work-logs-all-db-fixed
 5. **代碼一致性**：新添加的路由文件必須遵循項目現有的代碼模式
 6. **使用統一中間件**：不要自己實現認證邏輯，使用項目現有的認證中間件
 7. **正確的 db 調用模式**：該項目使用 async/await 模式的 `db.all()`, `db.get()`, `db.run()`，而非 better-sqlite3 的 `db.prepare().all()` 同步模式
+8. **欄位名稱必須匹配**：⭐ 最重要！路由文件中的欄位名稱必須與資料庫表結構完全一致，否則即使沒有錯誤也會返回空數據
 
 ---
 
