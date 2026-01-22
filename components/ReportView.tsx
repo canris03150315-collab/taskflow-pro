@@ -530,7 +530,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                                        {report.createdAt} 日報
+                                        {new Date(report.createdAt).toISOString().split('T')[0]} 日報
                                         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-normal">
                                             {getUserName(report.userId)}
                                         </span>

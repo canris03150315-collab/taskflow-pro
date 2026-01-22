@@ -73,12 +73,13 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
 
   // Initialize WebSocket
   useEffect(() => {
+    if (!currentUser) return;
+    
     const token = localStorage.getItem('auth_token');
-    // WebSocket is now enabled with backend support
     const isProduction = window.location.protocol === 'https:';
     
     if (!isProduction) { // Enable WebSocket for HTTP connections
-      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'ws://165.227.147.40:3000/ws';
+      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'wss://northern-encounter-galleries-fairy.trycloudflare.com/ws';
       wsClientRef.current = new WebSocketClient(wsUrl);
       
       const handleMessage = (event: any) => {
@@ -130,11 +131,9 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
           }
       };
     } else {
-      // HTTPS mode: use polling only
-      console.log('Running in HTTPS mode, WebSocket disabled, using polling');
-      setIsConnected(false);
+      console.log('HTTPS 環境，WebSocket 已禁用');
     }
-  }, [currentUser.id, activeChannelId, notificationSound]);
+  }, [currentUser, activeChannelId, notificationSound]);
 
   // Load Channels with polling for real-time updates
   useEffect(() => {

@@ -27,8 +27,13 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
     currentUser.role === Role.SUPERVISOR ? currentUser.department : 'ALL'
   );
   
-  // 日期篩選狀態
-  const today = new Date().toISOString().split('T')[0];
+  // 日期篩選狀態 - 使用台灣時區 (UTC+8)
+  const getTaiwanDate = () => {
+    const now = new Date();
+    const taiwanTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    return taiwanTime.toISOString().split('T')[0];
+  };
+  const today = getTaiwanDate();
   const [startDate, setStartDate] = useState<string>(today);
   const [endDate, setEndDate] = useState<string>(today);
   const [selectedDate, setSelectedDate] = useState<string>(today);

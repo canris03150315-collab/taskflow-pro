@@ -9,20 +9,23 @@
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6970b3d24602207b52ce103f`
+- **生產環境 Deploy ID**: `6971315ed8b93fb0c72c6606`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
-- **WebSocket URL**: `wss://robust-managing-stay-largely.trycloudflare.com/ws`
+- **WebSocket URL**: `wss://northern-encounter-galleries-fairy.trycloudflare.com/ws`
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.152-work-logs-correct-fields`
+- **Docker 映像**: `taskflow-pro:v8.9.167-websocket-tunnel-fix`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
+- **Cloudflare Tunnel**: `northern-encounter-galleries-fairy.trycloudflare.com` (2026-01-22 更新)
+- **Tunnel PID**: 1632505
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 13 個用戶，99 筆打卡記錄，25 筆工作日誌，完整 KOL 管理表結構
-- **快照**: `taskflow-snapshot-v8.9.152-work-logs-complete-20260121_145446.tar.gz` (213MB)
+- **資料庫**: 86部門每日任務已修復，所有記錄完整
+- **快照**: `taskflow-snapshot-v8.9.167-websocket-tunnel-fix` (213MB)
+- **快照位置**: `/root/taskflow-snapshots/`
 - **資料庫備份**: `taskflow-backup-2026-01-21T14-56-15-345Z.db` (3.20MB)
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 正常運行（包含所有最新功能）
@@ -2578,9 +2581,12 @@ completedItems[index] = isCompleted;  // 直接設置布林值，破壞數據結
 - 創建部署腳本（deploy-test.ps1, deploy-prod.ps1）
 - **結果**: 安全的部署流程
 
-### 5. WebSocket 修復 ⭐
-- 更新到當前 Cloudflare Tunnel
-- 即時更新功能恢復
+### 5. WebSocket 修復 ⭐ (2026-01-22 更新)
+- Cloudflare Tunnel URL 定期更新機制
+- 當前 URL: `northern-encounter-galleries-fairy.trycloudflare.com`
+- 即時更新功能正常
+- **重要**: Cloudflare Tunnel 會定期更換 URL，需要從日誌獲取最新 URL
+- **檢查命令**: `ssh root@165.227.147.40 "cat /root/cloudflared.log | grep -i 'https://.*trycloudflare.com' | tail -5"`
 - **結果**: 所有功能正常
 
 ### 6. 問題解決 ⭐
