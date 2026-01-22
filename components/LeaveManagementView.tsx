@@ -418,7 +418,10 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
       s.status === 'APPROVED' && 
       s.year === selectedMonth.year && 
       s.month === selectedMonth.month &&
-      (canApprove ? s.department_id === selectedDepartment : s.user_id === currentUser.id)
+      (canApprove 
+        ? s.department_id === selectedDepartment 
+        : (s.user_id === currentUser.id || s.department_id === currentUser.department)
+      )
     );
   };
 
@@ -879,22 +882,32 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                                 )}
                                 {offDuty.length > 0 && (
                                   <div className="bg-red-50 border border-red-200 rounded px-1 py-0.5">
-                                    <p className="text-red-700 font-bold text-[10px] sm:text-xs">
+                                    <p className="text-red-700 font-bold text-[10px] sm:text-xs mb-1">
                                       <span className="hidden sm:inline">休息 {offDuty.length}人</span>
                                       <span className="sm:hidden">🏖️ {offDuty.length}</span>
                                     </p>
-                                    <p className="text-red-600 truncate text-[9px] sm:text-xs hidden sm:block">{offDuty.map(u => u.name).join(', ')}</p>
+                                    <div className="flex flex-wrap gap-1 hidden sm:flex">
+                                      {offDuty.map(u => (
+                                        <span key={u.id} className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[9px] sm:text-xs font-medium">
+                                          {u.name}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
                                 {onDuty.length > 0 && !hasConflict && (
                                   <div className="bg-green-50 border border-green-200 rounded px-1 py-0.5">
-                                    <p className="text-green-700 font-bold text-[10px] sm:text-xs">
+                                    <p className="text-green-700 font-bold text-[10px] sm:text-xs mb-1">
                                       <span className="hidden sm:inline">上班 {onDuty.length}人</span>
                                       <span className="sm:hidden">✓ {onDuty.length}</span>
                                     </p>
-                                    <p className="text-green-600 truncate text-[9px] sm:text-xs hidden sm:block">
-                                      {onDuty.map(u => u.name).join(', ')}
-                                    </p>
+                                    <div className="flex flex-wrap gap-1 hidden sm:flex">
+                                      {onDuty.map(u => (
+                                        <span key={u.id} className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[9px] sm:text-xs font-medium">
+                                          {u.name}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
                               </>
