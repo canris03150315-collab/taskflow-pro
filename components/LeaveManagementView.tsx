@@ -425,10 +425,18 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
     );
   };
 
-  // Get users on duty for a specific day
+  // Memoized approved schedules
+  const approvedSchedules = useMemo(() => {
+    return getApprovedSchedules();
+  }, [schedules, selectedMonth.year, selectedMonth.month, selectedDepartment, canApprove, currentUser.id, currentUser.department]);
+
+  // Memoized department users
+  const deptUsers = useMemo(() => {
+    return users.filter(u => u.department === selectedDepartment);
+  }, [users, selectedDepartment]);
+
+  // Get users on duty for a specific day (use memoized data)
   const getUsersOnDuty = (day: number) => {
-    const approvedSchedules = getApprovedSchedules();
-    const deptUsers = users.filter(u => u.department === selectedDepartment);
     const targetDate = `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     
     return deptUsers.filter(user => {
@@ -452,10 +460,8 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
     });
   };
 
-  // Get users off duty for a specific day
+  // Get users off duty for a specific day (use memoized data)
   const getUsersOffDuty = (day: number) => {
-    const approvedSchedules = getApprovedSchedules();
-    const deptUsers = users.filter(u => u.department === selectedDepartment);
     const targetDate = `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     
     return deptUsers.filter(user => {
@@ -478,6 +484,23 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
       return false; // 既沒有休息也沒有請假
     });
   };
+
+  // Memoized daily stats for calendar rendering
+  const dailyStats = useMemo(() => {
+    const getDaysInMonth = (year: number, month: number) => {
+      return new Date(year, month, 0).getDate();
+    };
+    const daysInMonth = getDaysInMonth(selectedMonth.year, selectedMonth.month);
+    const stats: Record<number, { onDuty: User[]; offDuty: User[] }> = {};
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      stats[day] = {
+        onDuty: getUsersOnDuty(day),
+        offDuty: getUsersOffDuty(day)
+      };
+    }
+    return stats;
+  }, [approvedSchedules, deptUsers, selectedMonth, leaves]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -843,8 +866,8 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                   // Days
                   for (let day = 1; day <= daysInMonth; day++) {
                     const isToday = isCurrentMonth && today.getDate() === day;
-                    const onDuty = getUsersOnDuty(day);
-                    const offDuty = getUsersOffDuty(day);
+                    const onDuty = dailyStats[day]?.onDuty || [];
+                    const offDuty = dailyStats[day]?.offDuty || [];
                     const isWeekend = (firstDay + day - 1) % 7 === 0 || (firstDay + day - 1) % 7 === 6;
 
                     days.push(
