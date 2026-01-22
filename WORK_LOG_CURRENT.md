@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-21 22:15  
-**版本**: v8.9.152-work-logs-correct-fields  
-**狀態**: ✅ 工作日誌功能完全修復（欄位名稱已修正）
+**最後更新**: 2026-01-22 15:39  
+**版本**: v8.9.168-audit-log-api  
+**狀態**: ✅ 審核歷史 API 已添加
 
 ---
 
@@ -17,14 +17,14 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.167-websocket-tunnel-fix`
+- **Docker 映像**: `taskflow-pro:v8.9.168-audit-log-api`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `northern-encounter-galleries-fairy.trycloudflare.com` (2026-01-22 更新)
 - **Tunnel PID**: 1632505
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 86部門每日任務已修復，所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.167-websocket-tunnel-fix` (213MB)
+- **快照**: `taskflow-snapshot-v8.9.168-audit-log-api-complete-20260122_073931` (213MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **資料庫備份**: `taskflow-backup-2026-01-21T14-56-15-345Z.db` (3.20MB)
 - **環境變數**: GEMINI_API_KEY 已設置
@@ -34,6 +34,66 @@
 - **Git 狀態**: 已初始化，有完整歷史
 - **Git Commit**: `6595641` (v8.9.140 備份點)
 - **狀態**: ✅ 與生產環境同步
+
+---
+
+## 🎯 2026-01-22 更新記錄
+
+### 55. 審核歷史 API 修復 ⭐
+**完成時間**: 2026-01-22 15:39
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶點擊「審核歷史」標籤時，顯示「沒有找到審核記錄」，前端顯示「前端應用未找到」錯誤。
+
+#### 根本原因
+後端 `/api/reports/approval/audit-log` API 路由缺失
+- 前端 `AuditLogView.tsx` 正常
+- 資料表 `approval_audit_log` 存在（20 筆記錄）
+- 但 `reports.js` 沒有對應的 API 路由
+
+#### 修復方案
+在 `reports.js` 添加審核歷史 API 路由：
+- 權限檢查：BOSS/MANAGER/SUPERVISOR
+- 支援篩選：操作類型、開始日期、結束日期
+- 支援分頁：limit、offset
+- 返回格式：`{ success, logs, total, limit, offset }`
+
+#### 部署記錄
+```powershell
+# 1. 創建修復前快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.167-before-audit-log-api"
+
+# 2. 創建並執行修復腳本
+Get-Content "add-audit-api-ascii.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/add-audit-api-ascii.js"
+ssh root@165.227.147.40 "docker cp /tmp/add-audit-api-ascii.js taskflow-pro:/app/ && docker exec -w /app taskflow-pro node add-audit-api-ascii.js"
+
+# 3. 重啟容器
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+
+# 4. 測試 API
+ssh root@165.227.147.40 "docker exec -w /app taskflow-pro node test-audit-log-api.js"
+# 結果: 401 Unauthorized (預期，需認證)
+
+# 5. Commit 新映像
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.168-audit-log-api"
+
+# 6. 創建最終快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.168-audit-log-api-complete"
+```
+
+#### 最終版本
+- **後端映像**: `taskflow-pro:v8.9.168-audit-log-api`
+- **前端**: 無需修改（Deploy ID `6971315ed8b93fb0c72c6606`）
+- **快照**: 
+  - 修復前: `taskflow-snapshot-v8.9.167-before-audit-log-api-20260122_073300.tar.gz`
+  - 修復後: `taskflow-snapshot-v8.9.168-audit-log-api-complete-20260122_073931.tar.gz`
+- **狀態**: ✅ 已完成
+
+#### 關鍵點
+1. 後端路由必須使用 Pure ASCII，中文使用 Unicode Escape
+2. 遵循全域規則：修復前創建快照 → 修改 → 測試 → Commit 映像 → 最終快照
+3. API 測試返回 401 是正確的（需要認證 Token）
 
 ---
 
