@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-22 15:39  
-**版本**: v8.9.168-audit-log-api  
-**狀態**: ✅ 審核歷史 API 已添加
+**最後更新**: 2026-01-22 18:38  
+**版本**: v8.9.169-audit-db-syntax-fix  
+**狀態**: ✅ 審核歷史資料庫語法已修復
 
 ---
 
@@ -17,14 +17,14 @@
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.168-audit-log-api`
+- **Docker 映像**: `taskflow-pro:v8.9.169-audit-db-syntax-fix`
 - **容器 ID**: `584738027bbf`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `northern-encounter-galleries-fairy.trycloudflare.com` (2026-01-22 更新)
 - **Tunnel PID**: 1632505
 - **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
 - **資料庫**: 86部門每日任務已修復，所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.168-audit-log-api-complete-20260122_073931` (213MB)
+- **快照**: `taskflow-snapshot-v8.9.169-audit-db-syntax-fix-complete-20260122_103814` (213MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **資料庫備份**: `taskflow-backup-2026-01-21T14-56-15-345Z.db` (3.20MB)
 - **環境變數**: GEMINI_API_KEY 已設置
@@ -94,6 +94,96 @@ ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.168-audit-log-api-complet
 1. 後端路由必須使用 Pure ASCII，中文使用 Unicode Escape
 2. 遵循全域規則：修復前創建快照 → 修改 → 測試 → Commit 映像 → 最終快照
 3. API 測試返回 401 是正確的（需要認證 Token）
+
+---
+
+### 56. 審核歷史資料庫語法修復 ⭐⭐
+**完成時間**: 2026-01-22 18:38
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶報告審核歷史頁面返回 500 錯誤：
+```
+GET /api/reports/approval/audit-log?action=ALL&limit=20 500 (Internal Server Error)
+Error: 系統錯誤，無法載入審核歷史
+```
+
+#### 根本原因
+後端日誌顯示：`TypeError: req.db.prepare is not a function`
+
+**錯誤代碼**（在 v8.9.168）：
+```javascript
+const totalResult = req.db.prepare(countQuery).get(...params);
+const logs = req.db.prepare(query).all(...params);
+```
+
+**問題分析**：
+1. 使用了 `better-sqlite3` 語法（`prepare().get()` 和 `prepare().all()`）
+2. 但此項目使用的是異步資料庫接口
+3. 其他路由都使用 `await db.get()` 和 `await db.all()`
+4. 缺少 `const db = req.db;` 聲明
+
+#### 修復方案
+修改審核歷史 API 路由的資料庫查詢語法：
+
+**修復後代碼**：
+```javascript
+const db = req.db;  // 添加此行
+
+// 查詢總數
+const totalResult = await db.get(countQuery, params);
+
+// 查詢記錄
+const logs = await db.all(query, params);
+```
+
+#### 部署記錄
+```powershell
+# 1. 創建修復前快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.168-before-db-syntax-fix"
+
+# 2. 創建並執行修復腳本
+Get-Content "fix-audit-db-syntax.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-audit-db-syntax.js"
+ssh root@165.227.147.40 "docker cp /tmp/fix-audit-db-syntax.js taskflow-pro:/app/ && docker exec -w /app taskflow-pro node fix-audit-db-syntax.js"
+
+# 3. 添加 db 聲明
+Get-Content "add-db-declaration.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/add-db-declaration.js"
+ssh root@165.227.147.40 "docker cp /tmp/add-db-declaration.js taskflow-pro:/app/ && docker exec -w /app taskflow-pro node add-db-declaration.js"
+
+# 4. 重啟容器
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+
+# 5. 測試 API
+ssh root@165.227.147.40 "docker exec -w /app taskflow-pro node test-audit-with-auth.js"
+# 結果: 401 Unauthorized (預期，需認證)
+
+# 6. Commit 新映像
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.169-audit-db-syntax-fix"
+
+# 7. 創建最終快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.169-audit-db-syntax-fix-complete"
+```
+
+#### 最終版本
+- **後端映像**: `taskflow-pro:v8.9.169-audit-db-syntax-fix`
+- **前端**: 無需修改（Deploy ID `6971315ed8b93fb0c72c6606`）
+- **快照**: 
+  - 修復前: `taskflow-snapshot-v8.9.168-before-db-syntax-fix-20260122_103420.tar.gz`
+  - 修復後: `taskflow-snapshot-v8.9.169-audit-db-syntax-fix-complete-20260122_103814.tar.gz`
+- **狀態**: ✅ 已完成
+
+#### 關鍵教訓
+1. **資料庫接口一致性**：所有路由必須使用相同的資料庫查詢方式
+2. **參考現有代碼**：新增路由時應參考其他路由的實現方式
+3. **徹底測試**：添加 API 後必須進行完整的端到端測試
+4. **錯誤日誌**：後端日誌是診斷問題的關鍵
+
+#### 診斷工具
+創建的工具文件：
+- `check-db-usage.js` - 檢查其他路由的資料庫使用方式
+- `fix-audit-db-syntax.js` - 修復資料庫查詢語法
+- `add-db-declaration.js` - 添加 db 變數聲明
+- `test-audit-with-auth.js` - 測試 API 可用性
 
 ---
 
