@@ -1,5 +1,16 @@
 # TaskFlow Pro - AI 對話銜接指南
 
+⚠️ **警告：此文檔已過時，請勿參考！**
+
+**請改為閱讀**：
+- `AI-MANDATORY-CHECKLIST.md` - 強制檢查清單
+- `WORK_LOG_CURRENT.md` - 最新系統狀態
+- `PROJECT-QUICKSTART.md` - 快速啟動指南
+
+**此文檔保留僅供歷史參考。**
+
+---
+
 ## 📋 專案概述
 
 **TaskFlow Pro** 是一個企業內部任務管理系統，包含：

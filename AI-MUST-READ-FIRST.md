@@ -1,16 +1,23 @@
 # ⚠️ AI 必讀 - 開始工作前檢查清單
 
-**🚨 重要：每次開始新對話時，AI 必須先完成此檢查清單！**
+**🚨 重要：此文檔已更新，請改用新版本！**
+
+**請立即閱讀**：
+- ⭐⭐⭐ `AI-MANDATORY-CHECKLIST.md` - **新版強制檢查清單**
+- ⭐⭐⭐ `WORK_LOG_CURRENT.md` - 最新系統狀態
+- ⭐⭐ `PROJECT-QUICKSTART.md` - 快速啟動指南
+
+**此文檔保留僅供參考，但資訊可能過時。**
 
 ---
 
-## 📋 強制性閱讀順序
+## 📋 強制性閱讀順序（已更新）
 
 ### 第一步：閱讀核心文件（必須按順序）
 
-1. ✅ **本文件** (`AI-MUST-READ-FIRST.md`) - 了解工作流程
-2. ✅ **PROJECT-QUICKSTART.md** - 快速了解專案狀態
-3. ✅ **WORK_LOG_CURRENT.md** - 當前工作日誌和最新狀態
+1. ✅ **AI-MANDATORY-CHECKLIST.md** - **新版強制檢查清單**（必讀）
+2. ✅ **WORK_LOG_CURRENT.md** - 當前工作日誌和最新狀態
+3. ✅ **PROJECT-QUICKSTART.md** - 快速了解專案狀態
 4. ✅ **全域規則** (`c:\Users\USER\.codeium\windsurf\memories\global_rules.md`) - 必須遵守的規則
 
 ### 第二步：執行系統檢查

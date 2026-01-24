@@ -1,5 +1,15 @@
 # TaskFlow Pro - AI 部署指南
 
+⚠️ **警告：此文檔已過時，請勿參考！**
+
+**請改為閱讀**：
+- `AI-MANDATORY-CHECKLIST.md` - 強制檢查清單
+- `PROJECT-QUICKSTART.md` - 最新部署流程
+
+**此文檔保留僅供歷史參考。**
+
+---
+
 > 給其他 AI 助手的快速部署參考手冊
 
 ## 🏗️ 專案架構
