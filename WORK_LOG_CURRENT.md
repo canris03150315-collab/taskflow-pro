@@ -1,39 +1,157 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-22 19:58  
-**版本**: v8.9.169-audit-db-syntax-fix (後端) / 697210e41580c21f5b1e3092 (前端)  
-**狀態**: ✅ 月曆效能優化完成（減少 95% 重複計算）
+**最後更新**: 2026-01-24 23:17  
+**版本**: v8.9.170-ai-assistant-fixed (後端) / 6974d4e0105d64546e84afc0 (前端)  
+**狀態**: ⚠️ AI 助理修復進行中（資料庫 API 已修正，待測試）
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `697210e41580c21f5b1e3092`
+- **生產環境 Deploy ID**: `6974d4e0105d64546e84afc0`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
 - **WebSocket URL**: `wss://northern-encounter-galleries-fairy.trycloudflare.com/ws`
+- **netlify.toml**: ✅ 已修正（指向 Cloudflare Tunnel）
 - **狀態**: ✅ 正常運行，WebSocket 連接正常
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.169-audit-db-syntax-fix`
-- **容器 ID**: `584738027bbf`
+- **Docker 映像**: `taskflow-pro:v8.9.170-ai-assistant-fixed`
+- **容器 ID**: `dcbf78e4c7e0`
 - **容器狀態**: 運行中
-- **Cloudflare Tunnel**: `northern-encounter-galleries-fairy.trycloudflare.com` (2026-01-22 更新)
+- **Cloudflare Tunnel**: `northern-encounter-galleries-fairy.trycloudflare.com`
 - **Tunnel PID**: 1632505
-- **Cloudflare Tunnel**: `robust-managing-stay-largely.trycloudflare.com`
-- **資料庫**: 86部門每日任務已修復，所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.169-audit-db-syntax-fix-complete-20260122_103814` (213MB)
+- **資料庫**: 所有記錄完整
+- **快照**: `taskflow-snapshot-v8.9.170-ai-assistant-fixed-complete-20260124_151701` (213MB)
 - **快照位置**: `/root/taskflow-snapshots/`
-- **資料庫備份**: `taskflow-backup-2026-01-21T14-56-15-345Z.db` (3.20MB)
 - **環境變數**: GEMINI_API_KEY 已設置
-- **狀態**: ✅ 正常運行（包含所有最新功能）
+- **AI 助理**: ⚠️ 資料庫 API 已修正為異步 API，待測試
+- **狀態**: ✅ 服務運行中
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `6595641` (v8.9.140 備份點)
-- **狀態**: ✅ 與生產環境同步
+- **Git Commit**: `943469a` (v8.9.170 AI 助理修復)
+- **狀態**: ✅ 所有變更已提交
+
+---
+
+## 🎯 2026-01-24 更新記錄
+
+### 59. AI 助理考勤數據功能修復 ⚠️
+**開始時間**: 2026-01-24 13:41  
+**當前狀態**: ⚠️ 進行中（資料庫 API 已修正，待測試）
+
+#### 問題描述
+AI 助理無法訪問考勤數據，需要擴展功能以提供詳細的員工出勤統計。
+
+#### 修復過程
+
+**第一次嘗試（失敗）**：
+- 使用了錯誤的資料庫 API（better-sqlite3 同步 API）
+- 導致 `Cannot read properties of undefined (reading 'prepare')` 錯誤
+- 原因：系統使用的是 sqlcipher 異步 API
+
+**第二次嘗試（失敗）**：
+- 修改為 `req.db` 但仍使用同步 API
+- 導致 `db.prepare is not a function` 錯誤
+- 原因：`req.db` 提供的是異步方法（`async get/all/run`）
+
+**第三次修復（已完成）**：
+- 檢查其他路由文件（`tasks.js`）和資料庫實現（`database.js`）
+- 確認系統使用 sqlcipher 異步 API
+- 修正所有資料庫調用為異步 API
+- 服務已重啟，無錯誤日誌
+
+#### 修改內容
+
+**1. 擴展 `getSystemContext` 函數**：
+```javascript
+async function getSystemContext(db) {
+  const users = await db.all('SELECT ...');
+  const departments = await db.all('SELECT ...');
+  const activeTasks = await db.all('SELECT ...');
+  const completedTasksCount = await db.get('SELECT COUNT(*) ...');
+  const recentAnnouncements = await db.all('SELECT ...');
+  const attendanceRecords = await db.all('SELECT ... WHERE date >= ?', [sevenDaysAgo]);
+  const recentMemos = await db.all('SELECT ...');
+  return { ... };
+}
+```
+
+**新增數據**：
+- ✅ 考勤記錄（最近 7 天）
+- ✅ 已完成任務數量
+- ✅ 備忘錄（最近 10 條）
+
+**2. 改進 `buildSystemPrompt` 函數**：
+- ✅ 詳細的考勤統計（每位員工的 online/offline 次數和工作天數）
+- ✅ 改進的系統提示結構
+- ✅ 清晰的能力說明和回應指南
+
+**3. 修正 `authenticateToken` 函數**：
+```javascript
+async function authenticateToken(req, res, next) {
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [token]);
+  // ...
+}
+```
+
+**4. 修正所有路由處理器**：
+- 所有 `db.prepare().get/all/run()` → `await db.get/all/run()`
+- 所有參數從 `.all(param)` → `, [param]`
+
+#### 部署步驟
+
+```powershell
+# 1. 創建修復前快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.169-before-complete-ai-fix"
+
+# 2. 上傳並執行修復腳本
+Get-Content "fix-ai-assistant-async-api.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-async-api.js"
+ssh root@165.227.147.40 "docker cp /tmp/fix-async-api.js taskflow-pro:/app/fix-async-api.js; docker exec -w /app taskflow-pro node fix-async-api.js"
+
+# 3. 重啟容器
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+
+# 4. Commit 新映像
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.170-ai-assistant-fixed"
+
+# 5. 創建最終快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.170-ai-assistant-fixed-complete"
+
+# 6. Git commit
+git add .
+git commit -m "fix: AI 助理完整修復 - 使用正確的異步資料庫 API (sqlcipher) v8.9.170"
+```
+
+#### 最終版本
+- **後端**: `taskflow-pro:v8.9.170-ai-assistant-fixed`
+- **前端**: `6974d4e0105d64546e84afc0`（修正 netlify.toml）
+- **快照**: 
+  - 修復前: `taskflow-snapshot-v8.9.169-before-complete-ai-fix-20260124_145815.tar.gz`
+  - 修復後: `taskflow-snapshot-v8.9.170-ai-assistant-fixed-complete-20260124_151701.tar.gz`
+- **Git Commit**: `943469a`
+- **狀態**: ⚠️ 待測試
+
+#### 待完成工作
+- [ ] 測試 AI 助理是否能正常載入對話歷史
+- [ ] 測試 AI 助理是否能回答考勤相關問題
+- [ ] 驗證考勤數據是否正確顯示
+
+#### 關鍵教訓
+1. **必須檢查系統實際使用的資料庫 API**：
+   - 不能假設使用 better-sqlite3
+   - 必須檢查其他路由文件確認 API 類型
+   
+2. **同步 vs 異步 API 的差異**：
+   - better-sqlite3: `db.prepare('SELECT ...').get(param)`（同步）
+   - sqlcipher: `await db.get('SELECT ...', [param])`（異步）
+   
+3. **從後端日誌診斷問題**：
+   - 不要猜測，檢查具體錯誤訊息
+   - 檢查錯誤發生的具體位置和行號
 
 ---
 
