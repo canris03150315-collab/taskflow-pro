@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Trash2, RefreshCw, Sparkles, MessageSquare } from 'lucide-react';
+import { Send, Trash2, RefreshCw, Sparkles, MessageSquare, Zap, Paperclip } from 'lucide-react';
 import { api } from '../services/api';
 
 interface Message {
@@ -47,7 +47,7 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
     try {
       setIsLoadingHistory(true);
       const response = await api.aiAssistant.getConversations();
-      setMessages(response.conversations.reverse());
+      setMessages(response.conversations);
     } catch (error) {
       console.error('載入對話歷史失敗:', error);
     } finally {
@@ -143,29 +143,32 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-blue-50 to-indigo-50">
-      {/* 標題列 */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="h-full flex flex-col bg-gray-50">
+      {/* 簡潔的頂部標題 */}
+      <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-gray-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-800">AI 智能助理</h1>
-            <p className="text-sm text-gray-500">您的專屬企業管理顧問</p>
+            <h1 className="text-lg font-bold text-gray-900">AI 智能助理</h1>
+            <div className="flex items-center gap-2 text-xs text-green-600">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="uppercase tracking-wide">Connected</span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={loadConversations}
-            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
             title="重新載入"
           >
             <RefreshCw className="w-5 h-5" />
           </button>
           <button
             onClick={handleClearAll}
-            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             title="清空所有對話"
           >
             <Trash2 className="w-5 h-5" />
@@ -176,111 +179,123 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
       {/* 對話區域 */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+        className="flex-1 overflow-y-auto px-4 py-6 space-y-4"
       >
         {isLoadingHistory ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+              <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-2" />
               <p className="text-gray-500">載入對話歷史...</p>
             </div>
           </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center max-w-md">
-              <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">開始對話</h3>
-              <p className="text-gray-500 mb-4">
-                您可以詢問我任何關於公司管理的問題，例如：
-              </p>
-              <div className="text-left space-y-2 text-sm text-gray-600">
-                <p>• 「本月的出勤狀況如何？」</p>
-                <p>• 「幫我創建一個任務給 Se7en」</p>
-                <p>• 「財務報表摘要」</p>
-                <p>• 「哪些任務逾期了？」</p>
-              </div>
-            </div>
-          </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                  msg.role === 'user'
-                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
-                    : 'bg-white border border-gray-200 text-gray-800'
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <div className="flex-1">
-                    <p className="whitespace-pre-wrap break-words">{msg.message}</p>
-                    {msg.intent && (
-                      <div className="mt-2 text-xs opacity-75">
-                        意圖: {msg.intent}
+          <>
+            {/* 歡迎卡片 */}
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 text-center mb-6">
+              <div className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full mb-4 uppercase tracking-wide">
+                Consultant V3.9.0
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                您好，{currentUser.name}
+              </h2>
+              <p className="text-gray-600 text-sm">
+                我是您的專屬企業管理顧問，隨時為您效勞。
+              </p>
+            </div>
+
+            {/* 對話訊息 */}
+            {messages.length === 0 ? (
+              <div className="text-center text-gray-400 text-sm py-8">
+                開始對話，詢問我任何關於公司管理的問題
+              </div>
+            ) : (
+              messages.map((msg, index) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {msg.role === 'assistant' ? (
+                    <div className="max-w-[85%]">
+                      {/* AI 標籤 */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <Zap className="w-4 h-4 text-indigo-600" />
+                        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          AI Assistant
+                        </span>
                       </div>
-                    )}
-                    {msg.action_taken && (
-                      <div className="mt-1 text-xs opacity-75">
-                        動作: {msg.action_taken}
+                      {/* AI 訊息氣泡 */}
+                      <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                        <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {msg.message}
+                        </p>
+                        {/* 快捷按鈕（如果有 action_taken） */}
+                        {msg.action_taken && (
+                          <div className="flex gap-2 mt-3">
+                            <button className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded-lg transition-colors">
+                              查看儀表板
+                            </button>
+                            <button className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded-lg transition-colors">
+                              任務列表
+                            </button>
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-400 mt-2">
+                          {new Date(msg.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                  {msg.role === 'user' && (
-                    <button
-                      onClick={() => handleDeleteMessage(msg.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded transition-all"
-                      title="刪除"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    </div>
+                  ) : (
+                    <div className="max-w-[85%]">
+                      {/* 用戶訊息氣泡 */}
+                      <div className="bg-gray-200 rounded-2xl rounded-tr-sm px-4 py-3">
+                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {msg.message}
+                        </p>
+                        <div className="text-xs text-gray-500 mt-2 text-right">
+                          {new Date(msg.created_at).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-400'}`}>
-                  {new Date(msg.created_at).toLocaleString('zh-TW')}
-                </div>
-              </div>
-            </div>
-          ))
+              ))
+            )}
+          </>
         )}
       </div>
 
       {/* 輸入區域 */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4">
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="輸入您的問題或指令... (Shift+Enter 換行)"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              rows={3}
-              disabled={isLoading}
-            />
-          </div>
+      <div className="bg-white border-t border-gray-100 px-4 py-4">
+        <div className="flex items-center gap-3">
+          <button
+            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            title="附件"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
+          <input
+            type="text"
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="輸入您的問題或指令..."
+            className="flex-1 px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            disabled={isLoading}
+          />
           <button
             onClick={handleSendMessage}
             disabled={!inputMessage.trim() || isLoading}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium"
+            className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-full hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center shadow-lg"
           >
             {isLoading ? (
-              <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
-                處理中...
-              </>
+              <RefreshCw className="w-5 h-5 animate-spin" />
             ) : (
-              <>
-                <Send className="w-5 h-5" />
-                發送
-              </>
+              <Send className="w-5 h-5" />
             )}
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          💡 提示：AI 助理會從對話歷史中學習，記住您的偏好和公司業務規則
+        <p className="text-xs text-gray-400 mt-2 text-center">
+          提示：AI 助理會從對話歷史中學習，記住您的偏好和公司業務規則
         </p>
       </div>
     </div>

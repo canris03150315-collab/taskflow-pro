@@ -15,13 +15,13 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "http://165.227.147.40:3001/api/:splat"
+  to = "https://northern-encounter-galleries-fairy.trycloudflare.com/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/ws"
-  to = "ws://165.227.147.40:3000/ws"
+  to = "wss://northern-encounter-galleries-fairy.trycloudflare.com/ws"
   status = 200
   force = true
 
