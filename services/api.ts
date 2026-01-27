@@ -377,7 +377,7 @@ const RealApi = {
                     ...getAuthHeaders(),
                     'x-session-id': sessionId
                 };
-                const response = await fetch(`${API_BASE_URL}/reports/approval/status`, {
+                const response = await fetch(`${API_BASE_URL}/reports/approval/check`, {
                     method: 'GET',
                     headers
                 });
