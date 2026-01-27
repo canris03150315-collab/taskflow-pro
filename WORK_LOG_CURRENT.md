@@ -1,39 +1,131 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-24 23:17  
-**版本**: v8.9.170-ai-assistant-fixed (後端) / 6974d4e0105d64546e84afc0 (前端)  
-**狀態**: ⚠️ AI 助理修復進行中（資料庫 API 已修正，待測試）
+**最後更新**: 2026-01-27 22:22  
+**版本**: v8.9.179-audit-log-table-fixed (後端) / 6978c07c15dfbc00bce2dabe (前端)  
+**狀態**: ✅ 審核歷史記錄修復完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6974d4e0105d64546e84afc0`
+- **生產環境 Deploy ID**: `6978c07c15dfbc00bce2dabe`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
 - **WebSocket URL**: `wss://northern-encounter-galleries-fairy.trycloudflare.com/ws`
 - **netlify.toml**: ✅ 已修正（指向 Cloudflare Tunnel）
-- **狀態**: ✅ 正常運行，WebSocket 連接正常
+- **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.170-ai-assistant-fixed`
-- **容器 ID**: `dcbf78e4c7e0`
+- **Docker 映像**: `taskflow-pro:v8.9.179-audit-log-table-fixed`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `northern-encounter-galleries-fairy.trycloudflare.com`
-- **Tunnel PID**: 1632505
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.170-ai-assistant-fixed-complete-20260124_151701` (213MB)
+- **快照**: `taskflow-snapshot-v8.9.179-audit-log-table-fixed-complete-20260127_141549.tar.gz` (1.5MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
-- **AI 助理**: ⚠️ 資料庫 API 已修正為異步 API，待測試
 - **狀態**: ✅ 服務運行中
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `943469a` (v8.9.170 AI 助理修復)
+- **Git Commit**: `793a707` (v8.9.179 審核歷史記錄修復)
 - **狀態**: ✅ 所有變更已提交
+
+---
+
+## 🎯 2026-01-27 更新記錄
+
+### 60. 報表審核歷史記錄修復 ⭐⭐⭐
+**完成時間**: 2026-01-27 22:15  
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反映審核歷史記錄頁面不顯示任何記錄，要求深度診斷後再修復，避免反覆錯誤修復。
+
+#### 診斷過程
+按照用戶要求，先確認問題數量再統一修復：
+
+**1. 資料庫檢查**
+```javascript
+// 使用 Pure ASCII 腳本診斷
+const count = db.prepare('SELECT COUNT(*) as count FROM approval_audit_log').get();
+// 結果: 20 筆記錄存在
+```
+
+**2. 後端路由檢查**
+```javascript
+// 發現問題：查詢錯誤的表
+const logs = await dbCall(db, 'all',
+  'SELECT * FROM report_authorizations ...',  // ❌ 空表
+  [parseInt(limit), parseInt(offset)]
+);
+// 應該查詢: approval_audit_log（有 20 筆記錄）
+```
+
+**3. 前端期望檢查**
+- 前端 `AuditLogView.tsx` 期望欄位：`id`, `action`, `user_name`, `target_user_name`, `created_at`
+- 資料庫提供欄位：✅ 完全匹配
+
+#### 根本原因
+後端 `/api/reports/approval/audit-log` 路由查詢了**錯誤的表**：
+- 當前查詢：`report_authorizations`（空表，0 筆記錄）
+- 應該查詢：`approval_audit_log`（有 20 筆審核記錄）
+
+#### 修復方案
+修改後端路由查詢正確的表：
+```javascript
+// 修復前
+const logs = await dbCall(db, 'all',
+  'SELECT * FROM report_authorizations ORDER BY created_at DESC LIMIT ? OFFSET ?',
+  [parseInt(limit), parseInt(offset)]
+);
+
+// 修復後
+const logs = await dbCall(db, 'all',
+  'SELECT * FROM approval_audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?',
+  [parseInt(limit), parseInt(offset)]
+);
+```
+
+#### 部署步驟
+```powershell
+# 1. 創建並執行修復腳本
+Get-Content "fix-audit-log-complete.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/fix-audit-complete.js"
+ssh root@165.227.147.40 "docker cp /tmp/fix-audit-complete.js taskflow-pro:/app/fix-audit-complete.js; docker exec -w /app taskflow-pro node fix-audit-complete.js"
+
+# 2. 重啟容器
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+
+# 3. Commit 新映像
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.179-audit-log-table-fixed"
+
+# 4. 創建最終快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.179-audit-log-table-fixed-complete"
+
+# 5. Git commit
+git add .
+git commit -m "fix: 修復審核歷史記錄查詢錯誤的表 v8.9.179"
+```
+
+#### 最終版本
+- **後端映像**: `taskflow-pro:v8.9.179-audit-log-table-fixed`
+- **前端**: 無需修改（Deploy ID `6978c07c15dfbc00bce2dabe`）
+- **快照**: `taskflow-snapshot-v8.9.179-audit-log-table-fixed-complete-20260127_141549.tar.gz` (1.5MB)
+- **Git Commit**: `793a707`
+- **狀態**: ✅ 已完成
+
+#### 修復效果
+- ✅ 審核歷史記錄現在顯示 20 筆記錄
+- ✅ 包含操作類型：📤 申請、✅ 批准、🔄 撤銷
+- ✅ 顯示操作者：Seven (BOSS)、Se7en (SUPERVISOR)
+- ✅ 時間記錄：2026-01-14 的審核操作
+
+#### 關鍵教訓
+1. **深度診斷先行**：先確認問題數量（資料庫有數據、後端查詢錯表、前端正常）
+2. **一次性修復**：確認問題後統一修復，避免反覆錯誤
+3. **使用 Pure ASCII 腳本**：避免中文編碼問題導致容器崩潰
+4. **完整部署流程**：診斷 → 修復 → 測試 → Commit 映像 → 快照 → Git
 
 ---
 
