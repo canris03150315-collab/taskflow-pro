@@ -1,26 +1,26 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-27 22:22  
-**版本**: v8.9.179-audit-log-table-fixed (後端) / 6978c07c15dfbc00bce2dabe (前端)  
-**狀態**: ✅ 審核歷史記錄修復完成
+**最後更新**: 2026-01-27 22:40  
+**版本**: v8.9.179-audit-log-table-fixed (後端) / 6978e44c82a3ea268a9b51e2 (前端)  
+**狀態**: ✅ WebSocket 連線修復完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6978c07c15dfbc00bce2dabe`
+- **生產環境 Deploy ID**: `6978e44c82a3ea268a9b51e2`
 - **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
-- **WebSocket URL**: `wss://northern-encounter-galleries-fairy.trycloudflare.com/ws`
+- **WebSocket URL**: `wss://gives-include-jumping-savings.trycloudflare.com/ws`
 - **netlify.toml**: ✅ 已修正（指向 Cloudflare Tunnel）
 - **狀態**: ✅ 正常運行
 
 ### 後端
 - **Docker 映像**: `taskflow-pro:v8.9.179-audit-log-table-fixed`
 - **容器狀態**: 運行中
-- **Cloudflare Tunnel**: `northern-encounter-galleries-fairy.trycloudflare.com`
+- **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
 - **快照**: `taskflow-snapshot-v8.9.179-audit-log-table-fixed-complete-20260127_141549.tar.gz` (1.5MB)
 - **快照位置**: `/root/taskflow-snapshots/`
@@ -35,6 +35,63 @@
 ---
 
 ## 🎯 2026-01-27 更新記錄
+
+### 61. WebSocket 連線修復 ⭐
+**完成時間**: 2026-01-27 22:40  
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反映 WebSocket 連線失敗，這是 Cloudflare Tunnel URL 自動更換的老問題。
+
+#### 診斷過程
+按照診斷流程執行：
+
+**1. 從後端日誌獲取當前有效 URL**
+```bash
+ssh root@165.227.147.40 "cat /root/cloudflared.log | grep 'https://.*trycloudflare.com' | tail -5"
+# 結果: gives-include-jumping-savings.trycloudflare.com
+```
+
+**2. 檢查前端代碼**
+- 發現 `App.tsx` 和 `ChatSystem.tsx` 使用舊 URL
+- 舊 URL: `northern-encounter-galleries-fairy.trycloudflare.com`（已失效）
+- 新 URL: `gives-include-jumping-savings.trycloudflare.com`（當前有效）
+
+#### 根本原因
+Cloudflare 的 `trycloudflare.com` 是測試服務，URL 會定期自動更換。前端硬編碼的 URL 已過期。
+
+#### 修復方案
+一次性更新兩個文件中的 WebSocket URL：
+1. `App.tsx` 第 209 行
+2. `components/ChatSystem.tsx` 第 82 行
+
+#### 部署步驟
+```powershell
+# 1. 更新前端代碼（已完成）
+# 2. 重新構建
+npm run build
+
+# 3. 部署到生產環境
+netlify deploy --prod --dir=dist --no-build
+
+# 4. Git commit
+git add .
+git commit -m "fix: 更新 WebSocket URL - Cloudflare Tunnel 已更換"
+```
+
+#### 最終版本
+- **前端 Deploy ID**: `6978e44c82a3ea268a9b51e2`
+- **後端**: 無需修改（v8.9.179）
+- **WebSocket URL**: `wss://gives-include-jumping-savings.trycloudflare.com/ws`
+- **狀態**: ✅ 已完成
+
+#### 關鍵教訓
+1. **定期檢查 Tunnel URL**：Cloudflare 測試服務會自動更換 URL
+2. **從日誌獲取最新 URL**：不要依賴記憶或文檔中的舊 URL
+3. **檢查命令**：`ssh root@165.227.147.40 "cat /root/cloudflared.log | grep 'https://.*trycloudflare.com' | tail -5"`
+4. **一次性修復**：同時更新所有使用 WebSocket URL 的文件
+
+---
 
 ### 60. 報表審核歷史記錄修復 ⭐⭐⭐
 **完成時間**: 2026-01-27 22:15  
