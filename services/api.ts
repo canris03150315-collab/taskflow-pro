@@ -1210,6 +1210,32 @@ const RealApi = {
 
         exportExcel: async (): Promise<{ profiles: any[] }> => {
             return request<{ profiles: any[] }>('GET', '/kol/export-excel');
+        },
+
+        getKolPayments: async (kolId: string, params?: { startDate?: string; endDate?: string }): Promise<{ payments: any[]; total: number }> => {
+            const queryParams = new URLSearchParams();
+            if (params?.startDate) queryParams.append('startDate', params.startDate);
+            if (params?.endDate) queryParams.append('endDate', params.endDate);
+            return request<{ payments: any[]; total: number }>('GET', `/kol/profiles/${kolId}/payments?${queryParams}`);
+        },
+
+        createKolPayment: async (data: { kolId: string; amount: number; paymentDate: string; notes?: string }): Promise<{ payment: any }> => {
+            return request<{ payment: any }>('POST', '/kol/payments', data);
+        },
+
+        updateKolPayment: async (id: string, data: { amount: number; paymentDate: string; notes?: string }): Promise<{ payment: any }> => {
+            return request<{ payment: any }>('PUT', `/kol/payments/${id}`, data);
+        },
+
+        deleteKolPayment: async (id: string): Promise<{ success: boolean }> => {
+            return request<{ success: boolean }>('DELETE', `/kol/payments/${id}`);
+        },
+
+        getPaymentStats: async (params?: { startDate?: string; endDate?: string }): Promise<{ total: number }> => {
+            const queryParams = new URLSearchParams();
+            if (params?.startDate) queryParams.append('startDate', params.startDate);
+            if (params?.endDate) queryParams.append('endDate', params.endDate);
+            return request<{ total: number }>('GET', `/kol/payment-stats?${queryParams}`);
         }
     },
 

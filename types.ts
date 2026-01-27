@@ -568,13 +568,27 @@ export interface KOLPayment {
   platformAccount?: string;
 }
 
+export interface KOLWeeklyPayment {
+  id: string;
+  kolId: string;
+  amount: number;
+  paymentDate: string;
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export interface KOLStats {
   totalKOLs: number;
   activeKOLs: number;
-  activeContracts: number;
-  totalUnpaid: number;
-  monthlyPayments: number;
-  monthlyContracts: number;
+  pausedKOLs?: number;
+  stoppedKOLs?: number;
+  activeContracts?: number;
+  totalUnpaid?: number;
+  monthlyPayments?: number;
+  monthlyContracts?: number;
 }
 
 export interface KOLOperationLog {

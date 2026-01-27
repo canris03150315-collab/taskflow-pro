@@ -12,7 +12,6 @@ export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, on
   // Report Date - default to today
   const getTodayDate = () => {
     const now = new Date();
-    now.setHours(now.getHours() + 8);
     return now.toISOString().split('T')[0];
   };
   const [reportDate, setReportDate] = useState<string>(getTodayDate());
@@ -21,7 +20,6 @@ export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, on
   const getMinDate = () => {
     const date = new Date();
     date.setDate(date.getDate() - 7);
-    date.setHours(date.getHours() + 8);
     return date.toISOString().split('T')[0];
   };
   
