@@ -1,16 +1,16 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-27 22:40  
-**版本**: v8.9.179-audit-log-table-fixed (後端) / 6978e44c82a3ea268a9b51e2 (前端)  
-**狀態**: ✅ WebSocket 連線修復完成
+**最後更新**: 2026-01-28 01:40  
+**版本**: v8.9.180-kol-payment-stats-enhanced (後端) / 6978f8730087ae28c5b52abf (前端)  
+**狀態**: ✅ KOL 支付統計功能完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `6978e44c82a3ea268a9b51e2`
-- **測試環境 Deploy ID**: `69672b2fbb8596d47cbd4af3`
+- **生產環境 Deploy ID**: `6978f8730087ae28c5b52abf`
+- **測試環境 Deploy ID**: `6978f7fc15130b2e167d7e28`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
 - **WebSocket URL**: `wss://gives-include-jumping-savings.trycloudflare.com/ws`
@@ -18,19 +18,142 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.179-audit-log-table-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.180-kol-payment-stats-enhanced`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.179-audit-log-table-fixed-complete-20260127_141549.tar.gz` (1.5MB)
+- **快照**: `taskflow-snapshot-v8.9.180-kol-payment-stats-complete-20260127_174033.tar.gz` (222MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `793a707` (v8.9.179 審核歷史記錄修復)
+- **Git Commit**: `5636751` (v8.9.180 KOL 支付統計功能)
 - **狀態**: ✅ 所有變更已提交
+
+---
+
+## 🎯 2026-01-28 更新記錄
+
+### 62. KOL 支付統計功能 ⭐⭐⭐
+**完成時間**: 2026-01-28 01:40  
+**狀態**: ✅ 已完成
+
+#### 需求描述
+用戶要求新增可以查找和計算所有已支付金額的功能，方便統計和管理 KOL 支付情況。
+
+#### 實施方案
+採用方案 A（簡化版），包含以下功能：
+1. 統計卡片增強 - 新增「總支付金額」卡片
+2. 全局支付查詢 - 支付統計彈窗
+3. 日期範圍篩選 - 支持按日期查詢
+4. 部門篩選 - BOSS/MANAGER 可按部門統計
+
+#### 後端修改
+**文件**: `/app/dist/routes/kol.js`
+
+**增強 payment-stats API**：
+```javascript
+// 原本只返回總金額
+{ total: number }
+
+// 增強後返回詳細統計
+{
+  total: number,        // 總支付金額
+  count: number,        // 支付次數
+  average: number,      // 平均金額
+  byKol: [              // 按 KOL 統計（前 10 名）
+    { kolId, platformId, total }
+  ]
+}
+```
+
+**支持參數**：
+- `startDate` - 開始日期
+- `endDate` - 結束日期
+- `departmentId` - 部門 ID（可選）
+
+#### 前端修改
+**文件**: `components/KOLManagementView.tsx`
+
+**1. 新增狀態變數**：
+- `showPaymentStatsModal` - 控制統計彈窗顯示
+- `paymentStats` - 儲存統計數據
+- `statsDateRange` - 日期範圍
+
+**2. 新增函數**：
+- `loadPaymentStats()` - 載入支付統計
+
+**3. UI 修改**：
+- 統計卡片從 4 個增加到 5 個（新增「總支付金額」）
+- 新增「📊 支付統計」按鈕
+- 新增支付統計彈窗，包含：
+  - 日期範圍選擇器
+  - 三個統計卡片（總金額、次數、平均值）
+  - 支付排行榜（前 10 名，顯示🥇🥈🥉）
+
+#### 部署步驟
+```powershell
+# 1. 創建快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.179-before-kol-payment-stats"
+
+# 2. 後端修改
+Get-Content "enhance-kol-payment-stats-v2.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/enhance-kol-payment-stats-v2.js"
+ssh root@165.227.147.40 "docker cp /tmp/enhance-kol-payment-stats-v2.js taskflow-pro:/app/enhance-kol-payment-stats-v2.js"
+ssh root@165.227.147.40 "docker exec -w /app taskflow-pro node enhance-kol-payment-stats-v2.js"
+
+# 3. 重啟並 commit 映像
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.180-kol-payment-stats-enhanced"
+
+# 4. 前端部署
+Remove-Item -Recurse -Force dist
+npm run build
+$env:NETLIFY_SITE_ID = "480c7dd5-1159-4f1d-867a-0144272d1e0b"
+netlify deploy --prod --dir=dist --no-build  # 測試環境
+
+# 5. 測試通過後部署生產
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+
+# 6. 創建最終快照
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.180-kol-payment-stats-complete"
+
+# 7. Git commit
+git add .
+git commit -m "feat: 新增 KOL 支付統計功能 v8.9.180"
+```
+
+#### 最終版本
+- **後端映像**: `taskflow-pro:v8.9.180-kol-payment-stats-enhanced`
+- **前端生產 Deploy ID**: `6978f8730087ae28c5b52abf`
+- **前端測試 Deploy ID**: `6978f7fc15130b2e167d7e28`
+- **快照**: `taskflow-snapshot-v8.9.180-kol-payment-stats-complete-20260127_174033.tar.gz` (222MB)
+- **Git Commit**: `5636751`
+- **狀態**: ✅ 已完成並部署
+
+#### 功能特點
+1. **統計卡片**：
+   - 點擊「總支付金額」卡片可開啟詳細統計
+   - 即時顯示所有 KOL 的累計支付金額
+
+2. **支付統計彈窗**：
+   - 總支付金額、支付次數、平均金額三個指標
+   - 日期範圍篩選功能
+   - 支付排行榜（前 10 名）
+   - 金牌🥇、銀牌🥈、銅牌🥉視覺化顯示
+
+3. **部門篩選**：
+   - BOSS/MANAGER 可按部門查看統計
+   - 自動根據當前選擇的部門篩選
+
+#### 關鍵教訓
+1. **遵循工作流程**：嚴格按照工作日誌、全域規則執行
+2. **先測試後生產**：測試環境驗證通過後才部署生產
+3. **完整備份**：修改前後都創建快照
+4. **Pure ASCII 規則**：後端修改使用 Pure ASCII 腳本
+5. **使用 Get-Content 管道**：上傳文件使用 `Get-Content | ssh` 方式
 
 ---
 
