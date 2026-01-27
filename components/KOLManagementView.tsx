@@ -23,6 +23,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const [payments, setPayments] = useState<KOLWeeklyPayment[]>([]);
   const [paymentTotal, setPaymentTotal] = useState(0);
   const [profilePayments, setProfilePayments] = useState<Record<string, number>>({});
+  const [showPaymentStatsModal, setShowPaymentStatsModal] = useState(false);
+  const [paymentStats, setPaymentStats] = useState<{ total: number; count: number; average: number; byKol: any[] } | null>(null);
+  const [statsDateRange, setStatsDateRange] = useState({ startDate: '', endDate: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isBoss = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
@@ -78,6 +81,21 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       setProfilePayments(paymentMap);
     } catch (error) {
       console.error('Load payments error:', error);
+    }
+  };
+
+  const loadPaymentStats = async (startDate?: string, endDate?: string) => {
+    try {
+      const params: any = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      if (isBoss) params.departmentId = selectedDept;
+      
+      const result = await api.kol.getPaymentStats(params);
+      setPaymentStats(result);
+    } catch (error) {
+      console.error('Load payment stats error:', error);
+      alert('載入支付統計失敗');
     }
   };
 
@@ -287,7 +305,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   return (
     <div className="space-y-6">
       {/* 統計卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
           <div className="text-sm opacity-90">總 KOL 數</div>
           <div className="text-3xl font-bold mt-2">{stats?.totalKOLs || 0}</div>
@@ -303,6 +321,19 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
           <div className="text-sm opacity-90">不再合作</div>
           <div className="text-3xl font-bold mt-2">{stats?.stoppedKOLs || 0}</div>
+        </div>
+        <div 
+          className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
+          onClick={() => {
+            loadPaymentStats();
+            setShowPaymentStatsModal(true);
+          }}
+          title="點擊查看詳細統計"
+        >
+          <div className="text-sm opacity-90">總支付金額</div>
+          <div className="text-3xl font-bold mt-2">
+            ${Object.values(profilePayments).reduce((sum: number, val: number) => sum + val, 0).toLocaleString()}
+          </div>
         </div>
       </div>
 
@@ -367,6 +398,16 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 shadow-md whitespace-nowrap"
           >
             📤 匯出 Excel
+          </button>
+
+          <button
+            onClick={() => {
+              loadPaymentStats();
+              setShowPaymentStatsModal(true);
+            }}
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md whitespace-nowrap"
+          >
+            📊 支付統計
           </button>
         </div>
       </div>
@@ -523,6 +564,123 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           onDelete={handleDeletePayment}
           onRefresh={(startDate, endDate) => loadPaymentHistory(selectedProfile.id, startDate, endDate)}
         />
+      )}
+
+      {/* 支付統計 Modal */}
+      {showPaymentStatsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">💰 支付統計</h2>
+              <button
+                onClick={() => setShowPaymentStatsModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 日期範圍選擇 */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm font-medium mb-1">開始日期</label>
+                  <input
+                    type="date"
+                    value={statsDateRange.startDate}
+                    onChange={(e) => setStatsDateRange({ ...statsDateRange, startDate: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm font-medium mb-1">結束日期</label>
+                  <input
+                    type="date"
+                    value={statsDateRange.endDate}
+                    onChange={(e) => setStatsDateRange({ ...statsDateRange, endDate: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <button
+                  onClick={() => loadPaymentStats(statsDateRange.startDate, statsDateRange.endDate)}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  查詢
+                </button>
+                <button
+                  onClick={() => {
+                    setStatsDateRange({ startDate: '', endDate: '' });
+                    loadPaymentStats();
+                  }}
+                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                >
+                  清除
+                </button>
+              </div>
+            </div>
+
+            {/* 統計數據 */}
+            {paymentStats && (
+              <div className="space-y-6">
+                {/* 總覽卡片 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-6 text-white">
+                    <div className="text-sm opacity-90">總支付金額</div>
+                    <div className="text-3xl font-bold mt-2">${paymentStats.total.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 text-white">
+                    <div className="text-sm opacity-90">支付次數</div>
+                    <div className="text-3xl font-bold mt-2">{paymentStats.count}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-6 text-white">
+                    <div className="text-sm opacity-90">平均金額</div>
+                    <div className="text-3xl font-bold mt-2">${paymentStats.average.toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {/* 按 KOL 統計 */}
+                {paymentStats.byKol && paymentStats.byKol.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-bold mb-4">📊 支付排行榜（前 10 名）</h3>
+                    <div className="bg-white border rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">排名</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">KOL ID</th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">累計支付</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {paymentStats.byKol.map((item, index) => (
+                            <tr key={item.kolId} className="hover:bg-gray-50">
+                              <td className="px-4 py-3">
+                                <span className={`font-bold ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-gray-400' : index === 2 ? 'text-orange-400' : 'text-gray-600'}`}>
+                                  {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-medium">{item.platformId || item.kolId}</td>
+                              <td className="px-4 py-3 text-right font-bold text-green-600">
+                                ${item.total.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!paymentStats && (
+              <div className="text-center py-12 text-gray-500">
+                <div className="text-4xl mb-4">📊</div>
+                <p>請選擇日期範圍後點擊查詢</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
