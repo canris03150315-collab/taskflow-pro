@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 15:17  
-**版本**: v8.9.182-remove-employee-delete (後端) / 697b0a2f266765469f0ac338 (前端)  
-**狀態**: ✅ 移除員工自主刪除權限完成
+**最後更新**: 2026-01-29 19:25  
+**版本**: v8.9.184-users-get-refactored (後端) / 697b0a2f266765469f0ac338 (前端)  
+**狀態**: ✅ 用戶管理 API 重構（第一階段）完成
 
 ---
 
@@ -18,11 +18,11 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.182-remove-employee-delete`
+- **Docker 映像**: `taskflow-pro:v8.9.184-users-get-refactored`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.180-kol-payment-stats-complete-20260127_174033.tar.gz` (222MB)
+- **快照**: `taskflow-snapshot-v8.9.184-users-get-refactored-20260129_112453.tar.gz` (238MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
@@ -35,6 +35,86 @@
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 66. 用戶管理 API 重構（第一階段）⭐⭐⭐
+**完成時間**: 2026-01-29 19:25  
+**狀態**: ✅ 已完成
+
+#### 需求描述
+將用戶管理 API 從直接操作資料庫改為使用服務層，降低代碼耦合度，提高可維護性。
+
+#### 實施內容
+
+**1. 服務層架構建立**
+- 創建 `/app/services/` 目錄
+- 實現 `UserService` 類（靜態方法模式）
+- 支持完整的 CRUD 操作
+
+**2. UserService 方法**
+```javascript
+class UserService {
+  static async getAllUsers(db, currentUser)      // 獲取所有用戶（支持權限過濾）
+  static async getUserById(db, id)               // 根據 ID 獲取用戶
+  static async getUsersByDepartment(db, deptId)  // 根據部門獲取用戶
+  static async createUser(db, userData)          // 創建新用戶
+  static async updateUser(db, id, userData)      // 更新用戶
+  static async deleteUser(db, id)                // 刪除用戶（含級聯刪除）
+}
+```
+
+**3. GET / 路由重構**
+- **文件**: `/app/dist/routes/users.js`
+- **修改前**: 直接使用 `db.all()` 查詢
+- **修改後**: 調用 `UserService.getAllUsers(db, currentUser)`
+- **路徑**: `require('../../services/userService')`
+
+#### 技術挑戰與解決
+
+**問題 1：模組路徑錯誤**
+- 初始使用 `../services/userService`（錯誤）
+- 正確路徑：`../../services/userService`（從 `/app/dist/routes/` 到 `/app/services/`）
+
+**問題 2：服務層不存在**
+- v8.9.182 映像沒有服務層目錄
+- 解決：切換到 v8.9.183-service-layer 映像
+
+**問題 3：多次重構失敗**
+- 採用漸進式重構策略
+- 一次只重構一個路由並測試
+- 每步成功後立即 commit
+
+#### 測試驗證
+```bash
+# 測試結果
+=== Testing GET /api/users ===
++ Login successful, got token
+Status Code: 200
++ GET /api/users successful
++ Returned 13 users
++ First user: Seven
+SUCCESS: GET / route is working with UserService
+```
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.184-users-get-refactored`
+- **快照**: `taskflow-snapshot-v8.9.184-users-get-refactored-20260129_112453.tar.gz` (238MB)
+- **前端**: 無需修改
+- **狀態**: ✅ 已部署並測試通過
+
+#### 下一步計劃
+- [ ] 重構 GET /:id 路由
+- [ ] 重構 POST / 路由（創建用戶）
+- [ ] 重構 PUT /:id 路由（更新用戶）
+- [ ] 重構 DELETE /:id 路由
+- [ ] 重構其他輔助路由
+
+#### 關鍵經驗
+1. **路徑問題很關鍵**：必須正確計算相對路徑
+2. **漸進式重構**：一次一個路由，測試通過再繼續
+3. **快照保護**：每次修改前創建快照
+4. **立即提交**：測試成功立即 commit 新映像
+
+---
 
 ### 65. 移除員工自主刪除排班權限 ⭐⭐
 **完成時間**: 2026-01-29 15:17  
