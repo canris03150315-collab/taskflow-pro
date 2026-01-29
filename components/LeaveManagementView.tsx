@@ -94,11 +94,15 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
   });
   
   // Schedule form state
-  const [scheduleForm, setScheduleForm] = useState({
-    month: new Date().getMonth() + 1, // 下個月
-    year: new Date().getFullYear(),
-    selectedDays: [] as number[],
-    maxDays: 8 // 預設每月8天
+  const [scheduleForm, setScheduleForm] = useState(() => {
+    const today = new Date();
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return {
+      month: nextMonth.getMonth() + 1,
+      year: nextMonth.getFullYear(),
+      selectedDays: [] as number[],
+      maxDays: 8 // 預設每月8天
+    };
   });
 
   // Permission checks
@@ -231,6 +235,38 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
       : [...scheduleForm.selectedDays, day];
     
     setScheduleForm({ ...scheduleForm, selectedDays: newSelectedDays });
+  };
+
+  // Change schedule month
+  const changeScheduleMonth = (direction: 'prev' | 'next') => {
+    const today = new Date();
+    const currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const selectedMonth = new Date(scheduleForm.year, scheduleForm.month - 1, 1);
+    
+    let newMonth: Date;
+    if (direction === 'prev') {
+      newMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1);
+      // 不能選擇當月之前的月份
+      if (newMonth < currentMonth) {
+        toast.error('不能選擇當月之前的月份');
+        return;
+      }
+    } else {
+      newMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1);
+      // 最多只能選擇未來 3 個月
+      const maxMonth = new Date(today.getFullYear(), today.getMonth() + 3, 1);
+      if (newMonth > maxMonth) {
+        toast.error('最多只能選擇未來 3 個月');
+        return;
+      }
+    }
+    
+    setScheduleForm({
+      ...scheduleForm,
+      year: newMonth.getFullYear(),
+      month: newMonth.getMonth() + 1,
+      selectedDays: [] // 切換月份時清空已選日期
+    });
   };
 
   // Handle submit schedule
@@ -1516,6 +1552,30 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                 <span className="font-bold">📅 說明：</span>
                 請選擇 {scheduleForm.year} 年 {scheduleForm.month} 月要休息的日期。已選擇 {scheduleForm.selectedDays.length} 天，最多可選 {scheduleForm.maxDays} 天。
               </p>
+            </div>
+
+            {/* Month Selector */}
+            <div className="flex items-center justify-between mb-4 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <button
+                onClick={() => changeScheduleMonth('prev')}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition text-sm font-bold text-slate-700"
+              >
+                ← 上個月
+              </button>
+              <div className="text-center">
+                <p className="text-lg font-bold text-slate-800">
+                  {scheduleForm.year} 年 {scheduleForm.month} 月
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  可選擇：當月至未來 3 個月
+                </p>
+              </div>
+              <button
+                onClick={() => changeScheduleMonth('next')}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition text-sm font-bold text-slate-700"
+              >
+                下個月 →
+              </button>
             </div>
 
             {/* Calendar */}
