@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 22:22  
-**版本**: v8.9.190-backup-monitor-added (後端) / 697b6e791c8e56b5e225c16d (測試環境)  
-**狀態**: ✅ 備份監控系統已上線（測試環境）
+**最後更新**: 2026-01-29 23:07  
+**版本**: v8.9.191-backup-api-path-fixed (後端) / 697b74085f4ef0c995ed0169 (測試環境)  
+**狀態**: ✅ 備份監控系統完整修復並正常運行
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 前端
 - **生產環境 Deploy ID**: `697b600f1c8e567bd225c11d`
-- **測試環境 Deploy ID**: `697b6e791c8e56b5e225c16d` (備份監控頁面)
+- **測試環境 Deploy ID**: `697b74085f4ef0c995ed0169` (備份監控頁面)
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app (備份監控)
 - **WebSocket URL**: `wss://gives-include-jumping-savings.trycloudflare.com/ws`
@@ -18,23 +18,191 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.190-backup-monitor-added`
+- **Docker 映像**: `taskflow-pro:v8.9.191-backup-api-path-fixed`
+- **容器 ID**: `689732b10678`
 - **容器狀態**: 運行中
+- **掛載配置**:
+  - `/root/taskflow-data:/app/data` (讀寫)
+  - `/root/taskflow-backups:/app/data/backups:ro` (只讀)
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.189-finance-delete-route-fixed-20260129_133714.tar.gz` (238MB)
+- **快照**: `taskflow-snapshot-v8.9.191-before-remount-20260129_150113.tar.gz` (238MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `dc504bf` (移除員工自主刪除權限)
+- **Git Commit**: `e7f3c69` (修復備份監控 API 並重新創建容器掛載宿主機備份目錄)
 - **狀態**: ✅ 所有變更已提交
 
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 73. 備份監控系統深度排查與完整修復 ⭐⭐⭐⭐
+**完成時間**: 2026-01-29 23:07  
+**狀態**: ✅ 已完成
+
+#### 問題發現
+用戶反映備份監控頁面返回 404 錯誤，無法正常顯示備份列表。
+
+#### 深度診斷過程
+
+**診斷步驟 1：檢查前端 API 路徑**
+- 問題：API 路徑重複 `/api/api/backup/status`
+- 原因：`VITE_API_URL=/api` 與代碼中的 `/api/` 重複
+- 修復：修改為 `/backup/status`
+- 結果：路徑正確但仍返回 404
+
+**診斷步驟 2：檢查後端 API 路由**
+```bash
+docker exec taskflow-pro grep 'router\.' /app/dist/routes/backup.js
+```
+- 結果：✅ `router.get('/status'...)` 路由存在
+
+**診斷步驟 3：測試後端 API**
+使用容器內 Node.js 腳本測試：
+```javascript
+// 1. 登入獲取 token
+// 2. 使用 token 訪問 /api/backup/status
+```
+- 結果：❌ 返回 404，但錯誤訊息是 `{"error":"Backup directory not found"}`
+
+**診斷步驟 4：檢查備份目錄**
+```bash
+# 容器內
+docker exec taskflow-pro ls /root/taskflow-backups/
+# 結果：No such file or directory
+
+# 宿主機
+ls /root/taskflow-backups/
+# 結果：39 個備份文件
+```
+
+**根本原因**：
+- 後端代碼中備份目錄路徑：`/root/taskflow-backups/`（宿主機路徑）
+- 容器內無法訪問宿主機的 `/root/` 目錄
+- 需要掛載宿主機目錄到容器內
+
+#### 修復方案
+
+**方案 A：重新創建容器並掛載備份目錄**（已實施）
+
+**步驟 1：修復後端 API 路徑**
+```javascript
+// 修改前
+const backupDir = '/root/taskflow-backups';
+
+// 修改後
+const backupDir = '/app/data/backups';
+```
+
+**步驟 2：創建快照**
+```bash
+docker commit taskflow-pro taskflow-pro:v8.9.191-backup-api-path-fixed
+docker save ... | gzip > taskflow-snapshot-v8.9.191-before-remount-20260129_150113.tar.gz
+```
+
+**步驟 3：重新創建容器**
+```bash
+# 停止並刪除舊容器
+docker stop taskflow-pro
+docker rm taskflow-pro
+
+# 創建新容器，添加備份目錄掛載
+docker run -d \
+  --name taskflow-pro \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -e PORT=3000 \
+  -e GEMINI_API_KEY=*** \
+  -v /root/taskflow-data:/app/data \
+  -v /root/taskflow-backups:/app/data/backups:ro \
+  --restart unless-stopped \
+  taskflow-pro:v8.9.191-backup-api-path-fixed
+```
+
+**關鍵配置**：
+- 新增掛載：`/root/taskflow-backups:/app/data/backups:ro`
+- 只讀模式（`:ro`）：防止容器修改宿主機備份
+- 保留原有掛載：`/root/taskflow-data:/app/data`
+
+#### 測試驗證
+
+**後端 API 測試**：
+```bash
+docker exec -w /app taskflow-pro node test-backup-api.js
+```
+結果：
+```json
+{
+  "status": "healthy",
+  "totalBackups": 39,
+  "latestBackup": {
+    "filename": "taskflow_backup_20260129_150001.db",
+    "size": 3350528,
+    "created": "2026-01-29T15:00:01.536Z"
+  },
+  "hoursSinceLastBackup": "0.05"
+}
+```
+
+**前端測試**：
+- ✅ 備份監控頁面正常顯示
+- ✅ 顯示 39 個備份文件
+- ✅ 狀態顯示為「正常運行」（綠色）
+- ✅ 最新備份時間正確
+- ✅ 自動刷新功能正常
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.191-backup-api-path-fixed`
+- **容器 ID**: `689732b10678`
+- **前端 Deploy ID**: `697b74085f4ef0c995ed0169`
+- **快照**: `taskflow-snapshot-v8.9.191-before-remount-20260129_150113.tar.gz`
+- **Git Commit**: `e7f3c69`
+- **狀態**: ✅ 完全修復並正常運行
+
+#### 關鍵經驗
+
+1. **深度排查流程**：
+   - 前端路徑 → 後端路由 → API 測試 → 目錄檢查
+   - 使用容器內 Node.js 腳本進行精確診斷
+   - 不依賴猜測，逐步驗證每個環節
+
+2. **Docker 容器與宿主機隔離**：
+   - 容器內無法直接訪問宿主機路徑
+   - 需要使用 `-v` 參數掛載目錄
+   - 使用只讀模式（`:ro`）保護重要數據
+
+3. **容器重新創建流程**：
+   - 必須先創建快照備份
+   - 記錄所有原有配置（環境變數、端口、掛載）
+   - 使用 `--restart unless-stopped` 確保自動重啟
+
+4. **Pure ASCII 診斷腳本**：
+   - 所有診斷腳本必須使用純 ASCII 字符
+   - 避免 PowerShell 引號和編碼問題
+   - 使用 `Get-Content | ssh` 管道上傳文件
+
+5. **完整測試驗證**：
+   - 後端 API 測試（容器內）
+   - 前端功能測試（瀏覽器）
+   - 權限測試（BOSS 角色）
+   - 自動刷新測試
+
+#### 系統改善
+
+**修復前**：
+- 備份目錄：容器內 `/app/data/backups/`（舊備份，最新 1/26）
+- 顯示：0 個備份，狀態 error
+
+**修復後**：
+- 備份目錄：宿主機 `/root/taskflow-backups/` 掛載到容器
+- 顯示：39 個備份，狀態 healthy
+- 最新備份：2026-01-29 15:00（每小時自動備份）
+
+---
 
 ### 72. 備份監控系統上線（測試環境）⭐⭐⭐
 **完成時間**: 2026-01-29 22:22  
