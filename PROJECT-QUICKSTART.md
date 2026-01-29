@@ -1,8 +1,19 @@
 # TaskFlow Pro - AI 快速啟動指南
 
-**最後更新**: 2026-01-09  
-**版本**: 1.0  
+**最後更新**: 2026-01-29  
+**版本**: 2.0  
 **目的**: 讓 AI 快速了解專案當前狀態
+
+---
+
+## 📖 重要文檔
+
+**必讀文檔**（按優先級）：
+1. ⭐⭐⭐ `AI-MANDATORY-CHECKLIST.md` - 強制檢查清單
+2. ⭐⭐⭐ `AI-PROMPTS-GUIDE.md` - AI 提示詞指南
+3. ⭐⭐⭐ `WORK_LOG_CURRENT.md` - 當前工作日誌
+4. ⭐⭐ `PROJECT-COMPREHENSIVE-SUMMARY.md` - 專案深度總結
+5. ⭐⭐ 本文件 - 快速啟動指南
 
 ---
 
@@ -11,56 +22,68 @@
 **⚠️ 重要：每次開始新對話時，AI 必須先完成以下步驟！**
 
 ### 第零步：閱讀強制性檢查清單
-1. **先讀** `AI-MUST-READ-FIRST.md` - ⚠️ 這是最重要的文件
+1. **先讀** `AI-MANDATORY-CHECKLIST.md` - ⚠️ 這是最重要的文件
    - 包含絕對禁止的操作
    - 包含必須遵守的工作流程
    - 包含 AI 自我檢查問題
    - 包含違規後果
 
+2. **再讀** `AI-PROMPTS-GUIDE.md` - 標準化提示詞
+   - 開始專案時的提示詞
+   - 修改代碼時的提示詞
+   - 結束工作時的提示詞
+   - 緊急情況提示詞
+
 ### 第一步：讀取核心文件（按順序）
 1. **本文件** (`PROJECT-QUICKSTART.md`) - 快速了解專案狀態
-2. `WORK_LOG_CURRENT.md` - 當前工作日誌和最新狀態
-3. `PROJECT-KNOWLEDGE-BASE.md` - 項目知識庫
-4. `BACKUP-GUIDE.md` - 備份系統指南
-5. **全域規則** (`c:\Users\USER\.codeium\windsurf\memories\global_rules.md`) - 必須遵守的規則
+2. `WORK_LOG_CURRENT.md` - 當前工作日誌和最新狀態（前 50 行）
+3. `PROJECT-COMPREHENSIVE-SUMMARY.md` - 專案深度總結報告
+4. `PROJECT-KNOWLEDGE-BASE.md` - 項目知識庫（需要時參考）
 
-### 第二步：檢查系統狀態
-```powershell
-# 執行系統狀態檢查
-.\check-system-status.ps1
-```
+### 第二步：確認理解
+在開始工作前，AI 必須能回答以下問題：
+1. 當前前端生產環境 Deploy ID 是什麼？
+2. 當前後端 Docker 映像版本是什麼？
+3. 當前容器 ID 是什麼？
+4. 5 個絕對禁止的操作是什麼？
+5. 修改代碼前必須做什麼？
 
-### 第三步：確認理解
-在開始工作前，AI 必須能回答 `AI-MUST-READ-FIRST.md` 中的 10 個自我檢查問題。
+### 第三步：使用標準提示詞
+根據任務類型，使用 `AI-PROMPTS-GUIDE.md` 中的相應提示詞。
 
 ---
 
-## 📊 當前系統狀態（2026-01-09）
+## 📊 當前系統狀態（2026-01-29）
 
 ### 前端
 - **生產環境**: https://transcendent-basbousa-6df2d2.netlify.app
-  - Deploy ID: `696084895a9a07801e57fc81`
+  - Deploy ID: `697b600f1c8e567bd225c11d`
   - Site ID: `5bb6a0c9-3186-4d11-b9be-07bdce7bf186`
-- **測試環境**: https://bejewelled-shortbread-a1aa30.netlify.app
-  - Deploy ID: `6960843ec9bc3c7b0f2eb32d`
+- **測試環境**: https://bejewelled-shortbread-a1aa30.netlify.app（備份監控頁面）
+  - Deploy ID: `697b74085f4ef0c995ed0169`
   - Site ID: `480c7dd5-1159-4f1d-867a-0144272d1e0b`
-- **WebSocket URL**: `wss://robust-managing-stay-largely.trycloudflare.com/ws`
+- **WebSocket URL**: `wss://gives-include-jumping-savings.trycloudflare.com/ws`
 - **狀態**: ✅ 正常運行
 
 ### 後端
 - **伺服器**: 165.227.147.40
 - **SSH 密碼**: j7WW03n4emoh
-- **Docker 映像**: `taskflow-pro:v8.9.86-manual-edit-status-fix-clean`
+- **Docker 映像**: `taskflow-pro:v8.9.191-backup-api-path-fixed`
+- **容器 ID**: `689732b10678`
 - **容器名稱**: `taskflow-pro`
 - **端口**: 3000 (HTTPS), 3001 (HTTP)
-- **資料庫**: 12 個用戶，假表資料已清空
+- **掛載配置**:
+  - `/root/taskflow-data:/app/data` (讀寫)
+  - `/root/taskflow-backups:/app/data/backups:ro` (只讀)
+- **資料庫**: 所有記錄完整
+- **備份**: 39 個自動備份，狀態 healthy
+- **快照**: `taskflow-snapshot-v8.9.191-before-remount-20260129_150113.tar.gz` (238MB)
 - **狀態**: ✅ 正常運行
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **來源**: 從 Netlify source map 恢復（2026-01-09）
-- **最新 Commit**: 大規模清理專案文件
-- **狀態**: ✅ 與生產環境同步
+- **最新 Commit**: `c93358a` (創建專案深度總結報告)
+- **狀態**: ✅ 所有變更已提交
 
 ---
 
@@ -86,15 +109,14 @@
 ├── package.json             # 依賴管理
 ├── vite.config.ts           # Vite 配置
 ├── netlify.toml             # Netlify 配置
-├── complete-backup.ps1      # 完整備份腳本
-├── backup-database.ps1      # 資料庫備份腳本
 ├── deploy-test.ps1          # 測試環境部署
 ├── deploy-prod.ps1          # 生產環境部署
-├── improved-snapshot.sh     # 後端快照腳本（伺服器端）
+├── AI-MANDATORY-CHECKLIST.md # 強制檢查清單
+├── AI-PROMPTS-GUIDE.md      # AI 提示詞指南
 ├── WORK_LOG_CURRENT.md      # 當前工作日誌
+├── PROJECT-COMPREHENSIVE-SUMMARY.md # 專案深度總結
 ├── PROJECT-KNOWLEDGE-BASE.md # 項目知識庫
-├── BACKUP-GUIDE.md          # 備份指南
-└── archive-*/               # 歸檔文件（606 個）
+└── archive-*/               # 歸檔文件
 ```
 
 ---

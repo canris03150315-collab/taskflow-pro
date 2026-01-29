@@ -1,6 +1,7 @@
 # 🚨 AI 強制檢查清單（每次對話必讀）
 
 **創建日期**: 2026-01-24  
+**最後更新**: 2026-01-29  
 **狀態**: ✅ 強制執行  
 **重要性**: ⭐⭐⭐⭐⭐
 
@@ -28,14 +29,18 @@
 ### 從 WORK_LOG_CURRENT.md 獲取（必須每次確認）
 
 **前端**：
-- 生產 Deploy ID: `697210e41580c21f5b1e3092`
+- 生產 Deploy ID: `697b600f1c8e567bd225c11d`
+- 測試 Deploy ID: `697b74085f4ef0c995ed0169` (備份監控頁面)
 - 生產 URL: https://transcendent-basbousa-6df2d2.netlify.app
-- Netlify Site ID: `5bb6a0c9-3186-4d11-b9be-07bdce7bf186`
+- 測試 URL: https://bejewelled-shortbread-a1aa30.netlify.app
+- Netlify Site ID (生產): `5bb6a0c9-3186-4d11-b9be-07bdce7bf186`
+- Netlify Site ID (測試): `480c7dd5-1159-4f1d-867a-0144272d1e0b`
 
 **後端**：
-- Docker 映像: `taskflow-pro:v8.9.169-audit-db-syntax-fix`
-- 容器 ID: `584738027bbf`
+- Docker 映像: `taskflow-pro:v8.9.191-backup-api-path-fixed`
+- 容器 ID: `689732b10678`
 - 伺服器: root@165.227.147.40
+- SSH 密碼: j7WW03n4emoh
 
 **最後更新**: 檢查 `WORK_LOG_CURRENT.md` 第 3 行
 
@@ -317,6 +322,15 @@ AI 應該主動提醒：
 
 ---
 
-**最後更新**: 2026-01-24  
-**版本**: 1.1（新增長對話提醒機制）  
+**最後更新**: 2026-01-29  
+**版本**: 1.2（更新至 v8.9.191，新增測試環境資訊）  
 **狀態**: ✅ 強制執行
+
+---
+
+## 📖 相關文檔
+
+- `AI-PROMPTS-GUIDE.md` - AI 提示詞指南（開始、修改、結束時使用）
+- `PROJECT-COMPREHENSIVE-SUMMARY.md` - 專案深度總結報告
+- `WORK_LOG_CURRENT.md` - 當前工作日誌（必讀）
+- `PROJECT-QUICKSTART.md` - 快速啟動指南
