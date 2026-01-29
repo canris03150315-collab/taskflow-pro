@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 19:25  
-**版本**: v8.9.184-users-get-refactored (後端) / 697b0a2f266765469f0ac338 (前端)  
-**狀態**: ✅ 用戶管理 API 重構（第一階段）完成
+**最後更新**: 2026-01-29 19:35  
+**版本**: v8.9.185-users-get-by-id-refactored (後端) / 697b0a2f266765469f0ac338 (前端)  
+**狀態**: ✅ 用戶管理 API 重構（第二階段）完成
 
 ---
 
@@ -18,11 +18,11 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.184-users-get-refactored`
+- **Docker 映像**: `taskflow-pro:v8.9.185-users-get-by-id-refactored`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.184-users-get-refactored-20260129_112453.tar.gz` (238MB)
+- **快照**: `taskflow-snapshot-v8.9.185-users-get-by-id-refactored-20260129_113537.tar.gz` (238MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
@@ -101,12 +101,21 @@ SUCCESS: GET / route is working with UserService
 - **前端**: 無需修改
 - **狀態**: ✅ 已部署並測試通過
 
-#### 下一步計劃
-- [ ] 重構 GET /:id 路由
+#### 進度追蹤
+- [x] 重構 GET / 路由（獲取所有用戶）✅
+- [x] 重構 GET /:id 路由（獲取單個用戶）✅
 - [ ] 重構 POST / 路由（創建用戶）
 - [ ] 重構 PUT /:id 路由（更新用戶）
 - [ ] 重構 DELETE /:id 路由
 - [ ] 重構其他輔助路由
+
+#### 第二階段更新（2026-01-29 19:35）
+
+**重構 GET /:id 路由**
+- **修改前**: 直接使用 `db.get()` 查詢並手動解析 permissions
+- **修改後**: 調用 `UserService.getUserById(db, id)`
+- **測試結果**: ✅ 成功（返回用戶 Seven，role: BOSS）
+- **版本**: v8.9.185-users-get-by-id-refactored
 
 #### 關鍵經驗
 1. **路徑問題很關鍵**：必須正確計算相對路徑
