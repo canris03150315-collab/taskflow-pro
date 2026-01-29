@@ -102,6 +102,7 @@ const RealApi = {
             const res = await request<{ user: User, token: string }>('POST', '/auth/login', { username, password });
             if (res.token) {
                 localStorage.setItem('auth_token', res.token);
+                localStorage.setItem('user', JSON.stringify(res.user));
                 return res.user;
             }
             return undefined;
@@ -110,6 +111,7 @@ const RealApi = {
             const res = await request<{ user: User, token: string }>('POST', '/auth/setup', userData);
             if (res.token) {
                 localStorage.setItem('auth_token', res.token);
+                localStorage.setItem('user', JSON.stringify(res.user));
             }
             return res.user;
         },
