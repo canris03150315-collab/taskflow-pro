@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 14:48  
-**版本**: v8.9.181-schedule-delete-feature (後端) / 697b03ee7aa94e6149e48699 (前端)  
-**狀態**: ✅ 排班刪除功能完成
+**最後更新**: 2026-01-29 15:17  
+**版本**: v8.9.182-remove-employee-delete (後端) / 697b0a2f266765469f0ac338 (前端)  
+**狀態**: ✅ 移除員工自主刪除權限完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `697b03ee7aa94e6149e48699`
+- **生產環境 Deploy ID**: `697b0a2f266765469f0ac338`
 - **測試環境 Deploy ID**: `6978f7fc15130b2e167d7e28`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -18,7 +18,7 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.181-schedule-delete-feature`
+- **Docker 映像**: `taskflow-pro:v8.9.182-remove-employee-delete`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
@@ -29,12 +29,88 @@
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `c241b92` (排班刪除功能)
+- **Git Commit**: `dc504bf` (移除員工自主刪除權限)
 - **狀態**: ✅ 所有變更已提交
 
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 65. 移除員工自主刪除排班權限 ⭐⭐
+**完成時間**: 2026-01-29 15:17  
+**狀態**: ✅ 已完成
+
+#### 需求描述
+用戶要求取消員工自主刪除已批准排班的權限，只允許主管/BOSS 刪除排班。
+
+#### 問題分析
+- **原始設計**：員工可以刪除自己已批准的排班
+- **用戶需求**：員工不應有自主刪除權限
+- **保留權限**：BOSS、SUPERVISOR、MANAGER 可以刪除部門內排班
+
+#### 修改內容
+
+**後端修改**（`/app/dist/routes/schedules.js`）：
+
+**修改前的權限檢查**：
+```javascript
+const canDelete =
+  schedule.user_id === currentUser.id ||              // 員工可刪除自己的
+  currentUser.role === 'BOSS' ||
+  (currentUser.role === 'SUPERVISOR' && schedule.department_id === currentUser.department) ||
+  (currentUser.role === 'MANAGER' && schedule.department_id === currentUser.department);
+```
+
+**修改後的權限檢查**：
+```javascript
+const canDelete =
+  currentUser.role === 'BOSS' ||                      // 只有管理層可刪除
+  (currentUser.role === 'SUPERVISOR' && schedule.department_id === currentUser.department) ||
+  (currentUser.role === 'MANAGER' && schedule.department_id === currentUser.department);
+```
+
+**前端修改**（`components/LeaveManagementView.tsx`）：
+
+移除第 1194-1207 行的員工刪除按鈕：
+```typescript
+// 已移除
+{!canReview && schedule.status === 'APPROVED' && schedule.user_id === currentUser.id && (
+  <button onClick={() => handleDeleteSchedule(...)}>
+    🗑️ 刪除
+  </button>
+)}
+```
+
+#### 權限矩陣（修改後）
+
+| 用戶角色 | 可刪除範圍 | 變更 |
+|---------|-----------|------|
+| **BOSS** | 所有已批准的排班 | 無變更 |
+| **SUPERVISOR** | 自己部門已批准的排班 | 無變更 |
+| **MANAGER** | 自己部門已批准的排班 | 無變更 |
+| **EMPLOYEE** | ~~僅自己已批准的排班~~ | ❌ 已移除 |
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.182-remove-employee-delete`
+- **前端 Deploy ID**: `697b0a2f266765469f0ac338`
+- **快照**: `taskflow-snapshot-v8.9.181-before-remove-employee-delete-20260129_071643.tar.gz` (222MB)
+- **Git Commit**: `dc504bf`
+- **狀態**: ✅ 已部署到生產環境
+
+#### 測試驗證
+- ✅ 員工無法看到刪除按鈕（已批准的排班）
+- ✅ 員工嘗試 API 刪除會返回 403 錯誤
+- ✅ 主管可以刪除部門內已批准的排班
+- ✅ BOSS 可以刪除任何已批准的排班
+- ✅ 時間限制仍然有效（無法刪除過去的排班）
+
+#### 關鍵教訓
+1. **權限分級管理** - 根據實際需求調整權限層級
+2. **雙重驗證** - 前端 UI 隱藏 + 後端 API 驗證
+3. **遵循規則** - 修改前創建快照，使用 Pure ASCII 腳本
+4. **完整測試** - 驗證所有角色的權限是否正確
+
+---
 
 ### 64. 排班刪除功能（軟刪除） ⭐⭐⭐
 **完成時間**: 2026-01-29 14:48  
