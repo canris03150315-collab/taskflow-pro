@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 19:58  
-**版本**: v8.9.186-users-routes-refactored (後端) / 697b0a2f266765469f0ac338 (前端)  
-**狀態**: ✅ 用戶管理 API 重構完成（5/6 路由）
+**最後更新**: 2026-01-29 20:19  
+**版本**: v8.9.187-finance-routes-refactored (後端) / 697b0a2f266765469f0ac338 (前端)  
+**狀態**: ✅ 財務管理 API 重構完成（5/5 路由）
 
 ---
 
@@ -18,11 +18,11 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.186-users-routes-refactored`
+- **Docker 映像**: `taskflow-pro:v8.9.187-finance-routes-refactored`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.186-users-routes-refactored-20260129_115809.tar.gz` (238MB)
+- **快照**: `taskflow-snapshot-v8.9.187-finance-routes-refactored-20260129_121940.tar.gz` (238MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
@@ -35,6 +35,78 @@
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 67. 財務管理 API 重構 ⭐⭐⭐
+**完成時間**: 2026-01-29 20:19  
+**狀態**: ✅ 已完成
+
+#### 需求描述
+將財務管理 API 從直接操作資料庫改為使用服務層，遵循用戶管理重構的成功經驗。
+
+#### 實施內容
+
+**1. 創建 FinanceService**
+- 位置：`/app/services/financeService.js`
+- 使用 `dbCall` 包裝器（適配財務路由的特殊需求）
+- 包含防禦性編程：`Number(amount)` 確保金額類型正確
+
+**2. FinanceService 方法**
+```javascript
+class FinanceService {
+  static async getAllRecords(db)
+  static async getRecordById(db, id)
+  static async createRecord(db, data)
+  static async updateRecord(db, id, data)
+  static async deleteRecord(db, id)
+  static async confirmRecord(db, id)
+}
+```
+
+**3. 重構的路由**
+- ✅ GET / - 獲取所有財務記錄
+- ✅ POST / - 創建財務記錄（保留金額驗證日誌）
+- ✅ PUT /:id - 更新財務記錄
+- ✅ DELETE /:id - 刪除財務記錄
+- ✅ POST /:id/confirm - 確認財務記錄
+
+#### 技術挑戰與解決
+
+**問題 1：dbCall 包裝器**
+- 財務路由使用 `dbCall(db, 'prepare', ...)` 而非直接 `db.prepare()`
+- 解決：在 FinanceService 中實現相同的 `dbCall` 包裝器
+
+**問題 2：FinanceService import 未添加**
+- 重構腳本未找到正確的插入點
+- 解決：創建專門的腳本添加 import 語句
+
+**問題 3：PUT 路由變數未定義**
+- `date` 變數未從 `req.body` 解構
+- 解決：修正解構語句包含 `date`
+
+#### 測試驗證
+```
+=== Testing Finance Routes ===
+1. Login: ✅ PASS
+2. GET /api/finance: ✅ PASS (返回 37 筆記錄)
+3. POST /api/finance: ✅ PASS (金額驗證通過)
+4. PUT /api/finance/:id: ✅ PASS (更新金額 1500)
+5. DELETE /api/finance/:id: ✅ PASS
+```
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.187-finance-routes-refactored`
+- **快照**: `taskflow-snapshot-v8.9.187-finance-routes-refactored-20260129_121940.tar.gz` (238MB)
+- **前端**: 無需修改
+- **狀態**: ✅ 已部署並測試通過
+
+#### 關鍵經驗
+1. **檢查歷史記錄**：先閱讀 `WORK_LOG_20260103_FINANCE_AMOUNT_FIX.md` 了解已知問題
+2. **適配現有架構**：使用 `dbCall` 包裝器而非直接 `db.prepare()`
+3. **保留防禦性編程**：`Number(amount)` 確保金額類型正確
+4. **漸進式修復**：遇到問題立即修復，不累積錯誤
+5. **充分測試**：每個路由都經過驗證
+
+---
 
 ### 66. 用戶管理 API 重構（第一階段）⭐⭐⭐
 **完成時間**: 2026-01-29 19:25  
