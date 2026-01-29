@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 21:37  
-**版本**: v8.9.189-finance-delete-route-fixed (後端) / 697b600f1c8e567bd225c11d (前端)  
-**狀態**: ✅ 服務層重構與功能修復全部完成（含深度排查修復）
+**最後更新**: 2026-01-29 22:22  
+**版本**: v8.9.190-backup-monitor-added (後端) / 697b6e791c8e56b5e225c16d (測試環境)  
+**狀態**: ✅ 備份監控系統已上線（測試環境）
 
 ---
 
@@ -10,15 +10,15 @@
 
 ### 前端
 - **生產環境 Deploy ID**: `697b600f1c8e567bd225c11d`
-- **測試環境 Deploy ID**: `6978f7fc15130b2e167d7e28`
+- **測試環境 Deploy ID**: `697b6e791c8e56b5e225c16d` (備份監控頁面)
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
-- **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
+- **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app (備份監控)
 - **WebSocket URL**: `wss://gives-include-jumping-savings.trycloudflare.com/ws`
 - **netlify.toml**: ✅ 已修正（指向 Cloudflare Tunnel）
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.189-finance-delete-route-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.190-backup-monitor-added`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
@@ -35,6 +35,70 @@
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 72. 備份監控系統上線（測試環境）⭐⭐⭐
+**完成時間**: 2026-01-29 22:22  
+**狀態**: ✅ 已完成
+
+#### 需求背景
+用戶需要即時監控備份系統狀態，確認備份是否正常執行、查看備份時間和資料完整性。
+
+#### 實施方案
+**方案 A**：後端 API + 前端監控頁面
+
+#### 後端實施
+1. **新增 API 路由**：`GET /api/backup/status`
+2. **功能**：
+   - 讀取 `/root/taskflow-backups/` 目錄
+   - 返回備份列表（最近 20 個）
+   - 計算備份狀態（healthy/warning/error）
+   - 計算距離最後備份的時間
+3. **權限**：僅 BOSS 角色可訪問
+
+#### 前端實施
+1. **新組件**：`BackupMonitorView.tsx`
+2. **功能**：
+   - 備份狀態總覽（狀態、總數、最新大小）
+   - 最近備份列表（表格顯示）
+   - 資料完整性警告
+   - 自動刷新（每 5 分鐘）
+   - 手動刷新按鈕
+3. **UI 設計**：
+   - 🟢 綠色：正常（2 小時內有備份）
+   - 🟡 黃色：警告（超過 2 小時）
+   - 🔴 紅色：錯誤（超過 24 小時）
+
+#### 部署信息
+- **後端版本**：`taskflow-pro:v8.9.190-backup-monitor-added`
+- **測試環境 Deploy ID**：`697b6e791c8e56b5e225c16d`
+- **測試環境 URL**：https://bejewelled-shortbread-a1aa30.netlify.app
+- **頁面路由**：`/backup-monitor`
+
+#### 測試驗證
+- ✅ API 正常返回備份列表
+- ✅ 前端正確顯示備份狀態
+- ✅ 權限控制正常（僅 BOSS 可訪問）
+- ✅ 自動刷新功能正常
+
+#### 資料完整性發現
+通過備份監控系統發現：
+- ⚠️ 當前資料只到 2026-01-26
+- ⚠️ 缺少 2026-01-27 至 2026-01-29 的資料（3 天）
+- ⚠️ 受影響：attendance_records, routine_records, work_logs, reports
+
+#### 關鍵特性
+1. **即時監控**：隨時查看備份狀態
+2. **歷史記錄**：顯示最近 20 個備份
+3. **狀態警告**：自動標示異常狀態
+4. **資料完整性**：顯示資料範圍警告
+
+#### 未來改善
+- 添加備份下載功能
+- 添加手動觸發備份按鈕
+- 添加備份完整性自動檢查
+- 設置備份異常告警通知
+
+---
 
 ### 71. 深度排查發現財務 DELETE 路由遺漏 ⭐⭐⭐
 **完成時間**: 2026-01-29 21:37  
