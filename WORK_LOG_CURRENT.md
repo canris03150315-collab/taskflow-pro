@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 21:27  
-**版本**: v8.9.188-leave-delete-approved-fixed (後端) / 697b600f1c8e567bd225c11d (前端)  
-**狀態**: ✅ 服務層重構與功能修復全部完成
+**最後更新**: 2026-01-29 21:37  
+**版本**: v8.9.189-finance-delete-route-fixed (後端) / 697b600f1c8e567bd225c11d (前端)  
+**狀態**: ✅ 服務層重構與功能修復全部完成（含深度排查修復）
 
 ---
 
@@ -18,11 +18,11 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.188-leave-delete-approved-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.189-finance-delete-route-fixed`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.188-leave-delete-approved-fixed-20260129_125410.tar.gz` (238MB)
+- **快照**: `taskflow-snapshot-v8.9.189-finance-delete-route-fixed-20260129_133714.tar.gz` (238MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
@@ -35,6 +35,68 @@
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 71. 深度排查發現財務 DELETE 路由遺漏 ⭐⭐⭐
+**完成時間**: 2026-01-29 21:37  
+**狀態**: ✅ 已完成
+
+#### 問題發現
+用戶要求深度排查今天所有修改可能造成的錯誤。使用全面測試腳本發現：
+- ✅ 登入 API 正常
+- ✅ 用戶管理 API 正常（GET /, GET /:id）
+- ✅ 財務管理 API 部分正常（GET /, POST /, PUT /:id）
+- ❌ **財務 DELETE /:id 返回 404**
+- ✅ 假表刪除功能正常
+- ✅ 排班功能正常
+
+#### 診斷過程
+使用專門的診斷腳本追蹤問題：
+1. 創建測試財務記錄 → ✅ 成功（ID: finance-xxx）
+2. 驗證記錄存在 → ✅ 記錄在資料庫中
+3. 嘗試刪除記錄 → ❌ 返回 404 Not Found
+4. 檢查路由註冊 → ❌ **DELETE 路由完全不存在**
+
+**根本原因**：今天重構財務 API 時，**遺漏了 DELETE 路由**的重構。
+
+#### 修復方案
+添加缺失的 DELETE 路由到 `/app/dist/routes/finance.js`：
+```javascript
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { id } = req.params;
+    
+    await FinanceService.deleteRecord(db, id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete finance error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+```
+
+#### 測試驗證
+重新執行全面測試：
+- ✅ 登入 API（1 項）
+- ✅ 用戶管理 API（2 項）
+- ✅ 財務管理 API（4 項，包含 DELETE）
+- ✅ 假表管理 API（3 項）
+- ✅ 排班管理 API（2 項）
+
+**總計**：11 項測試全部通過 ✅
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.189-finance-delete-route-fixed`
+- **快照**: `taskflow-snapshot-v8.9.189-finance-delete-route-fixed-20260129_133714.tar.gz` (238MB)
+- **狀態**: ✅ 已部署並測試通過
+
+#### 關鍵經驗
+1. **重構後必須進行全面測試**：不能只測試修改的部分
+2. **使用自動化測試腳本**：手動測試容易遺漏
+3. **檢查所有 CRUD 操作**：GET、POST、PUT、DELETE 都要測試
+4. **深度排查很重要**：及時發現並修復潛在問題
+
+---
 
 ### 70. 登入後 localStorage 沒有保存用戶信息修復 ⭐⭐⭐
 **完成時間**: 2026-01-29 21:27  
