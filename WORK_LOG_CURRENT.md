@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 21:02  
-**版本**: v8.9.188-leave-delete-approved-fixed (後端) / 697b5a4ce70cd17199c32603 (前端)  
-**狀態**: ✅ 假表與排班刪除功能修復完成
+**最後更新**: 2026-01-29 21:27  
+**版本**: v8.9.188-leave-delete-approved-fixed (後端) / 697b600f1c8e567bd225c11d (前端)  
+**狀態**: ✅ 服務層重構與功能修復全部完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `697b5a4ce70cd17199c32603`
+- **生產環境 Deploy ID**: `697b600f1c8e567bd225c11d`
 - **測試環境 Deploy ID**: `6978f7fc15130b2e167d7e28`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -35,6 +35,81 @@
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 70. 登入後 localStorage 沒有保存用戶信息修復 ⭐⭐⭐
+**完成時間**: 2026-01-29 21:27  
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶登入後，`localStorage.getItem('user')` 返回 `null`，導致前端無法識別用戶角色，所有需要權限的功能按鈕都不顯示。
+
+#### 診斷過程
+使用 Node.js 腳本系統性診斷：
+1. **後端 API 測試**：✅ 登入 API 返回完整用戶信息（包括 role: BOSS）
+2. **前端源代碼檢查**：✅ TypeScript 代碼已添加 `localStorage.setItem('user')`
+3. **構建產物檢查**：❌ 構建後的 JavaScript 文件**不包含** `localStorage.setItem('user')`
+
+**根本原因**：構建緩存導致舊代碼被使用，新的 TypeScript 修改沒有被編譯到最終的 JavaScript 文件中。
+
+#### 修復方案
+
+**步驟 1：修改 TypeScript 源代碼**
+在 `services/api.ts` 的 `login` 和 `setup` 函數中添加：
+```typescript
+localStorage.setItem('user', JSON.stringify(res.user));
+```
+
+**步驟 2：清除構建緩存**
+```powershell
+Remove-Item -Recurse -Force dist, node_modules/.vite
+```
+
+**步驟 3：重新構建**
+```powershell
+npm run build
+```
+
+**步驟 4：驗證構建產物**
+```powershell
+# 檢查構建後的 JavaScript 是否包含 localStorage.setItem('user')
+Get-ChildItem dist\assets\index-*.js | ForEach-Object {
+  $content = Get-Content $_.FullName -Raw
+  if ($content -match 'localStorage\.setItem\(.user.') {
+    Write-Host "✓ Found in $($_.Name)"
+  }
+}
+```
+
+**步驟 5：部署到生產環境**
+
+#### 部署信息
+- **前端 Deploy ID**: `697b600f1c8e567bd225c11d`
+- **Git Commit**: `ba7653e`
+- **狀態**: ✅ 已部署並測試通過
+
+#### 測試驗證
+登入後執行：
+```javascript
+console.log(JSON.parse(localStorage.getItem('user')))
+```
+返回完整用戶信息：
+```javascript
+{
+  id: "admin-1767449914767",
+  username: "canris",
+  name: "Seven",
+  role: "BOSS",
+  department: "Management"
+}
+```
+
+#### 關鍵經驗
+1. **使用 Node.js 腳本診斷**：系統性地驗證後端 API、前端源代碼和構建產物
+2. **清除構建緩存**：Vite 的構建緩存可能導致舊代碼被使用
+3. **驗證構建產物**：修改代碼後必須驗證構建後的 JavaScript 是否包含修改
+4. **Pure ASCII 腳本**：診斷腳本必須使用純 ASCII 字符避免語法錯誤
+
+---
 
 ### 69. 排班刪除功能修復 ⭐⭐
 **完成時間**: 2026-01-29 21:02  
