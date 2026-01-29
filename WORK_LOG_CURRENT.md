@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 14:36  
-**版本**: v8.9.180-kol-payment-stats-enhanced (後端) / 697b008f8df3f109cf2b2360 (前端)  
-**狀態**: ✅ 排班月份選擇器功能完成
+**最後更新**: 2026-01-29 14:48  
+**版本**: v8.9.181-schedule-delete-feature (後端) / 697b03ee7aa94e6149e48699 (前端)  
+**狀態**: ✅ 排班刪除功能完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `697b008f8df3f109cf2b2360`
+- **生產環境 Deploy ID**: `697b03ee7aa94e6149e48699`
 - **測試環境 Deploy ID**: `6978f7fc15130b2e167d7e28`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -18,7 +18,7 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.180-kol-payment-stats-enhanced`
+- **Docker 映像**: `taskflow-pro:v8.9.181-schedule-delete-feature`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
@@ -29,12 +29,124 @@
 
 ### 本地代碼
 - **Git 狀態**: 已初始化，有完整歷史
-- **Git Commit**: `1c75a05` (排班月份選擇器功能)
+- **Git Commit**: `c241b92` (排班刪除功能)
 - **狀態**: ✅ 所有變更已提交
 
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 64. 排班刪除功能（軟刪除） ⭐⭐⭐
+**完成時間**: 2026-01-29 14:48  
+**狀態**: ✅ 已完成
+
+#### 需求描述
+用戶要求已批准的假表（排班）可以刪除或修改，以應對員工臨時取消休假或主管需要撤銷已批准排班的情況。
+
+#### 問題分析
+- **原始限制**：已批准的排班無法刪除，只能調整日期
+- **實際需求**：員工可能臨時不需要休假，需要刪除功能
+- **數據保留**：需要保留歷史記錄以供審計
+
+#### 實施方案（方案 A + 軟刪除）
+採用完整刪除功能配合軟刪除機制：
+
+**權限控制**：
+- **員工**：只能刪除自己「已批准」的排班
+- **主管/BOSS**：可以刪除部門內任何「已批准」的排班
+- **時間限制**：只能刪除未來的排班（過去的不能刪除）
+
+**軟刪除機制**：
+- 不真正刪除記錄
+- 將狀態改為 `CANCELLED`
+- 在月曆中不顯示已取消的排班
+- 保留完整歷史記錄
+
+#### 後端修改
+**文件**: `/app/dist/routes/schedules.js`
+
+**新增路由**: `DELETE /api/schedules/:id`
+```javascript
+router.delete('/:id', authenticateToken, async (req, res) => {
+  // 1. 查詢排班記錄
+  // 2. 權限檢查（自己的或部門內的）
+  // 3. 狀態檢查（只能刪除 APPROVED）
+  // 4. 時間檢查（只能刪除未來的）
+  // 5. 軟刪除（改為 CANCELLED）
+  // 6. 記錄日誌
+});
+```
+
+**安全檢查**：
+- ✅ 權限驗證（員工只能刪除自己的）
+- ✅ 狀態驗證（只能刪除已批准的）
+- ✅ 時間驗證（不能刪除過去的排班）
+- ✅ 操作日誌（記錄誰刪除了什麼）
+
+#### 前端修改
+
+**1. API 服務修改**（`services/api.ts`）：
+```typescript
+schedules: {
+  // ... 現有方法
+  delete: async (id: string): Promise<any> => {
+    const response = await fetch(`${API_BASE_URL}/schedules/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    // 錯誤處理
+  }
+}
+```
+
+**2. 組件修改**（`components/LeaveManagementView.tsx`）：
+
+**添加刪除處理函數**（第 387-401 行）：
+```typescript
+const handleDeleteSchedule = async (scheduleId, scheduleName, scheduleMonth) => {
+  if (!confirm('確定要刪除...')) return;
+  await api.schedules.delete(scheduleId);
+  toast.success('排班已刪除');
+  loadSchedules();
+};
+```
+
+**添加刪除按鈕**（第 1149-1207 行）：
+- **主管**：已批准排班顯示「✏️ 調整」和「🗑️ 刪除」按鈕
+- **員工**：自己已批准的排班顯示「🗑️ 刪除」按鈕
+- **待審核**：顯示「✏️ 調整」、「✓ 批准」、「✗ 駁回」按鈕
+
+#### 功能特點
+1. **雙重確認** - 刪除前彈出確認對話框
+2. **權限控制** - 員工只能刪除自己的，主管可以刪除部門的
+3. **時間限制** - 只能刪除未來的排班
+4. **軟刪除** - 保留歷史記錄，狀態改為 CANCELLED
+5. **操作日誌** - 記錄刪除操作的用戶和時間
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.181-schedule-delete-feature`
+- **前端 Deploy ID**: `697b03ee7aa94e6149e48699`
+- **快照**: `taskflow-snapshot-v8.9.180-before-schedule-delete-20260129_064814.tar.gz` (222MB)
+- **Git Commit**: `c241b92`
+- **狀態**: ✅ 已部署到生產環境
+
+#### 測試驗證
+- ✅ 員工可以刪除自己已批准的排班
+- ✅ 主管可以刪除部門內任何已批准的排班
+- ✅ 無法刪除過去的排班（顯示錯誤提示）
+- ✅ 無法刪除待審核或已駁回的排班
+- ✅ 刪除前顯示確認對話框
+- ✅ 刪除後狀態變為 CANCELLED
+- ✅ 已取消的排班不在月曆中顯示
+
+#### 關鍵教訓
+1. **軟刪除優於硬刪除** - 保留歷史記錄便於審計
+2. **權限分級控制** - 員工和主管有不同的刪除權限
+3. **時間限制保護** - 避免修改歷史數據
+4. **用戶體驗** - 雙重確認避免誤操作
+5. **遵循規則** - 修改前創建快照，後端使用 Pure ASCII
+
+---
 
 ### 63. 排班月份選擇器功能 ⭐⭐⭐
 **完成時間**: 2026-01-29 14:36  
