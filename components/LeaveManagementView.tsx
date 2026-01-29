@@ -1191,20 +1191,6 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                           )}
                         </div>
                       )}
-                      {!canReview && schedule.status === 'APPROVED' && schedule.user_id === currentUser.id && (
-                        <div className="flex flex-col gap-2 ml-4">
-                          <button
-                            onClick={() => handleDeleteSchedule(
-                              schedule.id,
-                              currentUser.name,
-                              `${schedule.year}年${schedule.month}月`
-                            )}
-                            className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition"
-                          >
-                            🗑️ 刪除
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
