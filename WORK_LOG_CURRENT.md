@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 20:54  
-**版本**: v8.9.188-leave-delete-approved-fixed (後端) / 697b585918dc7a61a0907541 (前端)  
-**狀態**: ✅ 假表刪除功能修復完成
+**最後更新**: 2026-01-29 21:02  
+**版本**: v8.9.188-leave-delete-approved-fixed (後端) / 697b5a4ce70cd17199c32603 (前端)  
+**狀態**: ✅ 假表與排班刪除功能修復完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `697b585918dc7a61a0907541`
+- **生產環境 Deploy ID**: `697b5a4ce70cd17199c32603`
 - **測試環境 Deploy ID**: `6978f7fc15130b2e167d7e28`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -35,6 +35,65 @@
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 69. 排班刪除功能修復 ⭐⭐
+**完成時間**: 2026-01-29 21:02  
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反映已批准的月度排班無法刪除，刪除按鈕不顯示。
+
+#### 根本原因
+**前端顯示邏輯錯誤**：
+```typescript
+const canReview = canApprove && schedule.status === 'PENDING';
+// 刪除按鈕只在 canReview 為 true 時顯示
+{canReview && (
+  <div>刪除按鈕</div>
+)}
+```
+只有**待審核（PENDING）**的排班才顯示操作按鈕，但後端邏輯卻是**只能刪除已批准（APPROVED）**的排班，造成邏輯衝突。
+
+#### 修復方案
+
+**前端修改** (`LeaveManagementView.tsx`)：
+```typescript
+// 添加新的權限檢查
+const canReview = canApprove && schedule.status === 'PENDING';
+const canManageApproved = canApprove && schedule.status === 'APPROVED';
+
+// 修改按鈕顯示條件
+{(canReview || canManageApproved) && (
+  <div className="flex flex-col gap-2 ml-4">
+    {schedule.status === 'APPROVED' ? (
+      <>
+        <button onClick={() => handleEditSchedule(schedule)}>✏️ 調整</button>
+        <button onClick={() => handleDeleteSchedule(...)}>🗑️ 刪除</button>
+      </>
+    ) : (
+      // 待審核的按鈕...
+    )}
+  </div>
+)}
+```
+
+#### 功能特性
+1. ✅ **已批准的排班**：顯示「調整」和「刪除」按鈕
+2. ✅ **待審核的排班**：顯示「調整」和「批准/駁回」按鈕
+3. ✅ **權限控制**：只有有審核權限的人才能看到操作按鈕
+4. ✅ **後端限制**：只能刪除當前月份或未來月份的排班
+
+#### 部署信息
+- **前端 Deploy ID**: `697b5a4ce70cd17199c32603`
+- **後端**: 無需修改（邏輯正確）
+- **狀態**: ✅ 已部署
+
+#### 測試驗證
+- ✅ 已批准的排班顯示刪除按鈕
+- ✅ 可以成功刪除已批准的排班
+- ✅ 刪除後排班狀態變為 CANCELLED
+
+---
 
 ### 68. 假表刪除功能修復 ⭐⭐
 **完成時間**: 2026-01-29 20:54  

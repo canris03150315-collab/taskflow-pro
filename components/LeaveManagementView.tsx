@@ -1085,6 +1085,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                 const dept = departments.find(d => d.id === schedule.department_id);
                 const selectedDays = JSON.parse(schedule.selected_days || '[]');
                 const canReview = canApprove && schedule.status === 'PENDING';
+                const canManageApproved = canApprove && schedule.status === 'APPROVED';
                 
                 return (
                   <div key={schedule.id} className="bg-white rounded-lg border border-slate-200 p-4">
@@ -1146,7 +1147,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                         </div>
                       </div>
                       
-                      {canReview && (
+                      {(canReview || canManageApproved) && (
                         <div className="flex flex-col gap-2 ml-4">
                           {schedule.status === 'APPROVED' ? (
                             <>
