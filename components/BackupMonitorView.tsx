@@ -28,7 +28,7 @@ export const BackupMonitorView: React.FC = () => {
     
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/backup/status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/backup/status`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

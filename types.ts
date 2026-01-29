@@ -423,6 +423,7 @@ export type MenuItemId =
   | 'memo' 
   | 'personnel' 
   | 'ai-assistant'
+  | 'backup-monitor'
   | 'settings';
 
 // NEW: Group Structure
@@ -451,7 +452,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
   {
     id: 'system',
     label: '系統設定',
-    items: ['ai-assistant', 'settings']
+    items: ['ai-assistant', 'backup-monitor', 'settings']
   }
 ];
 
@@ -459,7 +460,7 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
 export const DEFAULT_MENU_ORDER: MenuItemId[] = [
   'dashboard', 'chat', 'bulletin', 'tasks', 'leaves', 'sop', 
   'performance', 'team', 'reports', 'finance', 'data_center', 
-  'forum', 'memo', 'personnel', 'ai-assistant', 'settings'
+  'forum', 'memo', 'personnel', 'ai-assistant', 'backup-monitor', 'settings'
 ];
 
 export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = {
@@ -478,6 +479,7 @@ export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = 
   memo: { label: '個人備忘錄', icon: '✏️' },
   personnel: { label: '人員帳號管理', icon: '👥' },
   'ai-assistant': { label: 'AI 智能助理', icon: '✨' },
+  'backup-monitor': { label: '備份監控', icon: '💾' },
   settings: { label: '系統設定', icon: '⚙️' },
 };
 

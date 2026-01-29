@@ -1079,6 +1079,7 @@ function AppContent() {
       if (!config) return null;
       if (id === 'team' && !(hasPermission(currentUser!, 'CREATE_TASK') || currentUser!.role === Role.BOSS || currentUser!.role === Role.MANAGER || currentUser!.role === Role.SUPERVISOR)) return null;
       if (id === 'personnel' && !(hasPermission(currentUser!, 'MANAGE_USERS') || currentUser!.role === Role.BOSS || currentUser!.role === Role.MANAGER || currentUser!.role === Role.SUPERVISOR)) return null;
+      if (id === 'backup-monitor' && currentUser!.role !== Role.BOSS) return null;
       if (id === 'chat') {
         const badge = unreadChatCount > 0 ? <Badge count={unreadChatCount} /> : null;
         return (
