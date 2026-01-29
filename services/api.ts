@@ -1080,6 +1080,20 @@ const RealApi = {
                 throw new Error(error.error || 'Failed to update schedule');
             }
             return response.json();
+        },
+        delete: async (id: string): Promise<any> => {
+            const token = localStorage.getItem('auth_token');
+            if (!token) throw new Error('Not authenticated');
+            
+            const response = await fetch(`${API_BASE_URL}/schedules/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ error: 'Failed to delete schedule' }));
+                throw new Error(error.error || 'Failed to delete schedule');
+            }
+            return response.json();
         }
     },
 

@@ -384,6 +384,22 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
     }
   };
 
+  // Handle delete schedule
+  const handleDeleteSchedule = async (scheduleId: string, scheduleName: string, scheduleMonth: string) => {
+    if (!confirm(`確定要刪除 ${scheduleName} 的 ${scheduleMonth} 排班嗎？\n\n刪除後將無法恢復，該排班將被標記為已取消。`)) {
+      return;
+    }
+    
+    try {
+      await api.schedules.delete(scheduleId);
+      toast.success('排班已刪除');
+      loadSchedules();
+    } catch (error: any) {
+      console.error('刪除失敗:', error);
+      toast.error(error?.message || '刪除失敗');
+    }
+  };
+
   // Handle edit schedule
   const handleEditSchedule = (schedule: any) => {
     setEditingSchedule(schedule);
@@ -1132,23 +1148,60 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                       
                       {canReview && (
                         <div className="flex flex-col gap-2 ml-4">
+                          {schedule.status === 'APPROVED' ? (
+                            <>
+                              <button
+                                onClick={() => handleEditSchedule(schedule)}
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition"
+                              >
+                                ✏️ 調整
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSchedule(
+                                  schedule.id, 
+                                  users.find(u => u.id === schedule.user_id)?.name || '未知',
+                                  `${schedule.year}年${schedule.month}月`
+                                )}
+                                className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition"
+                              >
+                                🗑️ 刪除
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleEditSchedule(schedule)}
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition"
+                              >
+                                ✏️ 調整
+                              </button>
+                              <button
+                                onClick={() => handleApproveSchedule(schedule.id)}
+                                className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"
+                              >
+                                ✓ 批准
+                              </button>
+                              <button
+                                onClick={() => handleRejectSchedule(schedule.id)}
+                                className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition"
+                              >
+                                ✗ 駁回
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {!canReview && schedule.status === 'APPROVED' && schedule.user_id === currentUser.id && (
+                        <div className="flex flex-col gap-2 ml-4">
                           <button
-                            onClick={() => handleEditSchedule(schedule)}
-                            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition"
-                          >
-                            ✏️ 調整
-                          </button>
-                          <button
-                            onClick={() => handleApproveSchedule(schedule.id)}
-                            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition"
-                          >
-                            ✓ 批准
-                          </button>
-                          <button
-                            onClick={() => handleRejectSchedule(schedule.id)}
+                            onClick={() => handleDeleteSchedule(
+                              schedule.id,
+                              currentUser.name,
+                              `${schedule.year}年${schedule.month}月`
+                            )}
                             className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition"
                           >
-                            ✗ 駁回
+                            🗑️ 刪除
                           </button>
                         </div>
                       )}
