@@ -1212,9 +1212,11 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
                 const leaveType = LEAVE_TYPES.find(t => t.value === leave.leave_type);
                 const status = STATUS_CONFIG[leave.status as keyof typeof STATUS_CONFIG];
                 const isOwn = leave.user_id === currentUser.id;
+                const isBossOrManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
                 // Allow approving own leaves for testing if user has approve permission
                 const canApproveThis = canApprove && (leave.status === 'PENDING' || leave.status === 'CONFLICT');
-                const canCancelThis = isOwn && (leave.status === 'PENDING' || leave.status === 'CONFLICT');
+                // Allow canceling own leaves (any status except CANCELLED), or BOSS/MANAGER can cancel any
+                const canCancelThis = (isOwn || isBossOrManager) && leave.status !== 'CANCELLED';
 
                 return (
                   <div key={leave.id} className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-md transition">

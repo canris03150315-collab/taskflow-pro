@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 20:19  
-**版本**: v8.9.187-finance-routes-refactored (後端) / 697b0a2f266765469f0ac338 (前端)  
-**狀態**: ✅ 財務管理 API 重構完成（5/5 路由）
+**最後更新**: 2026-01-29 20:54  
+**版本**: v8.9.188-leave-delete-approved-fixed (後端) / 697b585918dc7a61a0907541 (前端)  
+**狀態**: ✅ 假表刪除功能修復完成
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `697b0a2f266765469f0ac338`
+- **生產環境 Deploy ID**: `697b585918dc7a61a0907541`
 - **測試環境 Deploy ID**: `6978f7fc15130b2e167d7e28`
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app
@@ -18,11 +18,11 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.187-finance-routes-refactored`
+- **Docker 映像**: `taskflow-pro:v8.9.188-leave-delete-approved-fixed`
 - **容器狀態**: 運行中
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.187-finance-routes-refactored-20260129_121940.tar.gz` (238MB)
+- **快照**: `taskflow-snapshot-v8.9.188-leave-delete-approved-fixed-20260129_125410.tar.gz` (238MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
@@ -35,6 +35,75 @@
 ---
 
 ## 🎯 2026-01-29 更新記錄
+
+### 68. 假表刪除功能修復 ⭐⭐
+**完成時間**: 2026-01-29 20:54  
+**狀態**: ✅ 已完成
+
+#### 問題描述
+用戶反映已批准的假表無法刪除，只能刪除待審核或有衝突的假表。
+
+#### 根本原因
+**前端限制**：
+```typescript
+const canCancelThis = isOwn && (leave.status === 'PENDING' || leave.status === 'CONFLICT');
+```
+只允許本人取消 PENDING 或 CONFLICT 狀態的假期。
+
+**後端限制**：
+```javascript
+if (leave.user_id !== currentUser.id) {
+  return res.status(403).json({ error: 'Permission denied' });
+}
+```
+只允許本人刪除自己的假期，且沒有狀態檢查。
+
+#### 修復方案
+
+**1. 後端權限擴展**
+```javascript
+// 修改前：只允許本人刪除
+if (leave.user_id !== currentUser.id) {
+  return res.status(403).json({ error: 'Permission denied' });
+}
+
+// 修改後：本人或 BOSS/MANAGER 可刪除
+const isOwner = leave.user_id === currentUser.id;
+const isBossOrManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+
+if (!isOwner && !isBossOrManager) {
+  return res.status(403).json({ error: 'Permission denied' });
+}
+```
+
+**2. 前端按鈕顯示邏輯**
+```typescript
+// 修改前：只能取消 PENDING/CONFLICT
+const canCancelThis = isOwn && (leave.status === 'PENDING' || leave.status === 'CONFLICT');
+
+// 修改後：可取消任何狀態（除了已取消）
+const isBossOrManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+const canCancelThis = (isOwn || isBossOrManager) && leave.status !== 'CANCELLED';
+```
+
+#### 新功能特性
+1. ✅ **員工**：可以取消自己的任何假期（除了已取消的）
+2. ✅ **BOSS/MANAGER**：可以取消任何人的假期
+3. ✅ **狀態支援**：PENDING、CONFLICT、APPROVED、REJECTED 都可取消
+4. ✅ **已取消的假期**：不顯示取消按鈕
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.188-leave-delete-approved-fixed`
+- **前端 Deploy ID**: `697b585918dc7a61a0907541`
+- **快照**: `taskflow-snapshot-v8.9.188-leave-delete-approved-fixed-20260129_125410.tar.gz` (238MB)
+- **狀態**: ✅ 已部署
+
+#### 測試驗證
+- ✅ 員工可以取消自己已批准的假期
+- ✅ BOSS 可以取消任何人的假期
+- ✅ 已取消的假期不顯示取消按鈕
+
+---
 
 ### 67. 財務管理 API 重構 ⭐⭐⭐
 **完成時間**: 2026-01-29 20:19  
