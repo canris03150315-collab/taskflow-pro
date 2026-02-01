@@ -1,15 +1,15 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-01-29 23:07  
-**版本**: v8.9.191-backup-api-path-fixed (後端) / 697b74085f4ef0c995ed0169 (測試環境)  
-**狀態**: ✅ 備份監控系統完整修復並正常運行
+**最後更新**: 2026-02-01 21:34  
+**版本**: v8.9.192-platform-revenue (後端) / 697f56d6d8053e5fa47da14f (生產環境)  
+**狀態**: ✅ 平台營收功能完整部署並正常運行
 
 ---
 
 ## 📊 當前系統狀態
 
 ### 前端
-- **生產環境 Deploy ID**: `697b600f1c8e567bd225c11d`
+- **生產環境 Deploy ID**: `697f56d6d8053e5fa47da14f`
 - **測試環境 Deploy ID**: `697b74085f4ef0c995ed0169` (備份監控頁面)
 - **生產 URL**: https://transcendent-basbousa-6df2d2.netlify.app
 - **測試 URL**: https://bejewelled-shortbread-a1aa30.netlify.app (備份監控)
@@ -18,7 +18,7 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.191-backup-api-path-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.192-platform-revenue`
 - **容器 ID**: `689732b10678`
 - **容器狀態**: 運行中
 - **掛載配置**:
@@ -35,6 +35,131 @@
 - **Git 狀態**: 已初始化，有完整歷史
 - **Git Commit**: `e7f3c69` (修復備份監控 API 並重新創建容器掛載宿主機備份目錄)
 - **狀態**: ✅ 所有變更已提交
+
+---
+
+## 🎯 2026-02-01 更新記錄
+
+### 74. 平台營收功能完整實施 ⭐⭐⭐⭐⭐
+**完成時間**: 2026-02-01 21:34  
+**狀態**: ✅ 已完成
+
+#### 功能概述
+實施完整的平台營收管理系統，包含 Excel 數據匯入、統計分析、歷史記錄查詢和數據還原功能。
+
+#### 後端實施
+
+**資料庫表結構**：
+```sql
+-- 主表：平台交易記錄
+CREATE TABLE platform_transactions (
+  id TEXT PRIMARY KEY,
+  platform_name TEXT NOT NULL,
+  date TEXT NOT NULL,
+  lottery_amount REAL DEFAULT 0,
+  external_game_amount REAL DEFAULT 0,
+  lottery_dividend REAL DEFAULT 0,
+  external_dividend REAL DEFAULT 0,
+  private_return REAL DEFAULT 0,
+  deposit_amount REAL DEFAULT 0,
+  withdrawal_amount REAL DEFAULT 0,
+  loan_amount REAL DEFAULT 0,
+  profit REAL DEFAULT 0,
+  balance REAL DEFAULT 0,
+  uploaded_by TEXT NOT NULL,
+  uploaded_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(platform_name, date)
+);
+
+-- 歷史表：記錄所有變更
+CREATE TABLE platform_transaction_history (
+  id TEXT PRIMARY KEY,
+  transaction_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  old_data TEXT,
+  new_data TEXT,
+  changed_by TEXT NOT NULL,
+  changed_at TEXT NOT NULL
+);
+```
+
+**API 路由** (`/api/platform-revenue`):
+- `POST /parse` - 解析 Excel 檔案
+- `POST /import` - 匯入數據到資料庫
+- `GET /` - 查詢交易記錄（支援日期範圍、平台篩選）
+- `GET /stats` - 統計數據（總計、平均、趨勢）
+- `GET /stats/by-date` - 按日期統計
+- `GET /history/:transactionId` - 查詢歷史記錄
+- `POST /restore/:historyId` - 還原歷史版本
+- `GET /export` - 匯出 Excel
+
+#### 前端實施
+
+**組件結構**：
+- `PlatformRevenueView.tsx` - 主容器組件
+- `RevenueUploadTab.tsx` - Excel 上傳和解析
+- `RevenueStatsTab.tsx` - 統計數據展示
+- `RevenueDateStatsTab.tsx` - 按日期統計
+- `RevenueHistoryTab.tsx` - 歷史記錄查詢
+
+**整合到 ReportView**：
+- 添加「💰 平台營收」標籤頁
+- 僅 BOSS/MANAGER/SUPERVISOR 可見
+- 完整的標籤切換和內容渲染
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.192-platform-revenue`
+- **前端 Deploy ID**: `697f56d6d8053e5fa47da14f`
+- **Git Commit**: `2a24768`
+- **狀態**: ✅ 已部署到生產環境
+
+#### 功能特點
+1. **Excel 匯入**：
+   - 支援多平台數據批量匯入
+   - 自動解析和驗證數據格式
+   - 重複數據檢測（platform_name + date）
+
+2. **統計分析**：
+   - 總計金額、次數、平均值
+   - 按平台分組統計
+   - 按日期趨勢分析
+
+3. **歷史記錄**：
+   - 記錄所有數據變更
+   - 支援版本還原
+   - 完整的審計追蹤
+
+4. **數據匯出**：
+   - 匯出為 Excel 格式
+   - 支援日期範圍篩選
+   - 包含所有統計數據
+
+#### 部署方式
+遵循全域規則使用 Netlify CLI 本地編譯部署：
+```powershell
+# 1. 清除舊構建
+Remove-Item -Recurse -Force dist
+
+# 2. 編譯（使用記憶體優化）
+$env:NODE_OPTIONS = "--max_old_space_size=4096"
+npm run build
+
+# 3. 部署到生產環境
+$env:NETLIFY_SITE_ID = "5bb6a0c9-3186-4d11-b9be-07bdce7bf186"
+netlify deploy --prod --dir=dist --no-build
+
+# 4. Git commit
+git add .
+git commit -m "Integrate platform revenue feature to ReportView"
+```
+
+#### 關鍵經驗
+1. **遵循全域規則**：不編譯 TypeScript，使用本地編譯 + Netlify CLI 部署
+2. **組件整合**：正確整合到 ReportView，添加 import、activeTab 類型、按鈕和內容渲染
+3. **權限控制**：僅管理層可見平台營收功能
+4. **數據安全**：使用歷史表記錄所有變更，支援版本還原
 
 ---
 
