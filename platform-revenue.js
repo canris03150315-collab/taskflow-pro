@@ -3,12 +3,21 @@ const router = express.Router();
 const multer = require('multer');
 const xlsx = require('xlsx');
 const { v4: uuidv4 } = require('uuid');
-const { dbCall } = require('../db-adapter');
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }
 });
+
+function dbCall(db, method, ...args) {
+  if (typeof db[method] === 'function') {
+    return db[method](...args);
+  }
+  if (db.db && typeof db.db[method] === 'function') {
+    return db.db[method](...args);
+  }
+  throw new Error(`Method ${method} not found on database object`);
+}
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];

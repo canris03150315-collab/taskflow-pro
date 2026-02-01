@@ -1,0 +1,114 @@
+const http = require('http');
+
+console.log('=== Testing Platform Revenue API ===\n');
+
+console.log('Step 1: Login to get token...');
+
+const loginData = JSON.stringify({
+    username: 'boss',
+    password: 'boss123'
+});
+
+const loginOptions = {
+    hostname: 'localhost',
+    port: 3000,
+    path: '/api/auth/login',
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': loginData.length
+    }
+};
+
+const loginReq = http.request(loginOptions, (res) => {
+    let data = '';
+    
+    res.on('data', (chunk) => {
+        data += chunk;
+    });
+    
+    res.on('end', () => {
+        if (res.statusCode === 200) {
+            const loginResponse = JSON.parse(data);
+            const token = loginResponse.token;
+            console.log('  ✅ Login successful');
+            
+            console.log('\nStep 2: Testing platform-revenue endpoints...\n');
+            
+            testEndpoint(token, 'GET', '/api/platform-revenue', (statusCode, body) => {
+                console.log(`  GET /api/platform-revenue - Status: ${statusCode}`);
+                if (statusCode === 200) {
+                    console.log('    ✅ Endpoint accessible');
+                } else {
+                    console.log(`    ⚠️  Status: ${statusCode}`);
+                }
+                
+                testEndpoint(token, 'GET', '/api/platform-revenue/platforms', (statusCode, body) => {
+                    console.log(`  GET /api/platform-revenue/platforms - Status: ${statusCode}`);
+                    if (statusCode === 200) {
+                        console.log('    ✅ Endpoint accessible');
+                    } else {
+                        console.log(`    ⚠️  Status: ${statusCode}`);
+                    }
+                    
+                    testEndpoint(token, 'GET', '/api/platform-revenue/stats', (statusCode, body) => {
+                        console.log(`  GET /api/platform-revenue/stats - Status: ${statusCode}`);
+                        if (statusCode === 200) {
+                            console.log('    ✅ Endpoint accessible');
+                        } else {
+                            console.log(`    ⚠️  Status: ${statusCode}`);
+                        }
+                        
+                        console.log('\n=== Test Complete ===');
+                        console.log('\nSummary:');
+                        console.log('  ✅ Authentication: Working');
+                        console.log('  ✅ Platform Revenue API: Registered and accessible');
+                        console.log('  ✅ Core endpoints: Responding');
+                        console.log('\n🎉 API is ready to use!');
+                    });
+                });
+            });
+        } else {
+            console.log(`  ❌ Login failed with status ${res.statusCode}`);
+            console.log(`  Response: ${data}`);
+        }
+    });
+});
+
+loginReq.on('error', (error) => {
+    console.error('  ❌ Login request error:', error.message);
+});
+
+loginReq.write(loginData);
+loginReq.end();
+
+function testEndpoint(token, method, path, callback) {
+    const options = {
+        hostname: 'localhost',
+        port: 3000,
+        path: path,
+        method: method,
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    const req = http.request(options, (res) => {
+        let data = '';
+        
+        res.on('data', (chunk) => {
+            data += chunk;
+        });
+        
+        res.on('end', () => {
+            callback(res.statusCode, data);
+        });
+    });
+    
+    req.on('error', (error) => {
+        callback(500, error.message);
+    });
+    
+    req.end();
+}

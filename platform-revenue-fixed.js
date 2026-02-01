@@ -1,0 +1,386 @@
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const xlsx = require('xlsx');
+const { v4: uuidv4 } = require('uuid');
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+function dbCall(db, method, ...args) {
+  if (typeof db[method] === 'function') {
+    return db[method](...args);
+  }
+  if (db.db && typeof db.db[method] === 'function') {
+    return db.db[method](...args);
+  }
+  throw new Error(`Method ${method} not found on database object`);
+}
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: '\u7f3a\u5c11\u8a8d\u8b49 Token' });
+  }
+  
+  try {
+    const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(403).json({ error: '\u7121\u6548\u7684 Token' });
+  }
+}
+
+function parseExcelDate(excelDate) {
+  if (typeof excelDate === 'string') return excelDate;
+  const date = new Date((excelDate - 25569) * 86400 * 1000);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseExcelFile(buffer) {
+  const workbook = xlsx.read(buffer, { type: 'buffer' });
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  const range = xlsx.utils.decode_range(worksheet['!ref']);
+  
+  const platformNames = [];
+  
+  for (let col = 1; col < range.e.c; col += 11) {
+    const headerCell = worksheet[xlsx.utils.encode_cell({ r: 0, c: col })];
+    if (headerCell && headerCell.v) {
+      platformNames.push(headerCell.v);
+    }
+  }
+  
+  const records = [];
+  
+  for (let row = 1; row <= range.e.r; row++) {
+    const dateCell = worksheet[xlsx.utils.encode_cell({ r: row, c: 0 })];
+    if (!dateCell || !dateCell.v) continue;
+    
+    const date = parseExcelDate(dateCell.v);
+    
+    platformNames.forEach((platformName, idx) => {
+      const baseCol = 1 + (idx * 11);
+      
+      const getCell = (offset) => {
+        const cell = worksheet[xlsx.utils.encode_cell({ r: row, c: baseCol + offset })];
+        return cell && cell.v !== undefined ? Number(cell.v) || 0 : 0;
+      };
+      
+      records.push({
+        platform_name: platformName,
+        date: date,
+        lottery_amount: getCell(0),
+        external_game_amount: getCell(1),
+        lottery_dividend: getCell(2),
+        external_dividend: getCell(3),
+        private_return: getCell(4),
+        deposit_amount: getCell(5),
+        withdrawal_amount: getCell(6),
+        loan_amount: getCell(7),
+        profit: getCell(8),
+        balance: getCell(9)
+      });
+    });
+  }
+  
+  return records;
+}
+
+router.post('/parse', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    const db = req.db;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: '\u8acb\u4e0a\u50b3\u6a94\u6848' });
+    }
+    
+    const records = parseExcelFile(req.file.buffer);
+    
+    const duplicates = [];
+    const newRecords = [];
+    
+    for (const record of records) {
+      const existing = dbCall(db, 'prepare', 
+        'SELECT * FROM platform_transactions WHERE platform_name = ? AND date = ?'
+      ).get(record.platform_name, record.date);
+      
+      if (existing) {
+        const differences = {};
+        const fields = [
+          'lottery_amount', 'external_game_amount', 'lottery_dividend',
+          'external_dividend', 'private_return', 'deposit_amount',
+          'withdrawal_amount', 'loan_amount', 'profit', 'balance'
+        ];
+        
+        fields.forEach(field => {
+          if (existing[field] !== record[field]) {
+            differences[field] = {
+              old: existing[field],
+              new: record[field]
+            };
+          }
+        });
+        
+        if (Object.keys(differences).length > 0) {
+          duplicates.push({
+            platform_name: record.platform_name,
+            date: record.date,
+            differences: differences
+          });
+        }
+      } else {
+        newRecords.push(record);
+      }
+    }
+    
+    res.json({
+      success: true,
+      total: records.length,
+      new: newRecords.length,
+      duplicates: duplicates.length,
+      newRecords: newRecords,
+      duplicateRecords: duplicates
+    });
+    
+  } catch (error) {
+    console.error('Parse error:', error);
+    res.status(500).json({ error: '\u89e3\u6790\u5931\u6557' });
+  }
+});
+
+router.post('/import', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
+      return res.status(403).json({ error: '\u6b0a\u9650\u4e0d\u8db3' });
+    }
+    
+    const { records } = req.body;
+    
+    if (!records || !Array.isArray(records)) {
+      return res.status(400).json({ error: '\u7121\u6548\u7684\u6578\u64da' });
+    }
+    
+    const now = new Date().toISOString();
+    let imported = 0;
+    
+    dbCall(db, 'prepare', 'BEGIN TRANSACTION').run();
+    
+    try {
+      for (const record of records) {
+        const id = uuidv4();
+        
+        dbCall(db, 'prepare', `
+          INSERT INTO platform_transactions (
+            id, platform_name, date,
+            lottery_amount, external_game_amount,
+            lottery_dividend, external_dividend, private_return,
+            deposit_amount, withdrawal_amount, loan_amount,
+            profit, balance,
+            uploaded_by, uploaded_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          id, record.platform_name, record.date,
+          record.lottery_amount, record.external_game_amount,
+          record.lottery_dividend, record.external_dividend, record.private_return,
+          record.deposit_amount, record.withdrawal_amount, record.loan_amount,
+          record.profit, record.balance,
+          currentUser.username, now, now, now
+        );
+        
+        const historyId = uuidv4();
+        dbCall(db, 'prepare', `
+          INSERT INTO platform_transaction_history (
+            id, transaction_id, action, old_data, new_data,
+            changed_by, changed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          historyId, id, 'CREATE', null, JSON.stringify(record),
+          currentUser.username, now
+        );
+        
+        imported++;
+      }
+      
+      dbCall(db, 'prepare', 'COMMIT').run();
+      
+      res.json({
+        success: true,
+        imported: imported
+      });
+      
+    } catch (err) {
+      dbCall(db, 'prepare', 'ROLLBACK').run();
+      throw err;
+    }
+    
+  } catch (error) {
+    console.error('Import error:', error);
+    res.status(500).json({ error: '\u532f\u5165\u5931\u6557' });
+  }
+});
+
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { startDate, endDate, platform } = req.query;
+    
+    let query = 'SELECT * FROM platform_transactions WHERE 1=1';
+    const params = [];
+    
+    if (startDate) {
+      query += ' AND date >= ?';
+      params.push(startDate);
+    }
+    
+    if (endDate) {
+      query += ' AND date <= ?';
+      params.push(endDate);
+    }
+    
+    if (platform) {
+      query += ' AND platform_name = ?';
+      params.push(platform);
+    }
+    
+    query += ' ORDER BY date DESC, platform_name ASC';
+    
+    const records = dbCall(db, 'prepare', query).all(...params);
+    
+    res.json({
+      success: true,
+      records: records
+    });
+    
+  } catch (error) {
+    console.error('Query error:', error);
+    res.status(500).json({ error: '\u67e5\u8a62\u5931\u6557' });
+  }
+});
+
+router.get('/platforms', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    
+    const platforms = dbCall(db, 'prepare',
+      'SELECT DISTINCT platform_name FROM platform_transactions ORDER BY platform_name'
+    ).all();
+    
+    res.json({
+      success: true,
+      platforms: platforms.map(p => p.platform_name)
+    });
+    
+  } catch (error) {
+    console.error('Platforms error:', error);
+    res.status(500).json({ error: '\u67e5\u8a62\u5931\u6557' });
+  }
+});
+
+router.get('/stats', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { startDate, endDate, platform } = req.query;
+    
+    let query = `
+      SELECT 
+        platform_name,
+        COUNT(*) as record_count,
+        SUM(lottery_amount) as total_lottery,
+        SUM(external_game_amount) as total_external,
+        SUM(profit) as total_profit,
+        AVG(profit) as avg_profit
+      FROM platform_transactions
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    if (startDate) {
+      query += ' AND date >= ?';
+      params.push(startDate);
+    }
+    
+    if (endDate) {
+      query += ' AND date <= ?';
+      params.push(endDate);
+    }
+    
+    if (platform) {
+      query += ' AND platform_name = ?';
+      params.push(platform);
+    }
+    
+    query += ' GROUP BY platform_name ORDER BY total_profit DESC';
+    
+    const stats = dbCall(db, 'prepare', query).all(...params);
+    
+    res.json({
+      success: true,
+      stats: stats
+    });
+    
+  } catch (error) {
+    console.error('Stats error:', error);
+    res.status(500).json({ error: '\u7d71\u8a08\u5931\u6557' });
+  }
+});
+
+router.get('/stats/by-date', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { startDate, endDate, platform } = req.query;
+    
+    let query = `
+      SELECT 
+        date,
+        SUM(lottery_amount) as total_lottery,
+        SUM(external_game_amount) as total_external,
+        SUM(profit) as total_profit,
+        COUNT(DISTINCT platform_name) as platform_count
+      FROM platform_transactions
+      WHERE 1=1
+    `;
+    const params = [];
+    
+    if (startDate) {
+      query += ' AND date >= ?';
+      params.push(startDate);
+    }
+    
+    if (endDate) {
+      query += ' AND date <= ?';
+      params.push(endDate);
+    }
+    
+    if (platform) {
+      query += ' AND platform_name = ?';
+      params.push(platform);
+    }
+    
+    query += ' GROUP BY date ORDER BY date DESC';
+    
+    const stats = dbCall(db, 'prepare', query).all(...params);
+    
+    res.json({
+      success: true,
+      stats: stats
+    });
+    
+  } catch (error) {
+    console.error('Date stats error:', error);
+    res.status(500).json({ error: '\u7d71\u8a08\u5931\u6557' });
+  }
+});
+
+module.exports = router;
