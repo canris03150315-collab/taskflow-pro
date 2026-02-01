@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-02-01 21:34  
-**版本**: v8.9.192-platform-revenue (後端) / 697f56d6d8053e5fa47da14f (生產環境)  
-**狀態**: ✅ 平台營收功能完整部署並正常運行
+**最後更新**: 2026-02-01 22:14  
+**版本**: v8.9.193-platform-revenue-complete (後端) / 697f56d6d8053e5fa47da14f (生產環境)  
+**狀態**: ✅ 平台營收 API 成功實施（Pure ASCII + 正確 dbCall 模式）
 
 ---
 
@@ -18,7 +18,7 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.192-platform-revenue`
+- **Docker 映像**: `taskflow-pro:v8.9.193-platform-revenue-complete`
 - **容器 ID**: `689732b10678`
 - **容器狀態**: 運行中
 - **掛載配置**:
@@ -40,14 +40,160 @@
 
 ## 🎯 2026-02-01 更新記錄
 
-### 74. 平台營收功能完整實施 ⭐⭐⭐⭐⭐
+### 75. 平台營收 API 成功實施（方案 A：完全重寫）⭐⭐⭐⭐⭐
+**完成時間**: 2026-02-01 22:14  
+**狀態**: ✅ 已完成
+
+#### 問題診斷與分析
+**初次實施失敗原因**（共 4 個核心問題）：
+1. ❌ 路由未在 `server.js` 中註冊
+2. ❌ 使用了不存在的 `db-adapter` 模塊
+3. ❌ **核心問題**：使用了錯誤的 `dbCall` 模式（約 20+ 處）
+4. ❌ **最關鍵**：未遵循專案規範（Pure ASCII、Unicode Escape）
+
+**診斷方法**：
+- ✅ 使用容器內 Node.js 腳本精確診斷
+- ✅ 查閱專案文檔（AI-MANDATORY-CHECKLIST.md、PROJECT-QUICKSTART.md）
+- ✅ 參考現有實施（kol.js、backup.js）
+- ✅ 系統性分析所有失敗點
+
+#### 解決方案：方案 A（完全重寫）
+
+**實施原則**：
+1. ✅ **Pure ASCII 規範**：所有代碼使用純 ASCII 字符
+2. ✅ **Unicode Escape**：中文訊息使用 `\uXXXX` 格式
+3. ✅ **正確的 dbCall 模式**：`const db = req.db; dbCall(db, 'prepare', query).get()`
+4. ✅ **直接導出 router**：不使用函數導出（server.js 已注入 req.db）
+
+#### 後端實施（核心功能）
+
+**路由文件**：`/app/dist/routes/platform-revenue.js`
+
+**已實施端點**：
+- `POST /parse` - 解析 Excel 文件
+- `POST /import` - 匯入數據到資料庫
+- `GET /` - 查詢交易記錄（支援日期範圍、平台篩選）
+- `GET /platforms` - 獲取平台列表
+- `GET /stats` - 統計數據（按平台分組）
+- `GET /stats/by-date` - 按日期統計
+
+**dbCall 函數定義**（參考 kol.js）：
+```javascript
+function dbCall(db, method, ...args) {
+  if (typeof db[method] === 'function') {
+    return db[method](...args);
+  }
+  if (db.db && typeof db.db[method] === 'function') {
+    return db.db[method](...args);
+  }
+  throw new Error(`Method ${method} not found on database object`);
+}
+```
+
+**正確的使用模式**：
+```javascript
+router.get('/example', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;  // ✅ 從 req 獲取 db
+    const result = dbCall(db, 'prepare', 'SELECT * FROM table WHERE id = ?').get(id);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+```
+
+#### 部署流程
+
+**步驟 1：創建快照**
+```powershell
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.192-before-platform-revenue"
+# 結果：256MB 快照
+```
+
+**步驟 2：上傳路由文件**
+```powershell
+Get-Content "platform-revenue-fixed.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/platform-revenue.js"
+ssh root@165.227.147.40 "docker cp /tmp/platform-revenue.js taskflow-pro:/app/dist/routes/platform-revenue.js"
+```
+
+**步驟 3：註冊路由**
+```powershell
+Get-Content "register-platform-revenue-server.js" -Raw | ssh root@165.227.147.40 "cat > /tmp/register-route.js"
+ssh root@165.227.147.40 "docker cp /tmp/register-route.js taskflow-pro:/app/register-route.js"
+ssh root@165.227.147.40 "docker exec -w /app taskflow-pro node register-route.js"
+```
+
+**步驟 4：重啟容器**
+```powershell
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+# 結果：容器成功啟動
+```
+
+**步驟 5：Commit 新映像**
+```powershell
+ssh root@165.227.147.40 "docker commit taskflow-pro taskflow-pro:v8.9.193-platform-revenue-complete"
+```
+
+**步驟 6：創建最終快照**
+```powershell
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.193-platform-revenue-complete"
+# 結果：256MB 快照
+```
+
+**步驟 7：Git commit**
+```powershell
+git add .
+git commit -m "Add platform revenue API - complete implementation with Pure ASCII and correct dbCall pattern"
+```
+
+#### 部署信息
+- **後端 Docker 映像**: `taskflow-pro:v8.9.193-platform-revenue-complete`
+- **前端 Deploy ID**: `697f56d6d8053e5fa47da14f`
+- **快照（修改前）**: `taskflow-snapshot-v8.9.192-before-platform-revenue-20260201_140836.tar.gz` (256MB)
+- **快照（完成後）**: `taskflow-snapshot-v8.9.193-platform-revenue-complete-20260201_141429.tar.gz` (256MB)
+- **Git Commit**: `bd70742`
+- **狀態**: ✅ 已部署並正常運行
+
+#### 關鍵教訓
+
+1. **必須先查閱專案文檔**
+   - ❌ 錯誤：直接開始編碼
+   - ✅ 正確：先閱讀 AI-MANDATORY-CHECKLIST.md、PROJECT-QUICKSTART.md
+
+2. **必須參考現有實施**
+   - ❌ 錯誤：假設實施方式
+   - ✅ 正確：參考 kol.js、backup.js 等現有路由
+
+3. **必須遵循專案規範**
+   - ❌ 錯誤：使用中文字符、錯誤的 dbCall 模式
+   - ✅ 正確：Pure ASCII + Unicode Escape + 正確的 dbCall 模式
+
+4. **必須使用容器內診斷**
+   - ❌ 錯誤：在外部猜測問題
+   - ✅ 正確：使用容器內 Node.js 腳本精確診斷
+
+5. **必須遵循部署流程**
+   - ❌ 錯誤：跳過備份、測試
+   - ✅ 正確：快照 → 修改 → 測試 → Commit → 快照 → Git
+
+6. **失敗後必須深入分析**
+   - ✅ 系統性分析所有失敗原因
+   - ✅ 查閱文檔找出正確方式
+   - ✅ 採用完全重寫而非修補
+
+---
+
+## 🎯 2026-02-01 更新記錄（前端部署）
+
+### 74. 平台營收功能前端部署 ⭐⭐⭐⭐⭐
 **完成時間**: 2026-02-01 21:34  
 **狀態**: ✅ 已完成
 
 #### 功能概述
-實施完整的平台營收管理系統，包含 Excel 數據匯入、統計分析、歷史記錄查詢和數據還原功能。
+實施完整的平台營收管理系統前端，包含 Excel 數據匯入、統計分析、歷史記錄查詢和數據還原功能。
 
-#### 後端實施
+#### 前端實施
 
 **資料庫表結構**：
 ```sql
