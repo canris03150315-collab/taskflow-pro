@@ -6,6 +6,7 @@ import WorkLogTab from './WorkLogTab';
 import { ApprovalModal } from './ApprovalModal';
 import { AuthorizationStatus } from './AuthorizationStatus';
 import { AuditLogView } from './AuditLogView';
+import { PlatformRevenueView } from './PlatformRevenueView';
 import { getAuthorization, isAuthorizationValid, clearAuthorization } from '../utils/authSession';
 
 interface ReportViewProps {
@@ -20,7 +21,7 @@ interface ReportViewProps {
 export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, reports: propReports, departments, onCreateClick, onOpenReportModal }) => {
   const toast = useToast();
   // Tab state - default to 'worklogs'
-  const [activeTab, setActiveTab] = useState<'worklogs' | 'reports' | 'audit'>('worklogs');
+  const [activeTab, setActiveTab] = useState<'worklogs' | 'reports' | 'audit' | 'platform'>('worklogs');
   
   const [reports, setReports] = useState<Report[]>(propReports || []);
   const [loading, setLoading] = useState(false);
@@ -280,16 +281,28 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                     營運報表
                 </button>
                 {(currentUser.role === 'BOSS' || currentUser.role === 'MANAGER' || currentUser.role === 'SUPERVISOR') && (
-                    <button
-                        onClick={() => setActiveTab('audit')}
-                        className={`px-4 py-2 font-semibold rounded-lg transition-colors ${
-                            activeTab === 'audit'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                    >
-                        📋 審核歷史
-                    </button>
+                    <>
+                        <button
+                            onClick={() => setActiveTab('platform')}
+                            className={`px-4 py-2 font-semibold rounded-lg transition-colors ${
+                                activeTab === 'platform'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                        >
+                            💰 平台營收
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('audit')}
+                            className={`px-4 py-2 font-semibold rounded-lg transition-colors ${
+                                activeTab === 'audit'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                        >
+                            📋 審核歷史
+                        </button>
+                    </>
                 )}
             </div>
         </div>
@@ -301,6 +314,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                 departments={departments}
                 users={users}
             />
+        ) : activeTab === 'platform' ? (
+            <PlatformRevenueView currentUser={currentUser} />
         ) : activeTab === 'audit' ? (
             <AuditLogView currentUser={currentUser} />
         ) : (
