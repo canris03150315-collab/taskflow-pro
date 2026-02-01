@@ -74,7 +74,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
     try {
       const response = await fetch(`${API_BASE_URL}/platform-revenue/platforms`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
       if (response.ok) {
@@ -95,7 +95,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/stats/platform?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
@@ -120,7 +120,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
@@ -145,7 +145,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/export?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 

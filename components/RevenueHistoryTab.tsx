@@ -52,7 +52,7 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/history?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
@@ -74,7 +74,7 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
       const response = await fetch(`${API_BASE_URL}/platform-revenue/restore/${historyId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 

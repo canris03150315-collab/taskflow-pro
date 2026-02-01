@@ -43,7 +43,7 @@ export const RevenueDateStatsTab: React.FC<RevenueDateStatsTabProps> = ({ curren
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/stats/date?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         }
       });
 
