@@ -93,13 +93,48 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
       if (result.hasConflicts) {
         setShowConflictModal(true);
       } else {
-        await handleImport('skip');
+        // 直接使用 result，不依賴 state
+        await handleImportWithResult(result, 'skip');
       }
     } catch (error) {
       console.error('Upload error:', error);
       alert('上傳失敗，請稍後再試');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleImportWithResult = async (result: ParseResult, action: 'overwrite' | 'skip') => {
+    try {
+      const recordsToImport = action === 'overwrite'
+        ? [...result.newRecords, ...result.duplicates.map(d => d.new)]
+        : result.newRecords;
+
+      const response = await fetch(`${API_BASE_URL}/platform-revenue/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          records: recordsToImport,
+          overwrite: action === 'overwrite'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('匯入失敗');
+      }
+
+      const importResult = await response.json();
+      alert(`成功匯入 ${importResult.imported} 筆數據`);
+      
+      setShowConflictModal(false);
+      setParseResult(null);
+      setSelectedFile(null);
+    } catch (error) {
+      console.error('Import error:', error);
+      alert('匯入失敗，請稍後再試');
     }
   };
 
@@ -112,39 +147,7 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
     }
 
     if (!parseResult) return;
-
-    try {
-      const recordsToImport = action === 'overwrite'
-        ? [...parseResult.newRecords, ...parseResult.duplicates.map(d => d.new)]
-        : parseResult.newRecords;
-
-      const response = await fetch(`${API_BASE_URL}/platform-revenue/import`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          records: recordsToImport,
-          action: action,
-          fileName: parseResult.fileName
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('匯入失敗');
-      }
-
-      const result = await response.json();
-      alert(`成功匯入 ${result.imported} 筆數據`);
-      
-      setShowConflictModal(false);
-      setParseResult(null);
-      setSelectedFile(null);
-    } catch (error) {
-      console.error('Import error:', error);
-      alert('匯入失敗，請稍後再試');
-    }
+    await handleImportWithResult(parseResult, action);
   };
 
   const fieldNames: Record<string, string> = {
@@ -244,18 +247,23 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
                           </tr>
                         </thead>
                         <tbody>
-                          {Object.entries(dup.differences).map(([field, diff]) => (
-                            <tr key={field} className="border-b border-gray-200">
-                              <td className="py-2 px-3">{fieldNames[field] || field}</td>
-                              <td className="text-right py-2 px-3">{diff.old.toLocaleString()}</td>
-                              <td className="text-right py-2 px-3">{diff.new.toLocaleString()}</td>
-                              <td className={`text-right py-2 px-3 font-semibold ${
-                                diff.change > 0 ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {diff.change > 0 ? '+' : ''}{diff.change.toLocaleString()}
-                              </td>
-                            </tr>
-                          ))}
+                          {Object.entries(dup.differences).map(([field, diff]: [string, any]) => {
+                            const oldVal = Number(diff.old) || 0;
+                            const newVal = Number(diff.new) || 0;
+                            const change = newVal - oldVal;
+                            return (
+                              <tr key={field} className="border-b border-gray-200">
+                                <td className="py-2 px-3">{fieldNames[field] || field}</td>
+                                <td className="text-right py-2 px-3">{oldVal.toLocaleString()}</td>
+                                <td className="text-right py-2 px-3">{newVal.toLocaleString()}</td>
+                                <td className={`text-right py-2 px-3 font-semibold ${
+                                  change > 0 ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                  {change > 0 ? '+' : ''}{change.toLocaleString()}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

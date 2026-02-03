@@ -207,7 +207,7 @@ function AppContent() {
 
     // 初始化 WebSocket 連接
     // 使用 Cloudflare Tunnel 提供有效的 HTTPS/WSS
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://gives-include-jumping-savings.trycloudflare.com/ws';
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://incorporate-ruth-matters-dental.trycloudflare.com/ws';
     console.log('[WebSocket] 連接到:', wsUrl);
     const wsClient = new WebSocketClient(wsUrl);
     wsClientRef.current = wsClient;

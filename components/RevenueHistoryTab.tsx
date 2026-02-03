@@ -58,7 +58,7 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
 
       if (response.ok) {
         const data = await response.json();
-        setHistory(data);
+        setHistory(data.history || []);
       }
     } catch (error) {
       console.error('Load history error:', error);
@@ -139,7 +139,7 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             >
               <option value="">全部</option>
-              {users.map(user => (
+              {users?.map(user => (
                 <option key={user.id} value={user.id}>{user.name}</option>
               ))}
             </select>

@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-02-01 22:14  
-**版本**: v8.9.193-platform-revenue-complete (後端) / 697f56d6d8053e5fa47da14f (生產環境)  
-**狀態**: ✅ 平台營收 API 成功實施（Pure ASCII + 正確 dbCall 模式）
+**最後更新**: 2026-02-02 22:41  
+**版本**: v8.9.207-backup-timestamps-fixed (後端) / 697f56d6d8053e5fa47da14f (生產環境)  
+**狀態**: ✅ 備份系統完整修復（路徑統一 + 時間戳記保留）
 
 ---
 
@@ -18,15 +18,20 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.193-platform-revenue-complete`
-- **容器 ID**: `689732b10678`
+- **Docker 映像**: `taskflow-pro:v8.9.207-backup-timestamps-fixed`
+- **容器 ID**: `36800e386cf4`
 - **容器狀態**: 運行中
 - **掛載配置**:
   - `/root/taskflow-data:/app/data` (讀寫)
-  - `/root/taskflow-backups:/app/data/backups:ro` (只讀)
+- **備份系統**:
+  - 備份目錄: `/root/taskflow-data/backups/`
+  - 備份數量: 117 個（涵蓋 9 天）
+  - 備份頻率: 每小時一次（crontab 正常運作）
+  - 時間戳記: ✅ 已修復（使用 `cp -p` 保留原始時間）
+  - 磁碟空間: 17 GB 可用（足夠保存 30 天以上）
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.191-before-remount-20260129_150113.tar.gz` (238MB)
+- **快照**: `taskflow-snapshot-v8.9.207-backup-timestamps-fixed-20260202_142236.tar.gz` (256MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
@@ -35,6 +40,240 @@
 - **Git 狀態**: 已初始化，有完整歷史
 - **Git Commit**: `e7f3c69` (修復備份監控 API 並重新創建容器掛載宿主機備份目錄)
 - **狀態**: ✅ 所有變更已提交
+
+---
+
+## 🎯 2026-02-02 更新記錄
+
+### 76. 備份系統完整修復（路徑統一 + 時間戳記保留）⭐⭐⭐⭐⭐
+**完成時間**: 2026-02-02 22:41  
+**狀態**: ✅ 已完成
+
+#### 問題診斷
+
+**問題 1：備份監控頁面顯示異常**
+- 備份數量顯示為 0
+- 最新備份大小顯示 N/A
+- 備份狀態顯示「異常狀態」
+
+**問題 2：備份時間戳記全部相同**
+- 所有 117 個備份的「建立時間」都顯示為「2026/02/02 下午 10:13:49」
+- 用戶發現異常並要求檢查
+
+#### 根本原因
+
+**原因 1：備份目錄路徑不一致**
+- 後端 API 查找：`/app/data/backups/`（容器內）
+- crontab 備份到：`/root/taskflow-backups/`（宿主機，未掛載到容器）
+- 結果：後端 API 找不到備份檔案
+
+**原因 2：複製備份時未保留時間戳記**
+- 使用 `cp` 命令複製檔案時，所有檔案的 mtime 都被更新為複製時間
+- 原始備份檔案有正確的時間戳記（每小時一次）
+- 複製後所有檔案時間變成同一時間
+
+#### 解決方案
+
+**修復 1：統一備份目錄路徑**
+
+變更備份目錄：
+- **舊路徑**：`/root/taskflow-backups/`（獨立目錄）
+- **新路徑**：`/root/taskflow-data/backups/`（容器掛載點內）
+
+更新備份腳本：
+```bash
+# /root/backup-taskflow.sh
+BACKUP_DIR="/root/taskflow-data/backups"  # 修改為容器可訪問的路徑
+```
+
+複製現有備份：
+```bash
+cp /root/taskflow-backups/taskflow_backup_*.db /root/taskflow-data/backups/
+cp /root/taskflow-backups/taskflow_backup_*.db-wal /root/taskflow-data/backups/
+cp /root/taskflow-backups/taskflow_backup_*.db-shm /root/taskflow-data/backups/
+```
+
+**修復 2：保留原始時間戳記**
+
+使用 `cp -p` 保留檔案屬性：
+```bash
+# 刪除錯誤時間的檔案
+rm -f /root/taskflow-data/backups/taskflow_backup_*.db*
+
+# 使用 -p 參數重新複製
+cp -p /root/taskflow-backups/taskflow_backup_*.db /root/taskflow-data/backups/
+cp -p /root/taskflow-backups/taskflow_backup_*.db-wal /root/taskflow-data/backups/
+cp -p /root/taskflow-backups/taskflow_backup_*.db-shm /root/taskflow-data/backups/
+```
+
+#### 驗證結果
+
+**後端 API 測試**：
+```javascript
+// 測試腳本結果
+Total backup files found: 117
+Latest backup: taskflow_backup_20260202_140001.db
+Size: 3.20 MB
+Created: 2026-02-02T14:00:01.586Z
+Status: healthy
+
+Unique dates found: 9
+Dates: ['2026-01-25', '2026-01-26', '2026-01-27', '2026-01-28', 
+        '2026-01-29', '2026-01-30', '2026-01-31', '2026-02-01', '2026-02-02']
+
+✅ SUCCESS: Timestamps are diverse and correct
+```
+
+**備份時間分佈**（2026-02-02）：
+- 00:00 - taskflow_backup_20260202_000001.db (3.2M)
+- 01:00 - taskflow_backup_20260202_010001.db (3.2M)
+- 02:00 - taskflow_backup_20260202_020001.db (3.2M)
+- ... (每小時一次)
+- 14:00 - taskflow_backup_20260202_140001.db (3.2M)
+
+✅ **今日已完成 15 次備份**（00:00 ~ 14:00）
+
+#### 備份系統完整檢查
+
+**1. 資料庫儲存位置**
+- 主資料庫：`/root/taskflow-data/taskflow.db`（宿主機）
+- 容器內路徑：`/app/data/taskflow.db`
+- 掛載方式：Docker bind mount（讀寫）
+- 當前大小：3.2 MB
+
+**2. 自動備份設定**
+- Crontab：`0 * * * * /root/backup-taskflow.sh`
+- 執行頻率：每小時整點
+- 備份腳本：`/root/backup-taskflow.sh`（v3）
+- 保留策略：保留最近 7 天
+
+**3. 備份檔案狀態**
+- 總備份數：117 個 .db 檔案
+- 時間範圍：2026-01-25 ~ 2026-02-02（9 天）
+- 備份目錄大小：488 MB
+- 時間戳記：✅ 正確（每個備份都有原始建立時間）
+
+**4. 磁碟空間分析**
+- 總容量：49 GB
+- 已使用：32 GB (66%)
+- 可用空間：17 GB
+- 備份佔用：488 MB
+
+**一個月備份空間需求**：
+- 每天 24 個備份 × 30 天 = 720 個備份
+- 所需空間：720 × 3.2 MB ≈ 2.25 GB
+- 結論：✅ 磁碟空間完全足夠（僅佔可用空間 13.2%）
+
+#### 部署流程
+
+**步驟 1：修復備份路徑**
+```bash
+# 創建修復腳本
+cat > /tmp/fix-backup-path-ascii.sh << 'EOF'
+#!/bin/bash
+BACKUP_DIR="/root/taskflow-data/backups"
+mkdir -p "$BACKUP_DIR"
+cp /root/taskflow-backups/taskflow_backup_*.db "$BACKUP_DIR/"
+cp /root/taskflow-backups/taskflow_backup_*.db-wal "$BACKUP_DIR/" 2>/dev/null
+cp /root/taskflow-backups/taskflow_backup_*.db-shm "$BACKUP_DIR/" 2>/dev/null
+# 更新備份腳本
+sed -i 's|BACKUP_DIR="/root/taskflow-backups"|BACKUP_DIR="/root/taskflow-data/backups"|g' /root/backup-taskflow.sh
+EOF
+
+chmod +x /tmp/fix-backup-path-ascii.sh
+/tmp/fix-backup-path-ascii.sh
+```
+
+**步驟 2：修復時間戳記**
+```bash
+# 創建修復腳本
+cat > /tmp/fix-timestamps.sh << 'EOF'
+#!/bin/bash
+BACKUP_DIR="/root/taskflow-data/backups"
+OLD_BACKUP_DIR="/root/taskflow-backups"
+
+# 刪除錯誤時間的檔案
+rm -f "$BACKUP_DIR"/taskflow_backup_*.db*
+
+# 使用 -p 保留時間戳記重新複製
+cp -p "$OLD_BACKUP_DIR"/taskflow_backup_*.db "$BACKUP_DIR/"
+cp -p "$OLD_BACKUP_DIR"/taskflow_backup_*.db-wal "$BACKUP_DIR/" 2>/dev/null
+cp -p "$OLD_BACKUP_DIR"/taskflow_backup_*.db-shm "$BACKUP_DIR/" 2>/dev/null
+
+# 更新 latest.db 符號連結
+LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/taskflow_backup_*.db | head -1)
+ln -sf "$LATEST_BACKUP" "$BACKUP_DIR/latest.db"
+EOF
+
+chmod +x /tmp/fix-timestamps.sh
+/tmp/fix-timestamps.sh
+```
+
+**步驟 3：重啟容器**
+```bash
+ssh root@165.227.147.40 "docker restart taskflow-pro"
+```
+
+**步驟 4：創建快照**
+```bash
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.206-backup-path-fixed"
+# 結果：256MB 快照
+
+ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.207-backup-timestamps-fixed"
+# 結果：256MB 快照
+```
+
+#### 最終版本
+
+- **後端映像**：`taskflow-pro:v8.9.207-backup-timestamps-fixed`
+- **容器 ID**：`36800e386cf4`
+- **快照**：
+  - `taskflow-snapshot-v8.9.206-backup-path-fixed-20260202_141534.tar.gz` (256MB)
+  - `taskflow-snapshot-v8.9.207-backup-timestamps-fixed-20260202_142236.tar.gz` (256MB)
+- **備份總數**：117 個
+- **備份狀態**：✅ 正常（healthy）
+- **時間戳記**：✅ 正確（每個備份都有原始時間）
+
+#### 關鍵教訓
+
+1. **備份目錄必須在容器掛載點內**
+   - 後端 API 只能訪問容器內路徑
+   - 備份目錄必須在掛載的 volume 內
+
+2. **複製備份檔案必須使用 `cp -p`**
+   - `-p` 參數保留檔案屬性（mtime, atime, mode）
+   - 否則所有檔案時間都會變成複製時間
+   - 對備份系統來說，時間戳記是判斷備份狀態的關鍵
+
+3. **備份系統需要定期檢查**
+   - 檢查備份數量是否正常
+   - 檢查時間戳記是否正確
+   - 檢查磁碟空間是否充足
+
+4. **備份監控頁面的重要性**
+   - 可視化備份狀態
+   - 及時發現異常
+   - 用戶能主動發現問題
+
+#### 備份系統架構總結
+
+```
+每小時整點 (crontab)
+    ↓
+執行 /root/backup-taskflow.sh
+    ↓
+複製 /root/taskflow-data/taskflow.db
+    ↓
+儲存到 /root/taskflow-data/backups/taskflow_backup_YYYYMMDD_HHMMSS.db
+    ↓
+容器內可透過 /app/data/backups/ 訪問
+    ↓
+後端 API 讀取並顯示在監控頁面
+    ↓
+保留最近 7 天的備份（自動清理）
+```
+
+**備份系統完全正常運作，無需任何調整！** 🎉
 
 ---
 

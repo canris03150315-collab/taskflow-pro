@@ -20,15 +20,6 @@ function dbCall(db, method, ...args) {
   throw new Error(`Method ${method} not found on database object`);
 }
 
-function parseExcelDate(excelDate) {
-  if (typeof excelDate === 'string') return excelDate;
-  const date = new Date((excelDate - 25569) * 86400 * 1000);
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function parseExcelFile(buffer) {
   const workbook = xlsx.read(buffer, { type: 'buffer' });
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -47,34 +38,40 @@ function parseExcelFile(buffer) {
   }
 
   const records = [];
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
 
-  for (let row = 2; row <= range.e.r; row++) {
+  for (let row = 4; row <= range.e.r; row++) {
     const dateCell = worksheet[xlsx.utils.encode_cell({ r: row, c: 1 })];
     if (!dateCell || !dateCell.v) continue;
 
-    const date = parseExcelDate(dateCell.v);
+    const dayNum = Number(dateCell.v);
+    if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) continue;
+
+    const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
 
     platformNames.forEach((platform) => {
       const baseCol = platform.startCol;
 
-      const getCell = (offset) => {
-        const cell = worksheet[xlsx.utils.encode_cell({ r: row, c: baseCol + offset })];
+      const getCell = (col) => {
+        const cell = worksheet[xlsx.utils.encode_cell({ r: row, c: col })];
         return cell && cell.v !== undefined ? Number(cell.v) || 0 : 0;
       };
 
       records.push({
         platform_name: platform.name,
-        date: date,
-        lottery_amount: getCell(1),
-        external_game_amount: getCell(3),
-        lottery_dividend: getCell(7),
-        external_dividend: getCell(9),
-        private_return: getCell(11),
-        deposit_amount: getCell(12),
-        withdrawal_amount: getCell(13),
-        loan_amount: getCell(14),
-        profit: getCell(15),
-        balance: getCell(16)
+        date: dateStr,
+        lottery_amount: getCell(baseCol + 1),
+        external_game_amount: getCell(baseCol + 3),
+        lottery_dividend: getCell(baseCol + 7),
+        external_dividend: getCell(baseCol + 9),
+        private_return: getCell(baseCol + 11),
+        deposit_amount: getCell(baseCol + 12),
+        withdrawal_amount: getCell(baseCol + 13),
+        loan_amount: getCell(baseCol + 14),
+        profit: getCell(baseCol + 15),
+        balance: getCell(baseCol + 16)
       });
     });
   }
@@ -289,6 +286,7 @@ router.get('/stats/platform', authenticateToken, async (req, res) => {
     let query = `
       SELECT 
         platform_name,
+        COUNT(*) as record_count,
         SUM(lottery_amount) as total_lottery,
         SUM(external_game_amount) as total_external,
         SUM(lottery_dividend) as total_lottery_dividend,
@@ -298,6 +296,9 @@ router.get('/stats/platform', authenticateToken, async (req, res) => {
         SUM(withdrawal_amount) as total_withdrawal,
         SUM(loan_amount) as total_loan,
         SUM(profit) as total_profit,
+        AVG(profit) as avg_profit,
+        MAX(profit) as max_profit,
+        MIN(profit) as min_profit,
         AVG(balance) as avg_balance
       FROM platform_transactions
       WHERE 1=1
@@ -374,6 +375,165 @@ router.get('/stats/by-date', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Date stats error:', error);
     res.status(500).json({ error: '\u65e5\u671f\u7d71\u8a08\u5931\u6557' });
+  }
+});
+
+router.get('/stats/date', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { startDate, endDate, platform } = req.query;
+
+    let query = `
+      SELECT 
+        date,
+        SUM(lottery_amount) as total_lottery,
+        SUM(external_game_amount) as total_external,
+        SUM(deposit_amount) as total_deposit,
+        SUM(withdrawal_amount) as total_withdrawal,
+        SUM(profit) as total_profit
+      FROM platform_transactions
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (startDate) {
+      query += ' AND date >= ?';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      query += ' AND date <= ?';
+      params.push(endDate);
+    }
+
+    if (platform) {
+      query += ' AND platform_name = ?';
+      params.push(platform);
+    }
+
+    query += ' GROUP BY date ORDER BY date DESC';
+
+    const stats = dbCall(db, 'prepare', query).all(...params);
+
+    res.json({
+      success: true,
+      stats: stats
+    });
+
+  } catch (error) {
+    console.error('Date stats error:', error);
+    res.status(500).json({ error: '\u65e5\u671f\u7d71\u8a08\u5931\u6557' });
+  }
+});
+
+router.get('/history', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { startDate, endDate, actionBy, actionType } = req.query;
+
+    let query = `
+      SELECT 
+        h.*,
+        u.name as action_by_name
+      FROM platform_revenue_history h
+      LEFT JOIN users u ON h.action_by = u.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (startDate) {
+      query += ' AND DATE(h.action_at) >= ?';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      query += ' AND DATE(h.action_at) <= ?';
+      params.push(endDate);
+    }
+
+    if (actionBy) {
+      query += ' AND h.action_by = ?';
+      params.push(actionBy);
+    }
+
+    if (actionType) {
+      query += ' AND h.action_type = ?';
+      params.push(actionType);
+    }
+
+    query += ' ORDER BY h.action_at DESC LIMIT 100';
+
+    const history = dbCall(db, 'prepare', query).all(...params);
+
+    res.json({
+      success: true,
+      history: history
+    });
+
+  } catch (error) {
+    console.error('History error:', error);
+    res.status(500).json({ error: '\u7372\u53d6\u6b77\u53f2\u8a18\u9304\u5931\u6557' });
+  }
+});
+
+router.post('/restore/:historyId', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { historyId } = req.params;
+    const currentUser = req.user;
+
+    const historyRecord = dbCall(db, 'prepare',
+      'SELECT * FROM platform_revenue_history WHERE id = ?'
+    ).get(historyId);
+
+    if (!historyRecord) {
+      return res.status(404).json({ error: '\u6b77\u53f2\u8a18\u9304\u4e0d\u5b58\u5728' });
+    }
+
+    if (!historyRecord.old_data) {
+      return res.status(400).json({ error: '\u7121\u6cd5\u9084\u539f\uff0c\u7f3a\u5c11\u820a\u8cc7\u6599' });
+    }
+
+    const oldData = JSON.parse(historyRecord.old_data);
+    const now = new Date().toISOString();
+
+    dbCall(db, 'prepare', `
+      UPDATE platform_transactions SET
+        lottery_amount = ?, external_game_amount = ?, lottery_dividend = ?,
+        external_dividend = ?, private_return = ?, deposit_amount = ?,
+        withdrawal_amount = ?, loan_amount = ?, profit = ?, balance = ?,
+        last_modified_by = ?, last_modified_by_name = ?, last_modified_at = ?,
+        updated_at = ?
+      WHERE id = ?
+    `).run(
+      oldData.lottery_amount, oldData.external_game_amount, oldData.lottery_dividend,
+      oldData.external_dividend, oldData.private_return, oldData.deposit_amount,
+      oldData.withdrawal_amount, oldData.loan_amount, oldData.profit, oldData.balance,
+      currentUser.id, currentUser.username, now, now,
+      historyRecord.transaction_id
+    );
+
+    const historyId2 = `history-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    dbCall(db, 'prepare', `
+      INSERT INTO platform_revenue_history (
+        id, transaction_id, action_type, action_by, action_at,
+        old_data, new_data, changes_summary
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      historyId2, historyRecord.transaction_id, 'RESTORE',
+      currentUser.id, now,
+      historyRecord.new_data, historyRecord.old_data,
+      '\u9084\u539f\u81f3\u6b77\u53f2\u7248\u672c'
+    );
+
+    res.json({
+      success: true,
+      message: '\u9084\u539f\u6210\u529f'
+    });
+
+  } catch (error) {
+    console.error('Restore error:', error);
+    res.status(500).json({ error: '\u9084\u539f\u5931\u6557' });
   }
 });
 

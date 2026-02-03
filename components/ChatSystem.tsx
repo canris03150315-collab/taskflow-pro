@@ -79,7 +79,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
     const isProduction = window.location.protocol === 'https:';
     
     if (!isProduction) { // Enable WebSocket for HTTP connections
-      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'wss://gives-include-jumping-savings.trycloudflare.com/ws';
+      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'wss://incorporate-ruth-matters-dental.trycloudflare.com/ws';
       wsClientRef.current = new WebSocketClient(wsUrl);
       
       const handleMessage = (event: any) => {

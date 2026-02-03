@@ -49,7 +49,7 @@ export const RevenueDateStatsTab: React.FC<RevenueDateStatsTabProps> = ({ curren
 
       if (response.ok) {
         const data = await response.json();
-        setStats(data);
+        setStats(data.stats || []);
       }
     } catch (error) {
       console.error('Load date stats error:', error);
