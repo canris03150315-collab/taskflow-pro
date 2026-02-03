@@ -337,6 +337,10 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">棋牌</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">外接返點</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">真人私返</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">彩票領取分紅</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">彩票下發分紅</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">外接領取分紅</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">外接下發分紅</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -355,6 +359,10 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
                         <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_game_chess || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_game_rebate || 0).toLocaleString()}</td>
                         <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_game_private || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_lottery_dividend_receive || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_lottery_dividend_send || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_external_dividend_receive || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_external_dividend_send || 0).toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
