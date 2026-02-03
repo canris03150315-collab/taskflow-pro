@@ -1,8 +1,8 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-02-02 22:41  
-**版本**: v8.9.207-backup-timestamps-fixed (後端) / 697f56d6d8053e5fa47da14f (生產環境)  
-**狀態**: ✅ 備份系統完整修復（路徑統一 + 時間戳記保留）
+**最後更新**: 2026-02-03 01:50  
+**版本**: v8.9.208-platform-revenue-detailed (後端) / 697f56d6d8053e5fa47da14f (生產環境)  
+**狀態**: ✅ 平台營收詳細欄位擴展完成
 
 ---
 
@@ -18,7 +18,7 @@
 - **狀態**: ✅ 正常運行
 
 ### 後端
-- **Docker 映像**: `taskflow-pro:v8.9.207-backup-timestamps-fixed`
+- **Docker 映像**: `taskflow-pro:v8.9.208-platform-revenue-detailed`
 - **容器 ID**: `36800e386cf4`
 - **容器狀態**: 運行中
 - **掛載配置**:
@@ -31,7 +31,7 @@
   - 磁碟空間: 17 GB 可用（足夠保存 30 天以上）
 - **Cloudflare Tunnel**: `gives-include-jumping-savings.trycloudflare.com`
 - **資料庫**: 所有記錄完整
-- **快照**: `taskflow-snapshot-v8.9.207-backup-timestamps-fixed-20260202_142236.tar.gz` (256MB)
+- **快照**: `taskflow-snapshot-v8.9.208-platform-revenue-detailed-complete-20260203_015027.tar.gz` (256MB)
 - **快照位置**: `/root/taskflow-snapshots/`
 - **環境變數**: GEMINI_API_KEY 已設置
 - **狀態**: ✅ 服務運行中
@@ -40,6 +40,65 @@
 - **Git 狀態**: 已初始化，有完整歷史
 - **Git Commit**: `e7f3c69` (修復備份監控 API 並重新創建容器掛載宿主機備份目錄)
 - **狀態**: ✅ 所有變更已提交
+
+---
+
+## 🎯 2026-02-03 更新記錄
+
+### 77. 平台營收詳細欄位擴展⭐⭐⭐⭐⭐
+**完成時間**: 2026-02-03 01:50  
+**狀態**: ✅ 已完成
+
+**問題描述**:
+- 用戶的 Excel 檔案包含詳細的子欄位（彩票工資、反點、真人AG、棋牌等）
+- 當前系統只存儲合併後的總和，丟失了詳細數據
+- 需要擴展數據庫以保留所有原始詳細欄位
+
+**實施方案**:
+- 方案 A：擴展數據庫保留詳細欄位（已採用）
+- 添加 10 個新欄位到 `platform_transactions` 表
+- 更新解析器存儲詳細數據
+- 前端添加詳細/簡要視圖切換
+
+**執行步驟**:
+1. ✅ 創建快照備份：`v8.9.208-platform-revenue-detailed-before`
+2. ✅ 數據庫遷移：添加 10 個詳細欄位
+3. ✅ 更新解析器：`platform-revenue-detailed.js`
+4. ✅ 替換路由文件
+5. ✅ 重啟容器
+6. ✅ Commit 新映像：`taskflow-pro:v8.9.208-platform-revenue-detailed`
+7. ✅ 創建最終快照：`v8.9.208-platform-revenue-detailed-complete`
+8. ✅ Git commit
+
+**新增欄位**:
+- `lottery_wage` - 彩票工資
+- `lottery_rebate` - 彩票反點
+- `game_ag` - 真人AG
+- `game_chess` - 棋牌
+- `game_rebate` - 外接返點
+- `game_private` - 真人私返
+- `lottery_dividend_receive` - 彩票領取分紅
+- `lottery_dividend_send` - 彩票下發分紅
+- `external_dividend_receive` - 外接領取分紅
+- `external_dividend_send` - 外接下發分紅
+
+**技術細節**:
+- 使用 `Get-Content | ssh` 管道上傳文件（符合規則）
+- 數據庫遷移使用簡化腳本避免編碼問題
+- 保留合併欄位以保持向後兼容
+- 前端組件：`RevenueStatsTab-Detailed.tsx`
+
+**驗證結果**:
+- ✅ 數據庫遷移成功，總欄位數：39
+- ✅ 容器重啟正常
+- ✅ 新映像已創建
+- ✅ 快照已保存
+
+**相關文件**:
+- `migrate-platform-revenue-simple.cjs` - 數據庫遷移腳本
+- `platform-revenue-detailed.js` - 更新的解析器
+- `components/RevenueStatsTab-Detailed.tsx` - 前端詳細視圖組件
+- `IMPLEMENTATION-PLAN-PLATFORM-REVENUE-DETAILED.md` - 實施計劃文檔
 
 ---
 
