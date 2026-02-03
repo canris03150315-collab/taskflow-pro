@@ -4,6 +4,7 @@ import { RevenueUploadTab } from './RevenueUploadTab';
 import { RevenueStatsTab } from './RevenueStatsTab';
 import { RevenueDateStatsTab } from './RevenueDateStatsTab';
 import { RevenueHistoryTab } from './RevenueHistoryTab';
+import RevenueMonthlyView from './RevenueMonthlyView';
 
 interface PlatformRevenueViewProps {
   currentUser: User;
@@ -16,7 +17,7 @@ export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
   users,
   departments
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'upload' | 'platform_stats' | 'date_stats' | 'history'>('upload');
+  const [activeSubTab, setActiveSubTab] = useState<'upload' | 'monthly' | 'platform_stats' | 'date_stats' | 'history'>('monthly');
 
   return (
     <div className="space-y-6">
@@ -30,6 +31,16 @@ export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
           }`}
         >
           📤 上傳報表
+        </button>
+        <button
+          onClick={() => setActiveSubTab('monthly')}
+          className={`px-4 py-2 font-semibold rounded-t-lg transition-colors ${
+            activeSubTab === 'monthly'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          📅 月度視圖
         </button>
         <button
           onClick={() => setActiveSubTab('platform_stats')}
@@ -65,6 +76,9 @@ export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
 
       {activeSubTab === 'upload' && (
         <RevenueUploadTab currentUser={currentUser} />
+      )}
+      {activeSubTab === 'monthly' && (
+        <RevenueMonthlyView currentUser={currentUser} />
       )}
       {activeSubTab === 'platform_stats' && (
         <RevenueStatsTab currentUser={currentUser} users={users} departments={departments} />
