@@ -15,13 +15,13 @@
 
 [[redirects]]
   from = "/api/*"
-  to = "https://robin-heel-device-rugby.trycloudflare.com/api/:splat"
+  to = "https://related-angle-carpet-get.trycloudflare.com/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/ws"
-  to = "wss://robin-heel-device-rugby.trycloudflare.com/ws"
+  to = "wss://related-angle-carpet-get.trycloudflare.com/ws"
   status = 200
   force = true
 

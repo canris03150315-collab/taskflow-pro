@@ -1,90 +1,57 @@
-// 修復 auth.js - 移除壞掉的代碼，添加正確的修改密碼端點
 const fs = require('fs');
 
-const filePath = '/app/dist/routes/auth.js';
-const brokenPath = '/tmp/auth-broken.js';
+console.log('=== Final Auth.js Fix (Keep async for bcrypt) ===\n');
 
-// 讀取原始壞掉的文件
-let content = fs.readFileSync(brokenPath, 'utf8');
+const authPath = '/app/dist/routes/auth.js';
 
-// 找到 exports.default 之前的部分（移除壞掉的 change-password 路由）
-const exportIndex = content.indexOf('exports.default = router;');
-const changePasswordIndex = content.indexOf('// POST /auth/change-password');
-
-if (changePasswordIndex > -1 && changePasswordIndex < exportIndex) {
-    // 移除壞掉的代碼
-    content = content.substring(0, changePasswordIndex);
+try {
+  let content = fs.readFileSync(authPath, 'utf8');
+  
+  console.log('[1/3] Fixing /setup/check route (no bcrypt, remove async)...');
+  content = content.replace(
+    /router\.get\('\/setup\/check',\s*async\s*\(req,\s*res\)\s*=>\s*\{[\s\S]*?const\s+result\s*=\s*await\s+db\.get\('SELECT COUNT\(\*\) as count FROM users'\);/,
+    "router.get('/setup/check', (req, res) => {\n  try {\n    const db = req.db;\n    const result = db.db.prepare('SELECT COUNT(*) as count FROM users').get();"
+  );
+  
+  console.log('[2/3] Fixing database calls in /login (keep async for bcrypt)...');
+  content = content.replace(
+    /const\s+userRow\s*=\s*await\s+db\.get\('SELECT \* FROM users WHERE username = \?',\s*\[username\]\);/,
+    "const userRow = db.db.prepare('SELECT * FROM users WHERE username = ?').get(username);"
+  );
+  
+  console.log('[3/3] Fixing database calls in /setup and /change-password...');
+  content = content.replace(
+    /const\s+existingUsers\s*=\s*await\s+db\.get\('SELECT COUNT\(\*\) as count FROM users'\);/g,
+    "const existingUsers = db.db.prepare('SELECT COUNT(*) as count FROM users').get();"
+  );
+  content = content.replace(
+    /const\s+existingUser\s*=\s*await\s+db\.get\('SELECT id FROM users WHERE username = \?',\s*\[username\]\);/,
+    "const existingUser = db.db.prepare('SELECT id FROM users WHERE username = ?').get(username);"
+  );
+  content = content.replace(
+    /const\s+deptExists\s*=\s*await\s+db\.get\('SELECT id FROM departments WHERE id = \?',\s*\[department \|\| 'Management'\]\);/,
+    "const deptExists = db.db.prepare('SELECT id FROM departments WHERE id = ?').get(department || 'Management');"
+  );
+  content = content.replace(
+    /await\s+db\.run\(`INSERT INTO users \(id, name, role, department, avatar, username, password, created_at, updated_at\)[\s\S]*?VALUES[\s\S]*?`,\s*\[([^\]]+)\]\);/,
+    "db.db.prepare('INSERT INTO users (id, name, role, department, avatar, username, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run($1);"
+  );
+  content = content.replace(
+    /const\s+userRow\s*=\s*await\s+db\.get\('SELECT \* FROM users WHERE id = \?',\s*\[decoded\.id\]\);/g,
+    "const userRow = db.db.prepare('SELECT * FROM users WHERE id = ?').get(decoded.id);"
+  );
+  content = content.replace(
+    /await\s+db\.run\('UPDATE users SET password = \?, updated_at = datetime\(\\\'now\\\'\) WHERE id = \?',\s*\[hashedNewPassword, decoded\.id\]\);/,
+    "db.db.prepare('UPDATE users SET password = ?, updated_at = ? WHERE id = ?').run(hashedNewPassword, new Date().toISOString(), decoded.id);"
+  );
+  
+  fs.writeFileSync(authPath, content, 'utf8');
+  
+  console.log('');
+  console.log('SUCCESS: All database calls fixed');
+  console.log('NOTE: async/await kept for bcrypt functions (hashPassword, verifyPassword)');
+  
+} catch (error) {
+  console.error('ERROR:', error.message);
+  process.exit(1);
 }
-
-// 如果結尾有多餘的 exports.default，移除
-content = content.replace(/exports\.default = router;\s*$/g, '');
-
-// 添加正確的修改密碼路由
-const changePasswordRoute = `
-// POST /auth/change-password - 修改密碼
-router.post("/change-password", async (req, res) => {
-    try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).json({ success: false, message: "未提供認證 Token" });
-        }
-        
-        const token = authHeader.substring(7);
-        const db = req.db;
-        
-        let decoded;
-        try {
-            decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-        } catch (e) {
-            return res.status(401).json({ success: false, message: "Token 無效或已過期" });
-        }
-        
-        const currentUser = await db.get("SELECT * FROM users WHERE id = ?", [decoded.id]);
-        if (!currentUser) {
-            return res.status(401).json({ success: false, message: "用戶不存在" });
-        }
-
-        const { userId, currentPassword, newPassword } = req.body;
-
-        if (!userId || !currentPassword || !newPassword) {
-            return res.status(400).json({ success: false, message: "請提供完整資訊" });
-        }
-
-        const isAdmin = currentUser.role === "BOSS" || currentUser.role === "MANAGER";
-        if (currentUser.id !== userId && !isAdmin) {
-            return res.status(403).json({ success: false, message: "無權修改他人密碼" });
-        }
-
-        const targetUser = await db.get("SELECT * FROM users WHERE id = ?", [userId]);
-        if (!targetUser) {
-            return res.status(404).json({ success: false, message: "用戶不存在" });
-        }
-
-        const validPassword = await bcrypt_1.default.compare(currentPassword, targetUser.password);
-        if (!validPassword) {
-            return res.status(400).json({ success: false, message: "目前密碼不正確" });
-        }
-
-        if (currentPassword === newPassword) {
-            return res.status(400).json({ success: false, message: "新密碼不能與目前密碼相同" });
-        }
-
-        const hashedPassword = await bcrypt_1.default.hash(newPassword, 10);
-        await db.run("UPDATE users SET password = ?, updated_at = ? WHERE id = ?",
-            [hashedPassword, new Date().toISOString(), userId]);
-
-        console.log("[Auth] 密碼已修改:", userId);
-        res.json({ success: true, message: "密碼修改成功" });
-    } catch (error) {
-        console.error("[Auth] 修改密碼錯誤:", error);
-        res.status(500).json({ success: false, message: "伺服器錯誤" });
-    }
-});
-
-exports.default = router;
-`;
-
-content = content.trim() + '\n' + changePasswordRoute;
-
-fs.writeFileSync(filePath, content);
-console.log('✓ auth.js 已修復');

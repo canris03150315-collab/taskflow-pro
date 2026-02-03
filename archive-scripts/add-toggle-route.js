@@ -1,41 +1,55 @@
 const fs = require('fs');
 
-const routinesPath = '/app/dist/routes/routines.js';
-let content = fs.readFileSync(routinesPath, 'utf8');
+const filePath = '/app/dist/routes/routines.js';
+let content = fs.readFileSync(filePath, 'utf8');
 
-const toggleRoute = `
-router.post('/records/:id/toggle', authenticateToken, async (req, res) => {
-  try {
-    const db = req.db;
-    const { id } = req.params;
-    const { index, isCompleted } = req.body;
-    
-    const record = dbCall(db, 'prepare', 'SELECT * FROM routine_records WHERE id = ?').get(id);
-    
-    if (!record) {
-      return res.status(404).json({ error: '\\u8a18\\u9304\\u4e0d\\u5b58\\u5728' });
-    }
-    
-    let completedItems = JSON.parse(record.completed_items || '[]');
-    completedItems[index] = isCompleted;
-    
-    dbCall(db, 'prepare', 'UPDATE routine_records SET completed_items = ? WHERE id = ?').run(JSON.stringify(completedItems), id);
-    
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Toggle item error:', error);
-    res.status(500).json({ error: '\\u4f3a\\u670d\\u5668\\u5167\\u90e8\\u932f\\u8aa4' });
-  }
-});
-`;
+console.log('=== Add toggle route ===');
 
-const insertPosition = content.indexOf('module.exports');
+// Find where to insert (before module.exports)
+const insertPosition = content.lastIndexOf('module.exports');
+
 if (insertPosition === -1) {
-  console.error('Cannot find insert position');
+  console.log('ERROR: Could not find module.exports');
   process.exit(1);
 }
 
-content = content.slice(0, insertPosition) + toggleRoute + '\n' + content.slice(insertPosition);
+const toggleRoute = `
+router.post('/records/:recordId/toggle', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const { recordId } = req.params;
+    const { index, isCompleted } = req.body;
+    
+    const record = await dbCall(db, 'get', 'SELECT * FROM routine_records WHERE id = ?', [recordId]);
+    
+    if (!record) {
+      return res.status(404).json({ error: 'Record not found' });
+    }
+    
+    const items = JSON.parse(record.completed_items || '[]');
+    
+    if (index < 0 || index >= items.length) {
+      return res.status(400).json({ error: 'Invalid index' });
+    }
+    
+    items[index].completed = isCompleted;
+    
+    await dbCall(db, 'run', 
+      'UPDATE routine_records SET completed_items = ? WHERE id = ?',
+      [JSON.stringify(items), recordId]
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in toggle:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-fs.writeFileSync(routinesPath, content, 'utf8');
-console.log('✅ Added toggle route');
+`;
+
+// Insert before module.exports
+content = content.slice(0, insertPosition) + toggleRoute + content.slice(insertPosition);
+
+fs.writeFileSync(filePath, content, 'utf8');
+console.log('SUCCESS: Added toggle route');

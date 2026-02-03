@@ -207,7 +207,7 @@ function AppContent() {
 
     // 初始化 WebSocket 連接
     // 使用 Cloudflare Tunnel 提供有效的 HTTPS/WSS
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://incorporate-ruth-matters-dental.trycloudflare.com/ws';
+    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://nato-procedures-web-started.trycloudflare.com/ws';
     console.log('[WebSocket] 連接到:', wsUrl);
     const wsClient = new WebSocketClient(wsUrl);
     wsClientRef.current = wsClient;
@@ -701,7 +701,7 @@ function AppContent() {
     
     // 使用後端返回的完整用戶數據（包含 permissions）
     const response = await api.users.update(dataToSend);
-    const updatedUser = response.user || response;
+    const updatedUser = (response as any).user || response;
     
     console.log('[DEBUG] Received from API:', updatedUser);
     console.log('[DEBUG] Permissions in updatedUser:', updatedUser.permissions);

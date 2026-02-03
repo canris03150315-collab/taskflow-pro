@@ -1,53 +1,50 @@
-const Database = require('./node_modules/better-sqlite3');
+const Database = require('better-sqlite3');
 const db = new Database('/app/data/taskflow.db');
 
-console.log('=== 診斷授權問題 ===\n');
+console.log('=== Diagnosing Auth Issue ===\n');
 
-// 1. 查詢所有授權記錄
-console.log('1. 所有授權記錄：');
-const allAuths = db.prepare(`
-  SELECT id, requester_id, first_approver_id, is_active, 
-         first_approved_at, authorized_at, expires_at, created_at
-  FROM report_authorizations
-  ORDER BY created_at DESC
-  LIMIT 10
-`).all();
+try {
+  // Check if users table exists
+  console.log('[1/4] Checking users table...');
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").all();
+  if (tables.length === 0) {
+    console.error('ERROR: users table does not exist!');
+    process.exit(1);
+  }
+  console.log('OK users table exists\n');
 
-allAuths.forEach(auth => {
-  console.log(`  ID: ${auth.id}`);
-  console.log(`  申請者: ${auth.requester_id}`);
-  console.log(`  審核者: ${auth.first_approver_id}`);
-  console.log(`  是否激活: ${auth.is_active}`);
-  console.log(`  審核時間: ${auth.first_approved_at || '未審核'}`);
-  console.log(`  授權時間: ${auth.authorized_at || '未授權'}`);
-  console.log(`  過期時間: ${auth.expires_at || '無'}`);
-  console.log(`  創建時間: ${auth.created_at}`);
-  console.log('  ---');
-});
+  // Check users count
+  console.log('[2/4] Checking users count...');
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+  console.log('Total users: ' + userCount.count);
+  
+  if (userCount.count === 0) {
+    console.error('ERROR: No users in database!');
+    process.exit(1);
+  }
+  console.log('');
 
-// 2. 查詢激活的授權
-console.log('\n2. 激活的授權記錄：');
-const activeAuths = db.prepare(`
-  SELECT * FROM report_authorizations
-  WHERE is_active = 1
-`).all();
+  // Check table structure
+  console.log('[3/4] Checking users table structure...');
+  const tableInfo = db.prepare('PRAGMA table_info(users)').all();
+  console.log('Columns: ' + tableInfo.map(col => col.name).join(', '));
+  console.log('');
 
-console.log(`  總數: ${activeAuths.length}`);
-activeAuths.forEach(auth => {
-  console.log(`  申請者: ${auth.requester_id}, 過期時間: ${auth.expires_at}`);
-});
+  // Test query
+  console.log('[4/4] Testing user query...');
+  const users = db.prepare('SELECT id, username, name, role FROM users LIMIT 3').all();
+  console.log('Sample users:');
+  users.forEach(u => {
+    console.log('  - ' + u.username + ' (' + u.role + ')');
+  });
+  console.log('');
 
-// 3. 查詢待審核的記錄
-console.log('\n3. 待審核的記錄：');
-const pendingAuths = db.prepare(`
-  SELECT * FROM report_authorizations
-  WHERE is_active = 0 AND first_approved_at = ''
-`).all();
+  console.log('SUCCESS: Database appears healthy');
 
-console.log(`  總數: ${pendingAuths.length}`);
-pendingAuths.forEach(auth => {
-  console.log(`  申請者: ${auth.requester_id}, 審核者: ${auth.first_approver_id}`);
-});
-
-db.close();
-console.log('\n=== 診斷完成 ===');
+} catch (error) {
+  console.error('ERROR:', error.message);
+  console.error('Stack:', error.stack);
+  process.exit(1);
+} finally {
+  db.close();
+}

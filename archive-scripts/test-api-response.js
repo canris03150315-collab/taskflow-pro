@@ -1,51 +1,86 @@
 const Database = require('better-sqlite3');
 const db = new Database('/app/data/taskflow.db');
 
-// 模擬後端的 parseAnnouncementJson 函數
-function parseAnnouncementJson(ann) {
-    if (!ann) return ann;
-    
-    try {
-        ann.read_by = ann.read_by ? JSON.parse(ann.read_by) : [];
-    } catch (e) {
-        ann.read_by = [];
-    }
+console.log('=== Test /api/routines/history API Response ===\n');
 
-    ann.createdBy = ann.created_by;
-    ann.createdAt = ann.created_at;
-    ann.updatedAt = ann.updated_at;
-    ann.readBy = ann.read_by;
+// Get a SUPERVISOR user for testing
+const supervisor = db.prepare(`
+  SELECT id, name, role, department 
+  FROM users 
+  WHERE role = 'SUPERVISOR'
+  LIMIT 1
+`).get();
 
-    return ann;
+if (!supervisor) {
+  console.log('ERROR: No SUPERVISOR user found');
+  process.exit(1);
 }
 
-// 查詢公告
-const announcement = db.prepare('SELECT * FROM announcements ORDER BY created_at DESC LIMIT 1').get();
+console.log('Test User:', supervisor);
+console.log('');
 
-console.log('=== 原始資料庫數據 ===');
-console.log('read_by (raw):', announcement.read_by);
-console.log('Type:', typeof announcement.read_by);
+// Simulate the API logic
+const userId = supervisor.id;
+const userDept = supervisor.department;
 
-console.log('\n=== 解析後的數據 ===');
-const parsed = parseAnnouncementJson({...announcement});
-console.log('read_by:', parsed.read_by);
-console.log('Type:', typeof parsed.read_by);
-console.log('Is Array:', Array.isArray(parsed.read_by));
-console.log('Length:', parsed.read_by.length);
+const thirtyDaysAgo = new Date();
+thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+const startDate = thirtyDaysAgo.toISOString().split('T')[0];
 
-console.log('\nreadBy:', parsed.readBy);
-console.log('Type:', typeof parsed.readBy);
-console.log('Is Array:', Array.isArray(parsed.readBy));
-console.log('Length:', parsed.readBy.length);
+console.log('Query parameters:');
+console.log('  userId:', userId);
+console.log('  userDept:', userDept);
+console.log('  startDate:', startDate);
+console.log('');
 
-console.log('\n=== JSON.stringify 後 ===');
-const jsonStr = JSON.stringify(parsed);
-console.log('JSON:', jsonStr.substring(0, 200) + '...');
+// Execute the query as SUPERVISOR
+let records;
+if (supervisor.role === 'SUPERVISOR') {
+  records = db.prepare(
+    'SELECT * FROM routine_records WHERE department_id = ? AND date >= ? ORDER BY date DESC'
+  ).all(userDept, startDate);
+} else if (supervisor.role === 'BOSS' || supervisor.role === 'MANAGER') {
+  records = db.prepare(
+    'SELECT * FROM routine_records WHERE date >= ? ORDER BY date DESC'
+  ).all(startDate);
+} else {
+  records = db.prepare(
+    'SELECT * FROM routine_records WHERE user_id = ? AND department_id = ? AND date >= ? ORDER BY date DESC'
+  ).all(userId, userDept, startDate);
+}
 
-console.log('\n=== 重新解析 JSON ===');
-const reparsed = JSON.parse(jsonStr);
-console.log('readBy type:', typeof reparsed.readBy);
-console.log('readBy is Array:', Array.isArray(reparsed.readBy));
-console.log('readBy length:', reparsed.readBy.length);
+console.log('Total records found:', records.length);
+console.log('');
+
+if (records.length > 0) {
+  // Map records as the API does
+  const mappedRecords = records.map(r => ({
+    id: r.id,
+    user_id: r.user_id,
+    department_id: r.department_id,
+    date: r.date,
+    items: JSON.parse(r.completed_items || '[]')
+  }));
+  
+  console.log('Sample API Response (first 3 records):');
+  console.log(JSON.stringify({ records: mappedRecords.slice(0, 3) }, null, 2));
+  
+  console.log('\n');
+  console.log('Record details:');
+  mappedRecords.slice(0, 5).forEach((rec, idx) => {
+    const completed = rec.items.filter(item => item.completed).length;
+    const total = rec.items.length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    console.log(`\n${idx + 1}. Date: ${rec.date}, User: ${rec.user_id}`);
+    console.log(`   Items: ${total}, Completed: ${completed} (${percent}%)`);
+    console.log(`   Items array length: ${rec.items.length}`);
+    if (rec.items.length > 0) {
+      console.log(`   First item:`, rec.items[0]);
+    }
+  });
+} else {
+  console.log('No records found!');
+}
 
 db.close();

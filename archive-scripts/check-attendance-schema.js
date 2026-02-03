@@ -1,23 +1,29 @@
-const Database = require('./node_modules/better-sqlite3');
-const db = new Database('/app/data/taskflow.db');
+const Database = require('better-sqlite3');
 
-console.log('=== Checking attendance_records table schema ===');
+console.log('=== Checking attendance_records Table Schema ===\n');
 
-// Get table info
-const tableInfo = db.prepare("PRAGMA table_info(attendance_records)").all();
-console.log('\nColumns:');
-tableInfo.forEach(col => {
-  console.log(`  ${col.name} (${col.type}) ${col.notnull ? 'NOT NULL' : ''} ${col.dflt_value ? 'DEFAULT ' + col.dflt_value : ''}`);
+// Open backup database
+const backupDb = new Database('/app/backup_20260126.db', { readonly: true });
+
+console.log('1. Backup database schema:\n');
+const backupSchema = backupDb.prepare("PRAGMA table_info(attendance_records)").all();
+console.log('Columns in attendance_records:');
+backupSchema.forEach(col => {
+  console.log(`  - ${col.name} (${col.type})`);
 });
 
-// Check for CHECK constraints
-console.log('\n=== Checking table SQL ===');
-const tableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='attendance_records'").get();
-console.log(tableSql ? tableSql.sql : 'Table not found');
+backupDb.close();
 
-// Get sample records to see actual status values
-console.log('\n=== Sample status values ===');
-const samples = db.prepare("SELECT DISTINCT status FROM attendance_records LIMIT 10").all();
-console.log('Distinct status values:', samples.map(r => r.status));
+// Open current database
+const currentDb = new Database('/app/data/taskflow.db', { readonly: true });
 
-db.close();
+console.log('\n2. Current database schema:\n');
+const currentSchema = currentDb.prepare("PRAGMA table_info(attendance_records)").all();
+console.log('Columns in attendance_records:');
+currentSchema.forEach(col => {
+  console.log(`  - ${col.name} (${col.type})`);
+});
+
+currentDb.close();
+
+console.log('\n=== Schema Check Complete ===');

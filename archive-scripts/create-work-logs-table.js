@@ -1,38 +1,38 @@
-const sqlite3 = require('better-sqlite3');
+// create-work-logs-table.js
+// Create work_logs table in database
 
-const dbPath = '/app/data/taskflow.db';
-const db = sqlite3(dbPath);
+const Database = require('./node_modules/better-sqlite3');
+const db = new Database('/app/data/taskflow.db');
 
 console.log('Creating work_logs table...');
 
+const sql = `
+CREATE TABLE IF NOT EXISTS work_logs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  department_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  today_tasks TEXT NOT NULL,
+  tomorrow_tasks TEXT NOT NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (department_id) REFERENCES departments(id)
+);
+`;
+
 try {
-  db.prepare(`
-    CREATE TABLE IF NOT EXISTS work_logs (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      date TEXT NOT NULL,
-      today_tasks TEXT NOT NULL,
-      tomorrow_tasks TEXT NOT NULL,
-      special_notes TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      UNIQUE(user_id, date)
-    )
-  `).run();
-  
+  db.exec(sql);
   console.log('SUCCESS: work_logs table created');
   
-  // Check table structure
-  const tableInfo = db.prepare("PRAGMA table_info(work_logs)").all();
-  console.log('\nTable structure:');
-  tableInfo.forEach(col => {
-    console.log(`  ${col.name}: ${col.type}${col.notnull ? ' NOT NULL' : ''}${col.pk ? ' PRIMARY KEY' : ''}`);
-  });
+  // Create indexes for better query performance
+  db.exec('CREATE INDEX IF NOT EXISTS idx_work_logs_user_date ON work_logs(user_id, date);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_work_logs_dept_date ON work_logs(department_id, date);');
+  console.log('SUCCESS: Indexes created');
   
+  db.close();
 } catch (error) {
   console.error('ERROR:', error.message);
   process.exit(1);
-} finally {
-  db.close();
 }

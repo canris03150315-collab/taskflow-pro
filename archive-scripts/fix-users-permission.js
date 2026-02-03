@@ -1,33 +1,65 @@
 const fs = require('fs');
-const authPath = '/app/dist/middleware/auth.js';
-let authContent = fs.readFileSync(authPath, 'utf8');
 
-console.log('Fixing requireSelfOrAdmin middleware...');
+console.log('Fixing users API permission for EMPLOYEE...');
 
-// Find and replace the requireSelfOrAdmin function
-const oldFunction = `        // BOSS 和 MANAGER 可以管理所有人
-        if (req.user.role === 'BOSS' || req.user.role === 'MANAGER') {
-            next();
-            return;
+try {
+  const usersPath = '/app/dist/routes/users.js';
+  let content = fs.readFileSync(usersPath, 'utf8');
+  
+  // Current: requireRole([BOSS, MANAGER, SUPERVISOR])
+  // Need: Allow EMPLOYEE to get users in their department
+  
+  // Find and replace the middleware chain
+  const oldMiddleware = "(0, auth_1.requireRole)([types_1.Role.BOSS, types_1.Role.MANAGER, types_1.Role.SUPERVISOR])";
+  
+  if (content.includes(oldMiddleware)) {
+    // Remove the requireRole middleware for GET /users
+    // Instead, we'll handle permission in the route handler
+    
+    const oldRouterGet = "router.get('/', auth_1.authenticateToken, (0, auth_1.requireRole)([types_1.Role.BOSS, types_1.Role.MANAGER, types_1.Role.SUPERVISOR]), async (req, res) => {";
+    
+    const newRouterGet = "router.get('/', auth_1.authenticateToken, async (req, res) => {";
+    
+    if (content.includes(oldRouterGet)) {
+      content = content.replace(oldRouterGet, newRouterGet);
+      
+      // Also need to add department filtering for EMPLOYEE
+      const oldQueryPart = "let query = 'SELECT id, name, role, department, avatar, username, permissions, created_at, updated_at FROM users';";
+      const oldParamsPart = "let params = [];";
+      
+      const newQueryLogic = `let query = 'SELECT id, name, role, department, avatar, username, permissions, created_at, updated_at FROM users';
+        let params = [];
+        
+        // EMPLOYEE can only see users in their own department
+        if (currentUser.role === 'EMPLOYEE') {
+            query += ' WHERE department = ?';
+            params.push(currentUser.department);
         }`;
-
-const newFunction = `        // BOSS 和 MANAGER 可以管理所有人
-        if (req.user.role === 'BOSS' || req.user.role === 'MANAGER') {
-            next();
-            return;
-        }
-        // 擁有 MANAGE_USERS 權限的用戶可以管理所有人
-        if (req.user.permissions && req.user.permissions.includes('MANAGE_USERS')) {
-            next();
-            return;
-        }`;
-
-if (authContent.includes(oldFunction)) {
-    authContent = authContent.replace(oldFunction, newFunction);
-    fs.writeFileSync(authPath, authContent, 'utf8');
-    console.log('Fixed requireSelfOrAdmin middleware');
-} else {
-    console.log('Pattern not found, checking alternative...');
+      
+      content = content.replace(oldQueryPart + "\\n" + "        " + oldParamsPart, newQueryLogic);
+      
+      // Try simpler replacement
+      content = content.replace(
+        "let query = 'SELECT id, name, role, department, avatar, username, permissions, created_at, updated_at FROM users';\n        let params = [];",
+        newQueryLogic
+      );
+      
+      fs.writeFileSync(usersPath, content, 'utf8');
+      console.log('SUCCESS: Users API permission fixed');
+      console.log('EMPLOYEE can now get users in their department');
+    } else {
+      console.log('Router pattern not found exactly');
+    }
+  } else {
+    console.log('requireRole middleware not found');
+    
+    // Check if already fixed
+    if (content.includes("currentUser.role === 'EMPLOYEE'")) {
+      console.log('Already fixed!');
+    }
+  }
+  
+} catch (error) {
+  console.error('ERROR:', error.message);
+  process.exit(1);
 }
-
-console.log('Complete!');
