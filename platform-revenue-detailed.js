@@ -147,7 +147,6 @@ router.post('/parse', authenticateToken, upload.single('file'), async (req, res)
 
     const duplicates = [];
     const newRecords = [];
-    let skippedCount = 0;
 
     for (const record of records) {
       const existing = dbCall(db, 'prepare',
@@ -181,8 +180,6 @@ router.post('/parse', authenticateToken, upload.single('file'), async (req, res)
             new: record,
             differences: differences
           });
-        } else {
-          skippedCount++;
         }
       } else {
         newRecords.push(record);
@@ -194,7 +191,6 @@ router.post('/parse', authenticateToken, upload.single('file'), async (req, res)
       total: records.length,
       newRecords: newRecords,
       duplicates: duplicates,
-      skipped: skippedCount,
       hasConflicts: duplicates.length > 0,
       fileName: req.file.originalname
     });

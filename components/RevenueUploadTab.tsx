@@ -21,7 +21,6 @@ interface ParseResult {
   newRecords: any[];
   totalRecords: number;
   fileName: string;
-  skipped?: number;
 }
 
 export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser }) => {
@@ -128,8 +127,7 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
       }
 
       const importResult = await response.json();
-      const skippedMsg = result.skipped && result.skipped > 0 ? `（已自動過濾 ${result.skipped} 筆重複數據）` : '';
-      alert(`成功匯入 ${importResult.imported} 筆數據${skippedMsg}`);
+      alert(`成功匯入 ${importResult.imported} 筆數據`);
       
       setShowConflictModal(false);
       setParseResult(null);
