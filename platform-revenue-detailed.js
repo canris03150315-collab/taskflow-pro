@@ -145,53 +145,10 @@ router.post('/parse', authenticateToken, upload.single('file'), async (req, res)
 
     const records = parseExcelFile(req.file.buffer);
 
-    const duplicates = [];
-    const newRecords = [];
-
-    for (const record of records) {
-      const existing = dbCall(db, 'prepare',
-        'SELECT * FROM platform_transactions WHERE platform_name = ? AND date = ?'
-      ).get(record.platform_name, record.date);
-
-      if (existing) {
-        const differences = {};
-        const fields = [
-          'lottery_wage', 'lottery_rebate', 'game_ag', 'game_chess',
-          'game_rebate', 'game_private', 'lottery_dividend_receive',
-          'lottery_dividend_send', 'external_dividend_receive',
-          'external_dividend_send', 'private_return', 'deposit_amount',
-          'withdrawal_amount', 'loan_amount', 'profit', 'balance'
-        ];
-
-        fields.forEach(field => {
-          if (existing[field] !== undefined && existing[field] !== record[field]) {
-            differences[field] = {
-              old: existing[field],
-              new: record[field]
-            };
-          }
-        });
-
-        if (Object.keys(differences).length > 0) {
-          duplicates.push({
-            platform: record.platform_name,
-            date: record.date,
-            existing: existing,
-            new: record,
-            differences: differences
-          });
-        }
-      } else {
-        newRecords.push(record);
-      }
-    }
-
     res.json({
       success: true,
       total: records.length,
-      newRecords: newRecords,
-      duplicates: duplicates,
-      hasConflicts: duplicates.length > 0,
+      records: records,
       fileName: req.file.originalname
     });
 
@@ -204,7 +161,7 @@ router.post('/parse', authenticateToken, upload.single('file'), async (req, res)
 router.post('/import', authenticateToken, async (req, res) => {
   try {
     const db = req.db;
-    const { records, overwrite } = req.body;
+    const { records } = req.body;
 
     if (!Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ error: '\u7121\u6548\u7684\u8cc7\u6599' });
@@ -212,7 +169,8 @@ router.post('/import', authenticateToken, async (req, res) => {
 
     const currentUser = req.user;
     const now = new Date().toISOString();
-    let imported = 0;
+    let inserted = 0;
+    let updated = 0;
     let skipped = 0;
 
     // INSERT 語句（包含所有詳細欄位）
@@ -241,22 +199,43 @@ router.post('/import', authenticateToken, async (req, res) => {
 
     for (const record of records) {
       const existing = dbCall(db, 'prepare',
-        'SELECT id FROM platform_transactions WHERE platform_name = ? AND date = ?'
+        'SELECT * FROM platform_transactions WHERE platform_name = ? AND date = ?'
       ).get(record.platform_name, record.date);
 
-      if (existing && overwrite) {
-        updateStmt.run(
-          record.lottery_wage, record.lottery_rebate, record.game_ag, record.game_chess,
-          record.game_rebate, record.game_private, record.lottery_dividend_receive,
-          record.lottery_dividend_send, record.external_dividend_receive, record.external_dividend_send,
-          record.lottery_amount, record.external_game_amount, record.lottery_dividend, record.external_dividend,
-          record.private_return, record.deposit_amount, record.withdrawal_amount, record.loan_amount,
-          record.profit, record.balance,
-          currentUser.id, currentUser.username, now, now,
-          record.platform_name, record.date
-        );
-        imported++;
-      } else if (!existing) {
+      if (existing) {
+        const fields = [
+          'lottery_wage', 'lottery_rebate', 'game_ag', 'game_chess',
+          'game_rebate', 'game_private', 'lottery_dividend_receive',
+          'lottery_dividend_send', 'external_dividend_receive', 'external_dividend_send',
+          'lottery_amount', 'external_game_amount', 'lottery_dividend', 'external_dividend',
+          'private_return', 'deposit_amount', 'withdrawal_amount', 'loan_amount',
+          'profit', 'balance'
+        ];
+        
+        let hasChanges = false;
+        for (const field of fields) {
+          if (existing[field] !== record[field]) {
+            hasChanges = true;
+            break;
+          }
+        }
+
+        if (hasChanges) {
+          updateStmt.run(
+            record.lottery_wage, record.lottery_rebate, record.game_ag, record.game_chess,
+            record.game_rebate, record.game_private, record.lottery_dividend_receive,
+            record.lottery_dividend_send, record.external_dividend_receive, record.external_dividend_send,
+            record.lottery_amount, record.external_game_amount, record.lottery_dividend, record.external_dividend,
+            record.private_return, record.deposit_amount, record.withdrawal_amount, record.loan_amount,
+            record.profit, record.balance,
+            currentUser.id, currentUser.username, now, now,
+            record.platform_name, record.date
+          );
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
         const id = `platform-tx-${Date.now()}-${uuidv4().slice(0, 8)}`;
         insertStmt.run(
           id, record.platform_name, record.date,
@@ -269,15 +248,15 @@ router.post('/import', authenticateToken, async (req, res) => {
           currentUser.id, currentUser.username, now, record.fileName || '',
           now, now
         );
-        imported++;
-      } else {
-        skipped++;
+        inserted++;
       }
     }
 
     res.json({
       success: true,
-      imported: imported,
+      imported: inserted + updated,
+      inserted: inserted,
+      updated: updated,
       skipped: skipped,
       total: records.length
     });

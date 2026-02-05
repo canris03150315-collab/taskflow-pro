@@ -7,27 +7,16 @@ interface RevenueUploadTabProps {
   currentUser: User;
 }
 
-interface DuplicateRecord {
-  platform: string;
-  date: string;
-  existing: any;
-  new: any;
-  differences: Record<string, { old: number; new: number; change: number }>;
-}
-
 interface ParseResult {
-  hasConflicts: boolean;
-  duplicates: DuplicateRecord[];
-  newRecords: any[];
-  totalRecords: number;
+  success: boolean;
+  total: number;
+  records: any[];
   fileName: string;
 }
 
 export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
-  const [showConflictModal, setShowConflictModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -88,14 +77,9 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
       }
 
       const result: ParseResult = await response.json();
-      setParseResult(result);
 
-      if (result.hasConflicts) {
-        setShowConflictModal(true);
-      } else {
-        // 直接使用 result，不依賴 state
-        await handleImportWithResult(result, 'skip');
-      }
+      // 直接自動匯入所有記錄
+      await handleImport(result.records);
     } catch (error) {
       console.error('Upload error:', error);
       alert('上傳失敗，請稍後再試');
@@ -104,22 +88,15 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
     }
   };
 
-  const handleImportWithResult = async (result: ParseResult, action: 'overwrite' | 'skip') => {
+  const handleImport = async (records: any[]) => {
     try {
-      const recordsToImport = action === 'overwrite'
-        ? [...result.newRecords, ...result.duplicates.map(d => d.new)]
-        : result.newRecords;
-
       const response = await fetch(`${API_BASE_URL}/platform-revenue/import`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          records: recordsToImport,
-          overwrite: action === 'overwrite'
-        })
+        body: JSON.stringify({ records })
       });
 
       if (!response.ok) {
@@ -127,40 +104,17 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
       }
 
       const importResult = await response.json();
-      alert(`成功匯入 ${importResult.imported} 筆數據`);
+      const message = `同步完成！已處理共 ${importResult.imported} 筆資料` +
+        (importResult.inserted > 0 ? `（新增 ${importResult.inserted} 筆）` : '') +
+        (importResult.updated > 0 ? `（更新 ${importResult.updated} 筆）` : '') +
+        (importResult.skipped > 0 ? `（已自動過濾 ${importResult.skipped} 筆完全重複的數據）` : '');
       
-      setShowConflictModal(false);
-      setParseResult(null);
+      alert(message);
       setSelectedFile(null);
     } catch (error) {
       console.error('Import error:', error);
       alert('匯入失敗，請稍後再試');
     }
-  };
-
-  const handleImport = async (action: 'overwrite' | 'skip' | 'cancel') => {
-    if (action === 'cancel') {
-      setShowConflictModal(false);
-      setParseResult(null);
-      setSelectedFile(null);
-      return;
-    }
-
-    if (!parseResult) return;
-    await handleImportWithResult(parseResult, action);
-  };
-
-  const fieldNames: Record<string, string> = {
-    lottery_amount: '彩票',
-    external_game_amount: '外接遊戲',
-    lottery_dividend: '彩票分紅',
-    external_dividend: '外接分紅',
-    private_return: '私返',
-    deposit_amount: '充值',
-    withdrawal_amount: '提款',
-    loan_amount: '借款',
-    profit: '營利',
-    balance: '餘額'
   };
 
   return (
@@ -218,105 +172,6 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
         )}
       </div>
 
-      {showConflictModal && parseResult && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-orange-600">⚠️ 發現重複數據</h3>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-gray-700">
-                以下 <strong>{parseResult.duplicates.length}</strong> 筆數據已存在，請選擇處理方式：
-              </p>
-
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {parseResult.duplicates.slice(0, 5).map((dup, idx) => (
-                  <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                    <div className="font-semibold mb-2">
-                      平台：{dup.platform} | 日期：{dup.date}
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-300">
-                            <th className="text-left py-2 px-3">欄位</th>
-                            <th className="text-right py-2 px-3">現有數據</th>
-                            <th className="text-right py-2 px-3">新數據</th>
-                            <th className="text-right py-2 px-3">差異</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Object.entries(dup.differences).map(([field, diff]: [string, any]) => {
-                            const oldVal = Number(diff.old) || 0;
-                            const newVal = Number(diff.new) || 0;
-                            const change = newVal - oldVal;
-                            return (
-                              <tr key={field} className="border-b border-gray-200">
-                                <td className="py-2 px-3">{fieldNames[field] || field}</td>
-                                <td className="text-right py-2 px-3">{oldVal.toLocaleString()}</td>
-                                <td className="text-right py-2 px-3">{newVal.toLocaleString()}</td>
-                                <td className={`text-right py-2 px-3 font-semibold ${
-                                  change > 0 ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {change > 0 ? '+' : ''}{change.toLocaleString()}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-                {parseResult.duplicates.length > 5 && (
-                  <p className="text-gray-500 text-center">
-                    還有 {parseResult.duplicates.length - 5} 筆重複數據...
-                  </p>
-                )}
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ 覆蓋後將記錄修改歷史，可在「修改記錄」頁面查看
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="font-semibold">處理方式：</p>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="radio" name="action" value="overwrite" defaultChecked className="w-4 h-4" />
-                    <span>覆蓋舊數據（使用新數據）⚠️</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input type="radio" name="action" value="skip" className="w-4 h-4" />
-                    <span>保留舊數據（跳過新數據）</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => handleImport('cancel')}
-                className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={() => {
-                  const action = (document.querySelector('input[name="action"]:checked') as HTMLInputElement)?.value as 'overwrite' | 'skip';
-                  handleImport(action || 'overwrite');
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                ✓ 確認處理 ({parseResult.duplicates.length} 筆重複)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
