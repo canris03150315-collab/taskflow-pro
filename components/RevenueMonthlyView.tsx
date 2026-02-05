@@ -59,7 +59,7 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
   const loadPlatforms = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/platform-revenue/platforms`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
       });
       if (response.ok) {
         const data = await response.json();
@@ -83,7 +83,7 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
 
       const response = await fetch(
         `${API_BASE_URL}/platform-revenue?startDate=${startDate}&endDate=${endDate}&platform=${selectedPlatform}`,
-        { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+        { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } }
       );
 
       if (response.ok) {
@@ -123,7 +123,7 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
         },
         body: JSON.stringify({
           platform: selectedPlatform,
