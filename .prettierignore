@@ -1,0 +1,16 @@
+node_modules
+dist
+frontend/dist
+backend/dist
+backend/node_modules
+backend/data
+archive-backups
+archive-scripts
+backups
+*.min.js
+*.bundle.js
+package-lock.json
+docs
+PROJECT_BRAIN.md
+WORK_LOG_CURRENT.md
+*.md

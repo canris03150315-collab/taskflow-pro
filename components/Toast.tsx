@@ -2,7 +2,7 @@
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
-interface ToastItem {
+interface ToastData {
   id: string;
   message: string;
   type: ToastType;
@@ -25,7 +25,10 @@ export const useToast = () => {
   return context;
 };
 
-const ToastItem: React.FC<{ toast: ToastItem; onRemove: (id: string) => void }> = ({ toast, onRemove }) => {
+const ToastItem: React.FC<{ toast: ToastData; onRemove: (id: string) => void }> = ({
+  toast,
+  onRemove,
+}) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       onRemove(toast.id);
@@ -37,24 +40,24 @@ const ToastItem: React.FC<{ toast: ToastItem; onRemove: (id: string) => void }> 
     success: 'bg-emerald-500',
     error: 'bg-red-500',
     info: 'bg-blue-500',
-    warning: 'bg-amber-500'
+    warning: 'bg-amber-500',
   }[toast.type];
 
   const icon = {
     success: '✓',
     error: '✕',
     info: 'ℹ',
-    warning: '⚠'
+    warning: '⚠',
   }[toast.type];
 
   return (
-    <div 
+    <div
       className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px] max-w-[400px] animate-slide-in`}
       style={{ animation: 'slideIn 0.3s ease-out' }}
     >
       <span className="text-lg font-bold">{icon}</span>
       <span className="flex-1 text-sm font-medium">{toast.message}</span>
-      <button 
+      <button
         onClick={() => onRemove(toast.id)}
         className="text-white/80 hover:text-white transition"
       >
@@ -65,22 +68,22 @@ const ToastItem: React.FC<{ toast: ToastItem; onRemove: (id: string) => void }> 
 };
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
 
   const addToast = useCallback((message: string, type: ToastType) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message, type }]);
   }, []);
 
   const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const contextValue: ToastContextType = {
     success: (message: string) => addToast(message, 'success'),
     error: (message: string) => addToast(message, 'error'),
     info: (message: string) => addToast(message, 'info'),
-    warning: (message: string) => addToast(message, 'warning')
+    warning: (message: string) => addToast(message, 'warning'),
   };
 
   return (
@@ -88,7 +91,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       {children}
       {/* Toast Container */}
       <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
-        {toasts.map(toast => (
+        {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
         ))}
       </div>
