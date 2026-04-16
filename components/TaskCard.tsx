@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { Task, User, Role, TaskStatus, Urgency, DepartmentDef } from '../types';
 import { Badge } from './Badge';
+import { translateTaskContent } from '../utils/taskTranslations';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface TaskCardProps {
   task: Task;
@@ -36,6 +38,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   isExpanded,
   onToggleExpand
 }) => {
+  // 狀態正規化：後端使用中文狀態值，前端 enum 使用英文
+  // 建立一個正規化的狀態值以便統一比較
+  const STATUS_CN_TO_EN: Record<string, string> = {
+    '待接取': TaskStatus.OPEN,
+    '已指派': TaskStatus.ASSIGNED,
+    '進行中': TaskStatus.IN_PROGRESS,
+    '已完成': TaskStatus.COMPLETED,
+    '已取消': TaskStatus.CANCELLED,
+  };
+  const normalizedStatus = STATUS_CN_TO_EN[task.status] || task.status;
+
   const [showProgressPanel, setShowProgressPanel] = useState(false);
   const [progressInput, setProgressInput] = useState(task.progress || 0);
   const [noteInput, setNoteInput] = useState('');
@@ -45,11 +58,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const assigneeName = users.find(u => u.id === (task.acceptedByUserId || task.assignedToUserId))?.name;
   
   // 判斷是否為「指派給我」的任務 (且尚未完成)
-  const isAssignedToMe = task.assignedToUserId === currentUser.id && task.status === TaskStatus.ASSIGNED;
+  const isAssignedToMe = task.assignedToUserId === currentUser.id && normalizedStatus === TaskStatus.ASSIGNED;
 
   // 判斷是否過期 (有截止日 && 時間已過 && 未完成)
   const isExpired = task.deadline 
-    ? new Date(task.deadline) < new Date() && task.status !== TaskStatus.COMPLETED
+    ? new Date(task.deadline) < new Date() && normalizedStatus !== TaskStatus.COMPLETED
     : false;
 
   // 格式化截止日期 (將 T 替換為空格，並保留時分)
@@ -58,10 +71,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     return deadline.replace('T', ' ');
   };
 
-  // 格式化創建時間
+  // 格式化創建時間 (轉換為本地時間)
   const formatCreatedAt = (createdAt?: string) => {
     if (!createdAt) return '未知';
-    return createdAt.replace('T', ' ').substring(0, 16); // 只顯示到分鐘
+    try {
+      return new Date(createdAt).toLocaleString('zh-TW');
+    } catch {
+      return createdAt.replace('T', ' ').substring(0, 16);
+    }
   };
 
   const getTimelineUserName = (userId: string) => users.find(u => u.id === userId)?.name || '未知';
@@ -76,8 +93,25 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   // 判斷是否有執行權限 (所有角色都可以執行任務)
   const canExecuteTask = true;
 
+  // 判斷是否可以接取此任務 (含建立者自己)
+  // 條件：狀態為待接取 (OPEN) 且符合下列之一：
+  //   1. 任務未指派給任何人或部門 (公開)
+  //   2. 指派給當前使用者
+  //   3. 指派給當前使用者所屬部門
+  //   4. 當前使用者為 BOSS 或 MANAGER
+  const canAcceptTask =
+    normalizedStatus === TaskStatus.OPEN &&
+    !task.acceptedByUserId &&
+    (
+      (!task.assignedToUserId && !task.assignedToDepartment) ||
+      task.assignedToUserId === currentUser.id ||
+      task.assignedToDepartment === currentUser.department ||
+      currentUser.role === Role.BOSS ||
+      currentUser.role === Role.MANAGER
+    );
+
   // 判斷是否有封存權限 (任務已完成 且 (是建立者 或 是執行者 或 是主管/老闆))
-  const canArchive = task.status === TaskStatus.COMPLETED && !task.isArchived && (
+  const canArchive = normalizedStatus === TaskStatus.COMPLETED && !task.isArchived && (
       task.createdBy === currentUser.id ||
       task.acceptedByUserId === currentUser.id ||
       currentUser.role === Role.BOSS ||
@@ -98,41 +132,41 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   // 判斷是否可以撤銷任務 (建立者，且任務尚未完成或取消)
   const canCancel = 
     task.createdBy === currentUser.id &&
-    task.status !== TaskStatus.COMPLETED &&
-    task.status !== TaskStatus.CANCELLED;
+    normalizedStatus !== TaskStatus.COMPLETED &&
+    normalizedStatus !== TaskStatus.CANCELLED;
 
   // 判斷是否可以重新開啟任務 (建立者，且任務已取消)
-  const canReopen = 
+  const canReopen =
     task.createdBy === currentUser.id &&
-    task.status === TaskStatus.CANCELLED;
+    normalizedStatus === TaskStatus.CANCELLED;
 
   return (
     <div className={`
       relative rounded-xl p-0.5 transition-all duration-500 group
-      ${task.status === TaskStatus.CANCELLED ? 'opacity-50 grayscale' : task.isArchived ? 'opacity-60 grayscale' : (task.status === TaskStatus.COMPLETED ? 'opacity-90' : 'hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200')}
-      ${isHighlighted ? 'bg-yellow-400 scale-[1.02] shadow-[0_0_20px_rgba(250,204,21,0.6)] ring-4 ring-yellow-300 z-10' : task.status === TaskStatus.CANCELLED ? 'bg-gradient-to-br from-red-100 via-red-200 to-red-300' : 'bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300'}
+      ${normalizedStatus === TaskStatus.CANCELLED ? 'opacity-50 grayscale' : task.isArchived ? 'opacity-60 grayscale' : (normalizedStatus === TaskStatus.COMPLETED ? 'opacity-90' : 'hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200')}
+      ${isHighlighted ? 'bg-yellow-400 scale-[1.02] shadow-[0_0_20px_rgba(250,204,21,0.6)] ring-4 ring-yellow-300 z-10' : normalizedStatus === TaskStatus.CANCELLED ? 'bg-gradient-to-br from-red-100 via-red-200 to-red-300' : 'bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300'}
     `}>
       {/* S級緊急任務光暈特效 */}
-      {task.urgency === 'urgent' && task.status !== TaskStatus.COMPLETED && (
+      {task.urgency === 'urgent' && normalizedStatus !== TaskStatus.COMPLETED && (
         <div className="absolute inset-0 rounded-xl bg-red-400 blur-sm opacity-30 animate-pulse"></div>
       )}
 
       <div className="bg-white rounded-[10px] p-6 relative border border-white flex flex-col min-h-full">
         
         {/* 指派給您的特別標示 */}
-        {isAssignedToMe && task.status === TaskStatus.ASSIGNED && (
+        {isAssignedToMe && normalizedStatus === TaskStatus.ASSIGNED && (
            <div className="absolute -right-12 top-6 bg-red-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
              指派給您
            </div>
         )}
         {/* 公開任務標示 */}
-        {task.status === TaskStatus.OPEN && (
+        {normalizedStatus === TaskStatus.OPEN && (
            <div className="absolute -right-12 top-6 bg-emerald-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
              公開任務
            </div>
         )}
         {/* 已取消標示 */}
-        {task.status === TaskStatus.CANCELLED && (
+        {normalizedStatus === TaskStatus.CANCELLED && (
            <div className="absolute -right-12 top-6 bg-slate-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
              已取消
            </div>
@@ -143,13 +177,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <div className="flex justify-between items-start mb-3 pr-8">
             <div className="flex flex-col gap-2 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge type="status" value={task.status} />
+                <Badge type="status" value={normalizedStatus} />
                 <Badge type="urgency" value={task.urgency} />
                 {task.targetDepartment && <Badge type="department" value={task.targetDepartment} departments={departments} />}
                 {task.isArchived && <span className="bg-slate-200 text-slate-500 px-2 py-1 rounded text-xs font-bold border border-slate-300">🗄️ 已封存</span>}
               </div>
-              <h4 className={`text-xl font-bold flex flex-wrap items-center gap-2 ${task.status === TaskStatus.COMPLETED || task.status === TaskStatus.CANCELLED ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-                {task.title}
+              <h4 className={`text-xl font-bold flex flex-wrap items-center gap-2 ${normalizedStatus === TaskStatus.COMPLETED || normalizedStatus === TaskStatus.CANCELLED ? 'text-slate-400 line-through' : 'text-slate-800'}`} title={task.title}>
+                <span className="line-clamp-2 break-all">{task.title}</span>
                 {isExpired && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600 border border-red-200 shadow-sm animate-pulse whitespace-nowrap no-underline">
                     ⚠️ 已過期
@@ -174,9 +208,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 )}
                 {canDelete && onDelete && (
                   <button
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      if (confirm('確定要刪除此任務嗎？此操作無法復原。')) {
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (await showConfirm('確定要刪除此任務嗎？此操作無法復原。')) {
                         onDelete(task.id);
                       }
                     }}
@@ -255,19 +289,57 @@ export const TaskCard: React.FC<TaskCardProps> = ({
              )}
           </div>
 
-          {/* 進度條 (Progress Bar) */}
-          <div className="mb-4">
-             <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
-                <span>任務進度</span>
-                <span>{task.progress}%</span>
-             </div>
-             <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all duration-500 ${task.status === TaskStatus.COMPLETED ? 'bg-emerald-500' : 'bg-blue-500'}`} 
-                  style={{ width: `${task.progress}%` }}
-                ></div>
-             </div>
-          </div>
+          {/* 進度條 (Progress Bar) - 可互動 */}
+          {(() => {
+             // 允許直接拖拉更新進度的使用者：接取者、指派者、建立者、BOSS / MANAGER
+             const canUpdateProgress =
+               !task.isArchived &&
+               normalizedStatus !== TaskStatus.COMPLETED &&
+               normalizedStatus !== TaskStatus.CANCELLED &&
+               (
+                 task.acceptedByUserId === currentUser.id ||
+                 task.assignedToUserId === currentUser.id ||
+                 task.createdBy === currentUser.id ||
+                 currentUser.role === Role.BOSS ||
+                 currentUser.role === Role.MANAGER
+               );
+
+             return (
+               <div className="mb-4">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
+                     <span>任務進度{canUpdateProgress && <span className="ml-1 text-[10px] text-blue-500 font-normal">(可拖拉調整)</span>}</span>
+                     <span>{task.progress}%</span>
+                  </div>
+                  {canUpdateProgress ? (
+                     <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={task.progress || 0}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={async (e) => {
+                           const newValue = Number(e.target.value);
+                           const currentProgress = task.progress || 0;
+                           if (newValue < currentProgress) {
+                             const confirmed = await showConfirm(`確定要將進度從 ${currentProgress}% 降至 ${newValue}%？`);
+                             if (!confirmed) return;
+                           }
+                           onUpdateProgress(task.id, newValue, '', newValue === 100);
+                        }}
+                        className={`w-full h-2 rounded-full appearance-none cursor-pointer ${normalizedStatus === TaskStatus.COMPLETED ? 'accent-emerald-500' : 'accent-blue-500'} bg-slate-100`}
+                     />
+                  ) : (
+                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${normalizedStatus === TaskStatus.COMPLETED ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                          style={{ width: `${task.progress}%` }}
+                        ></div>
+                     </div>
+                  )}
+               </div>
+             );
+          })()}
 
           {/* 卡片內容 (可伸縮區域) */}
           <div className="mb-4 overflow-hidden relative">
@@ -308,7 +380,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                                               <span className="font-bold text-slate-700">{userName}</span>
                                               <span className="text-slate-400">{new Date(entry.timestamp).toLocaleString()}</span>
                                           </div>
-                                          <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">{entry.content}</p>
+                                          <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">{translateTaskContent(entry.content)}</p>
                                           <div className="text-[10px] text-blue-500 font-bold mt-1">進度更新至: {entry.progress}%</div>
                                       </div>
                                   );
@@ -342,7 +414,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </div>
           
           {/* 完成回報顯示 (Legacy) */}
-          {task.status === TaskStatus.COMPLETED && task.completionNotes && !isExpanded && (
+          {normalizedStatus === TaskStatus.COMPLETED && task.completionNotes && !isExpanded && (
             <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg mb-4">
               <p className="text-xs text-emerald-600 font-bold mb-1 uppercase">最新結案報告</p>
               <p className="text-sm text-emerald-800 line-clamp-2">
@@ -420,18 +492,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 )}
 
                 <div className="flex-shrink-0 ml-auto">
-                {/* 可執行: 接取任務 (公開) */}
-                {canExecuteTask && task.status === TaskStatus.OPEN && (
-                    <button 
+                {/* 可執行: 接取任務 (公開，包含建立者) */}
+                {canExecuteTask && canAcceptTask && (
+                    <button
                     onClick={() => onAccept(task.id)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-100 transition-all"
                     >
-                    領取任務
+                    接取任務
                     </button>
                 )}
                 
                 {/* 可執行: 啟動被指派的任務 */}
-                {task.status === TaskStatus.ASSIGNED && canExecuteTask && task.assignedToUserId === currentUser.id && (
+                {normalizedStatus === TaskStatus.ASSIGNED && canExecuteTask && task.assignedToUserId === currentUser.id && (
                     <button 
                     onClick={() => onAccept(task.id)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-100 transition-all animate-pulse"
@@ -441,7 +513,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 )}
                 
                 {/* 可執行: 回報成果 (開啟面板) */}
-                {canExecuteTask && task.status === TaskStatus.IN_PROGRESS && task.acceptedByUserId === currentUser.id && (
+                {canExecuteTask && normalizedStatus === TaskStatus.IN_PROGRESS && task.acceptedByUserId === currentUser.id && (
                     <button 
                     onClick={() => { setShowProgressPanel(true); setNoteInput(''); }}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-blue-100 transition-all flex items-center gap-2"
@@ -452,7 +524,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 )}
 
                 {/* 完成標記 */}
-                {task.status === TaskStatus.COMPLETED && (
+                {normalizedStatus === TaskStatus.COMPLETED && (
                     <span className="text-emerald-600 font-bold text-sm border border-emerald-200 px-3 py-1 rounded bg-emerald-50 select-none flex items-center gap-1">
                     <span>✔</span> {task.isArchived ? '已封存' : '已結案'}
                     </span>

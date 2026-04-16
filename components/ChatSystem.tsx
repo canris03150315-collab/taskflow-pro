@@ -4,6 +4,7 @@ import { api } from '../services/api';
 import { useToast } from './Toast';
 import { WebSocketClient } from '../utils/websocketClient';
 import { ChatMessageReadStatusModal } from './ChatMessageReadStatusModal';
+import { showConfirm } from '../utils/dialogService';
 import { CreateGroupModal } from './CreateGroupModal';
 import { GroupInfoModal } from './GroupInfoModal';
 
@@ -79,7 +80,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
     const isProduction = window.location.protocol === 'https:';
     
     if (!isProduction) { // Enable WebSocket for HTTP connections
-      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'wss://incorporate-ruth-matters-dental.trycloudflare.com/ws';
+      const wsUrl = (import.meta as any).env?.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
       wsClientRef.current = new WebSocketClient(wsUrl);
       
       const handleMessage = (event: any) => {
@@ -116,13 +117,9 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
         }
       };
 
-      wsClientRef.current.addMessageHandler(handleMessage);
-      wsClientRef.current.connect(token || undefined).then(() => {
-          setIsConnected(true);
-      }).catch(err => {
-          console.error("WS Connect Error", err);
-          setIsConnected(false);
-      });
+      wsClientRef.current.onMessage(handleMessage);
+      wsClientRef.current.connect();
+      setIsConnected(true);
 
       return () => {
           if (wsClientRef.current) {
@@ -133,7 +130,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
     } else {
       console.log('HTTPS 環境，WebSocket 已禁用');
     }
-  }, [currentUser, activeChannelId, notificationSound]);
+  }, [currentUser]);
 
   // Load Channels with polling for real-time updates
   useEffect(() => {
@@ -378,7 +375,7 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
 
   const handleDeleteChannel = async (channelId: string, e: React.MouseEvent) => {
       e.stopPropagation();
-      if (!confirm('確定要刪除此聊天室嗎？所有訊息將被永久刪除。')) {
+      if (!(await showConfirm('確定要刪除此聊天室嗎？所有訊息將被永久刪除。'))) {
           return;
       }
       try {

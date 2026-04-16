@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { User } from '../types';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 const API_BASE_URL = '/api';
 
@@ -48,12 +49,12 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
 
   const handleFileSelect = async (file: File) => {
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      alert('請上傳 Excel 檔案（.xlsx 或 .xls）');
+      showWarning('請上傳 Excel 檔案（.xlsx 或 .xls）');
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('檔案過大，請上傳小於 10MB 的檔案');
+      showWarning('檔案過大，請上傳小於 10MB 的檔案');
       return;
     }
 
@@ -82,7 +83,7 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
       await handleImport(result.records);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('上傳失敗，請稍後再試');
+      showError('上傳失敗，請稍後再試');
     } finally {
       setIsUploading(false);
     }
@@ -109,11 +110,11 @@ export const RevenueUploadTab: React.FC<RevenueUploadTabProps> = ({ currentUser 
         (importResult.updated > 0 ? `（更新 ${importResult.updated} 筆）` : '') +
         (importResult.skipped > 0 ? `（已自動過濾 ${importResult.skipped} 筆完全重複的數據）` : '');
       
-      alert(message);
+      showSuccess(message);
       setSelectedFile(null);
     } catch (error) {
       console.error('Import error:', error);
-      alert('匯入失敗，請稍後再試');
+      showError('匯入失敗，請稍後再試');
     }
   };
 

@@ -31,7 +31,7 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
   const [filterDept, setFilterDept] = useState<string>('ALL');
 
   // Dynamic Map
-  const getDeptName = (id: string) => getDepartmentFullPath(departments, id);
+  const getDeptName = (id: string) => getDepartmentFullPath(id, departments);
   const flatDepts = useMemo(() => flattenDepartments(departments), [departments]);
   const getDeptColor = (id: string) => {
       const theme = departments.find(d => d.id === id)?.theme || 'slate';
@@ -85,7 +85,7 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
       ${user.role === Role.SUPERVISOR ? 'border-purple-200' : ''}
     `}>
        <div className="w-10 h-10 md:w-12 md:h-12 rounded-full border border-slate-200 overflow-hidden mb-1 md:mb-2">
-           <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+           <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-full h-full object-cover" />
        </div>
        <div className="text-center w-full">
            <div className="font-bold text-slate-800 text-xs md:text-sm truncate">{user.name}</div>
@@ -319,9 +319,9 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
               {visibleUsers.map(user => (
                   <div key={user.id} className={`rounded-xl border shadow-sm p-5 flex items-start gap-4 relative group hover:shadow-md transition ${getDeptColor(user.department)}`}>
                       <div className="w-16 h-16 rounded-full bg-white flex-shrink-0 border border-slate-200 overflow-hidden">
-                          <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                          <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-full h-full object-cover" />
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-start">
                               <h3 className="text-lg font-bold text-slate-800 truncate">{user.name}</h3>

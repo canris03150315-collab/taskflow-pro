@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Memo, MemoTodo } from '../types';
 import { api } from '../services/api';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface MemoViewProps {
   currentUser: User;
@@ -77,7 +78,7 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
       setQuickTodoInput('');
     } catch (error) {
       console.error('新增備忘錄失敗:', error);
-      alert('新增失敗，請稍後再試');
+      showError('新增失敗，請稍後再試');
     }
   };
 
@@ -100,7 +101,7 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
       setTextContent('');
     } catch (error) {
       console.error('新增備忘錄失敗:', error);
-      alert('新增失敗，請稍後再試');
+      showError('新增失敗，請稍後再試');
     }
   };
 
@@ -128,13 +129,13 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('確定要刪除這張便條嗎？')) {
+    if (await showConfirm('確定要刪除這張便條嗎？')) {
       try {
         await api.memos.delete(id);
         setMemos(memos.filter(m => m.id !== id));
       } catch (error) {
         console.error('刪除備忘錄失敗:', error);
-        alert('刪除失敗，請稍後再試');
+        showError('刪除失敗，請稍後再試');
       }
     }
   };
@@ -146,7 +147,7 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
 
     // 如果只剩一個項目，詢問是否刪除整張便條
     if (memo.todos.length === 1) {
-      if (window.confirm('這是最後一個項目，要刪除整張便條嗎？')) {
+      if (await showConfirm('這是最後一個項目，要刪除整張便條嗎？')) {
         await api.memos.delete(memoId);
         setMemos(memos.filter(m => m.id !== memoId));
       }

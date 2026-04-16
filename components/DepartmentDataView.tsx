@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import { useToast } from './Toast';
 import { flattenDepartments, getDepartmentFullPath } from '../utils/departmentUtils';
 import { ManualAttendanceModal } from './ManualAttendanceModal';
+import { showConfirm } from '../utils/dialogService';
 
 declare global {
   interface Window {
@@ -159,7 +160,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
 
   // Handle delete attendance record
   const handleDeleteAttendance = async (id: string) => {
-    if (!confirm('確定要刪除此打卡記錄嗎？此操作無法復原。')) return;
+    if (!(await showConfirm('確定要刪除此打卡記錄嗎？此操作無法復原。'))) return;
     try {
       await api.attendance.delete(id);
       const att = await api.attendance.getHistory();
@@ -171,7 +172,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
   };
 
   // --- Helpers ---
-  const getDeptName = (id: string) => getDepartmentFullPath(departments, id);
+  const getDeptName = (id: string) => getDepartmentFullPath(id, departments);
   const flatDepts = useMemo(() => flattenDepartments(departments), [departments]);
   const getUserName = (id?: string) => users.find(u => u.id === id)?.name || 'Unknown';
   const getUserDept = (userId: string) => {
@@ -362,10 +363,16 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
           return;
       }
 
-      const ws = window.XLSX.utils.json_to_sheet(data);
-      const wb = window.XLSX.utils.book_new();
-      window.XLSX.utils.book_append_sheet(wb, ws, "Data");
-      window.XLSX.writeFile(wb, filename);
+      try {
+          const ws = window.XLSX.utils.json_to_sheet(data);
+          const wb = window.XLSX.utils.book_new();
+          window.XLSX.utils.book_append_sheet(wb, ws, "Data");
+          window.XLSX.writeFile(wb, filename);
+          toast.success(`已成功匯出 ${data.length} 筆資料至 ${filename}`);
+      } catch (error) {
+          console.error('Excel 匯出錯誤:', error);
+          toast.error('Excel 匯出失敗，請稍後再試');
+      }
   };
 
   return (
@@ -575,9 +582,9 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                                     <tr key={r.id} className="hover:bg-slate-50">
                                         <td className="p-4 text-slate-500">{r.createdAt}</td>
                                         <td className="p-4 font-bold text-slate-700">{getUserName(r.userId)}</td>
-                                        <td className="p-4 text-right font-mono text-slate-600">{r.content.depositAmount.toLocaleString()}</td>
-                                        <td className="p-4 text-right font-mono text-red-400">{r.content.withdrawalAmount.toLocaleString()}</td>
-                                        <td className={`p-4 text-right font-mono font-bold ${r.content.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{r.content.netIncome.toLocaleString()}</td>
+                                        <td className="p-4 text-right font-mono text-slate-600">{(r.content.depositAmount ?? 0).toLocaleString()}</td>
+                                        <td className="p-4 text-right font-mono text-red-400">{(r.content.withdrawalAmount ?? 0).toLocaleString()}</td>
+                                        <td className={`p-4 text-right font-mono font-bold ${(r.content.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{(r.content.netIncome ?? 0).toLocaleString()}</td>
                                         <td className="p-4 text-right">{r.content.registrations}</td>
                                         <td className="p-4 text-xs text-slate-500 max-w-xs truncate">{r.content.notes}</td>
                                     </tr>
@@ -598,7 +605,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                                         <td className="p-4"><span className="bg-slate-100 px-2 py-0.5 rounded text-xs">{r.category}</span></td>
                                         <td className="p-4 font-medium text-slate-700">{r.description}</td>
                                         <td className="p-4 text-xs text-slate-400">{r.scope === 'DEPARTMENT' ? '部門公費' : getUserName(r.ownerId)}</td>
-                                        <td className={`p-4 text-right font-mono font-bold ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-red-500'}`}>{r.type === 'INCOME' ? '+' : '-'}{r.amount.toLocaleString()}</td>
+                                        <td className={`p-4 text-right font-mono font-bold ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-red-500'}`}>{r.type === 'INCOME' ? '+' : '-'}{(r.amount ?? 0).toLocaleString()}</td>
                                         <td className="p-4 text-xs">{r.status === 'COMPLETED' ? '✅' : '⏳'}</td>
                                     </tr>
                                 ))}
@@ -645,13 +652,13 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                                 <div className="bg-white p-3 rounded-lg border border-slate-100 mb-2">
                                     <div className="flex justify-between items-center mb-1">
                                         <span className="text-xs text-slate-400">淨入盈虧</span>
-                                        <span className={`font-mono font-bold text-lg ${r.content.netIncome >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                            ${r.content.netIncome.toLocaleString()}
+                                        <span className={`font-mono font-bold text-lg ${(r.content.netIncome ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            ${(r.content.netIncome ?? 0).toLocaleString()}
                                         </span>
                                     </div>
                                     <div className="flex justify-between text-xs text-slate-500">
-                                        <span>充 ${r.content.depositAmount.toLocaleString()}</span>
-                                        <span>提 ${r.content.withdrawalAmount.toLocaleString()}</span>
+                                        <span>充 ${(r.content.depositAmount ?? 0).toLocaleString()}</span>
+                                        <span>提 ${(r.content.withdrawalAmount ?? 0).toLocaleString()}</span>
                                     </div>
                                 </div>
                                 <div className="text-xs text-slate-500 line-clamp-2">{r.content.notes}</div>
@@ -683,7 +690,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                                 <div className="flex justify-between items-center mb-2">
                                     <div className="font-medium text-slate-700 truncate mr-2">{r.description}</div>
                                     <div className={`font-mono font-bold text-lg ${r.type === 'INCOME' ? 'text-emerald-600' : 'text-red-500'}`}>
-                                        {r.type === 'INCOME' ? '+' : '-'}{r.amount.toLocaleString()}
+                                        {r.type === 'INCOME' ? '+' : '-'}{(r.amount ?? 0).toLocaleString()}
                                     </div>
                                 </div>
                                 <div className="flex justify-between text-xs text-slate-400">

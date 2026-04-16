@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, RoutineTemplate, Role, DepartmentDef } from '../types';
 import { api } from '../services/api';
+import { showConfirm } from '../utils/dialogService';
 
 interface DocumentLibraryViewProps {
   currentUser: User;
@@ -293,7 +294,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
                         </button>
                         <button
                           onClick={async () => {
-                            if (confirm(`確定要刪除「${doc.title}」嗎？`)) {
+                            if (await showConfirm(`確定要刪除「${doc.title}」嗎？`)) {
                               await api.routines.deleteTemplate(doc.id);
                               await loadDocuments();
                             }

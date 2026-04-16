@@ -4,6 +4,7 @@ import { User, MenuItemId, DEFAULT_MENU_GROUPS, MENU_LABELS } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
 import DataCleanupView from './DataCleanupView';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface SystemSettingsViewProps {
   currentUser: User;
@@ -17,7 +18,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ currentU
   const [menuGroups, setMenuGroups] = useState(DEFAULT_MENU_GROUPS);
   const [draggedItem, setDraggedItem] = useState<{ groupIndex: number; itemIndex: number } | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [avatar, setAvatar] = useState(currentUser.avatar || '');
+  const [avatar, setAvatar] = useState(currentUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(currentUser.name || 'default')}&backgroundColor=b6e3f4`);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
   const [isUploadingBackup, setIsUploadingBackup] = useState(false);
@@ -25,12 +26,12 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ currentU
   const [showDataCleanup, setShowDataCleanup] = useState(false);
 
   const handleResetSystem = async () => {
-      if (confirm('⚠️ 危險操作：確定要重置系統嗎？所有資料將被清空！')) {
+      if (await showConfirm('⚠️ 危險操作：確定要重置系統嗎？所有資料將被清空！')) {
           const doubleCheck = prompt('請輸入 "RESET" 以確認重置');
           if (doubleCheck === 'RESET') {
               try {
                   await api.system.resetFactoryDefault();
-                  alert('系統已重置，將重新載入');
+                  showSuccess('系統已重置，將重新載入');
                   window.location.reload();
               } catch (e) {
                   toast.error('重置失敗');
@@ -71,7 +72,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ currentU
           return;
       }
       
-      if (!confirm('⚠️ 警告：上傳備份將會覆蓋現有資料庫！\n\n確定要繼續嗎？')) {
+      if (!(await showConfirm('⚠️ 警告：上傳備份將會覆蓋現有資料庫！\n\n確定要繼續嗎？'))) {
           if (uploadInputRef.current) uploadInputRef.current.value = '';
           return;
       }

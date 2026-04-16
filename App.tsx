@@ -8,10 +8,13 @@ import { LoginPage } from './components/LoginPage';
 import { SetupPage } from './components/SetupPage';
 import { UserModal } from './components/UserModal';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
-import { api } from './services/api';
+import { api, request } from './services/api';
 import { NotificationToast, Notification } from './components/NotificationToast';
 import { ToastProvider, useToast } from './components/Toast';
 import { WebSocketClient, WebSocketMessage } from './utils/websocketClient';
+import { GlobalDialogs } from './components/GlobalDialogs';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { showToast, showSuccess, showError, showWarning, showConfirm } from './utils/dialogService';
 
 // 動態載入大型組件 - 程式碼分割優化
 import { FloatingChatButton } from './components/FloatingChatButton';
@@ -37,6 +40,7 @@ const LeaveManagementView = lazy(() => import('./components/LeaveManagementView'
 const DepartmentDataView = lazy(() => import('./components/DepartmentDataView').then(m => ({ default: m.DepartmentDataView })));
 const AIAssistantView = lazy(() => import('./components/AIAssistantView').then(m => ({ default: m.default })));
 const BackupMonitorView = lazy(() => import('./components/BackupMonitorView').then(m => ({ default: m.BackupMonitorView })));
+const CentralDashboardView = lazy(() => import('./components/CentralDashboardView').then(m => ({ default: m.CentralDashboardView })));
 
 // 載入中骨架屏組件
 const PageSkeleton = () => (
@@ -53,6 +57,7 @@ const PageSkeleton = () => (
 
 function AppContent() {
   const toast = useToast();
+  const isCentralMode = (import.meta as any).env?.VITE_INSTANCE_MODE === 'central';
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSetupMode, setIsSetupMode] = useState(false);
@@ -80,7 +85,7 @@ function AppContent() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
-  const [currentPage, setCurrentPage] = useState<MenuItemId>('dashboard'); 
+  const [currentPage, setCurrentPage] = useState<MenuItemId>(isCentralMode ? 'central-dashboard' : 'dashboard');
   const [boardTab, setBoardTab] = useState<'my_tasks' | 'available' | 'all' | 'archived'>('all');
   const [selectedTaskCategory, setSelectedTaskCategory] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -207,110 +212,100 @@ function AppContent() {
 
     // 初始化 WebSocket 連接
     // 使用 Cloudflare Tunnel 提供有效的 HTTPS/WSS
-    const wsUrl = import.meta.env.VITE_WS_URL || 'wss://nato-procedures-web-started.trycloudflare.com/ws';
+    const wsUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
     console.log('[WebSocket] 連接到:', wsUrl);
     const wsClient = new WebSocketClient(wsUrl);
     wsClientRef.current = wsClient;
 
-    const token = localStorage.getItem('auth_token');
-    
-    wsClient.connect(token || undefined).then(() => {
-      console.log('[WebSocket] 已連接');
-      
-      // 發送認證訊息
-      wsClient.sendMessage('AUTH', { userId: currentUser.id });
-      
-      // 添加訊息處理器
-      const handleMessage = async (msg: WebSocketMessage) => {
-        console.log('[WebSocket] 收到事件:', msg.type);
-        
-        // 人員管理事件
-        if (msg.type === 'USER_CREATED' || msg.type === 'USER_UPDATED' || msg.type === 'USER_DELETED') {
-          try {
-            const updatedUsers = await api.users.getAll();
-            setUsers(Array.isArray(updatedUsers) ? updatedUsers : []);
-            toast.success('人員資料已更新');
-          } catch (error) {
-            console.error('更新人員資料失敗:', error);
-          }
+    // 添加訊息處理器
+    const handleMessage = async (msg: WebSocketMessage) => {
+      console.log('[WebSocket] 收到事件:', msg.type);
+
+      // 人員管理事件
+      if (msg.type === 'USER_CREATED' || msg.type === 'USER_UPDATED' || msg.type === 'USER_DELETED') {
+        try {
+          const updatedUsers = await api.users.getAll();
+          setUsers(Array.isArray(updatedUsers) ? updatedUsers : []);
+          toast.success('人員資料已更新');
+        } catch (error) {
+          console.error('更新人員資料失敗:', error);
         }
-        
-        // 任務管理事件
-        if (msg.type === 'TASK_CREATED' || msg.type === 'TASK_UPDATED' || msg.type === 'TASK_DELETED') {
-          try {
-            const updatedTasks = await api.tasks.getAll();
-            setTasks(Array.isArray(updatedTasks) ? updatedTasks : []);
-            toast.success('任務資料已更新');
-          } catch (error) {
-            console.error('更新任務資料失敗:', error);
-          }
+      }
+
+      // 任務管理事件
+      if (msg.type === 'TASK_CREATED' || msg.type === 'TASK_UPDATED' || msg.type === 'TASK_DELETED') {
+        try {
+          const updatedTasks = await api.tasks.getAll();
+          setTasks(Array.isArray(updatedTasks) ? updatedTasks : []);
+          toast.success('任務資料已更新');
+        } catch (error) {
+          console.error('更新任務資料失敗:', error);
         }
-        
-        // 財務管理事件
-        if (msg.type === 'FINANCE_CREATED' || msg.type === 'FINANCE_UPDATED' || msg.type === 'FINANCE_DELETED') {
-          try {
-            const updatedFinance = await api.finance.getAll();
-            setFinanceRecords(Array.isArray(updatedFinance) ? updatedFinance : []);
-            toast.success('財務資料已更新');
-          } catch (error) {
-            console.error('更新財務資料失敗:', error);
-          }
+      }
+
+      // 財務管理事件
+      if (msg.type === 'FINANCE_CREATED' || msg.type === 'FINANCE_UPDATED' || msg.type === 'FINANCE_DELETED') {
+        try {
+          const updatedFinance = await api.finance.getAll();
+          setFinanceRecords(Array.isArray(updatedFinance) ? updatedFinance : []);
+          toast.success('財務資料已更新');
+        } catch (error) {
+          console.error('更新財務資料失敗:', error);
         }
-        
-        // 部門管理事件
-        if (msg.type === 'DEPARTMENT_CREATED' || msg.type === 'DEPARTMENT_UPDATED' || msg.type === 'DEPARTMENT_DELETED') {
-          try {
-            const updatedDepts = await api.departments.getAll();
-            setDepartments(Array.isArray(updatedDepts) ? updatedDepts : []);
-            toast.success('部門資料已更新');
-          } catch (error) {
-            console.error('更新部門資料失敗:', error);
-          }
+      }
+
+      // 部門管理事件
+      if (msg.type === 'DEPARTMENT_CREATED' || msg.type === 'DEPARTMENT_UPDATED' || msg.type === 'DEPARTMENT_DELETED') {
+        try {
+          const updatedDepts = await api.departments.getAll();
+          setDepartments(Array.isArray(updatedDepts) ? updatedDepts : []);
+          toast.success('部門資料已更新');
+        } catch (error) {
+          console.error('更新部門資料失敗:', error);
         }
-        
-        // 公告系統事件
-        if (msg.type === 'ANNOUNCEMENT_CREATED' || msg.type === 'ANNOUNCEMENT_UPDATED' || msg.type === 'ANNOUNCEMENT_DELETED') {
-          try {
-            const updatedAnnouncements = await api.announcements.getAll();
-            setAnnouncements(Array.isArray(updatedAnnouncements) ? updatedAnnouncements : []);
-            toast.success('公告資料已更新');
-          } catch (error) {
-            console.error('更新公告資料失敗:', error);
-          }
+      }
+
+      // 公告系統事件
+      if (msg.type === 'ANNOUNCEMENT_CREATED' || msg.type === 'ANNOUNCEMENT_UPDATED' || msg.type === 'ANNOUNCEMENT_DELETED') {
+        try {
+          const updatedAnnouncements = await api.announcements.getAll();
+          setAnnouncements(Array.isArray(updatedAnnouncements) ? updatedAnnouncements : []);
+          toast.success('公告資料已更新');
+        } catch (error) {
+          console.error('更新公告資料失敗:', error);
         }
-        
-        // 報表系統事件
-        if (msg.type === 'REPORT_CREATED' || msg.type === 'REPORT_UPDATED' || msg.type === 'REPORT_DELETED') {
-          try {
-            const updatedReports = await api.reports.getAll();
-            setReports(Array.isArray(updatedReports) ? updatedReports : []);
-            toast.success('報表資料已更新');
-          } catch (error) {
-            console.error('更新報表資料失敗:', error);
-          }
+      }
+
+      // 報表系統事件
+      if (msg.type === 'REPORT_CREATED' || msg.type === 'REPORT_UPDATED' || msg.type === 'REPORT_DELETED') {
+        try {
+          const updatedReports = await api.reports.getAll();
+          setReports(Array.isArray(updatedReports) ? updatedReports : []);
+          toast.success('報表資料已更新');
+        } catch (error) {
+          console.error('更新報表資料失敗:', error);
         }
-        
-        // 工作日誌系統事件
-        if (msg.type === 'work_log_created' || msg.type === 'work_log_updated' || msg.type === 'work_log_deleted') {
-          window.dispatchEvent(new CustomEvent('worklog-updated'));
+      }
+
+      // 工作日誌系統事件
+      if (msg.type === 'work_log_created' || msg.type === 'work_log_updated' || msg.type === 'work_log_deleted') {
+        window.dispatchEvent(new CustomEvent('worklog-updated'));
+      }
+
+      // 建議系統事件
+      if (msg.type === 'SUGGESTION_CREATED' || msg.type === 'SUGGESTION_UPDATED' || msg.type === 'SUGGESTION_DELETED') {
+        try {
+          const updatedSuggestions = await api.forum.getAll();
+          setSuggestions(Array.isArray(updatedSuggestions) ? updatedSuggestions : []);
+          toast.success('建議資料已更新');
+        } catch (error) {
+          console.error('更新建議資料失敗:', error);
         }
-        
-        // 建議系統事件
-        if (msg.type === 'SUGGESTION_CREATED' || msg.type === 'SUGGESTION_UPDATED' || msg.type === 'SUGGESTION_DELETED') {
-          try {
-            const updatedSuggestions = await api.forum.getAll();
-            setSuggestions(Array.isArray(updatedSuggestions) ? updatedSuggestions : []);
-            toast.success('建議資料已更新');
-          } catch (error) {
-            console.error('更新建議資料失敗:', error);
-          }
-        }
-      };
-      
-      wsClient.addMessageHandler(handleMessage);
-    }).catch(error => {
-      console.error('[WebSocket] 連接失敗:', error);
-    });
+      }
+    };
+
+    wsClient.onMessage(handleMessage);
+    wsClient.connect();
 
     // 清理函數
     return () => {
@@ -319,7 +314,7 @@ function AppContent() {
         wsClientRef.current = null;
       }
     };
-  }, [currentUser, toast]);
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -426,9 +421,9 @@ function AppContent() {
           setUsers([user]);
           setCurrentUser(user);
           setIsSetupMode(false);
-          setCurrentPage('dashboard');
+          setCurrentPage(isCentralMode ? 'central-dashboard' : 'dashboard');
       } catch (err) {
-          alert('初始化失敗');
+          showError('初始化失敗');
       } finally {
           setIsProcessingSetup(false);
       }
@@ -436,7 +431,7 @@ function AppContent() {
 
   const handleLogin = async (user: User) => {
     setCurrentUser(user);
-    setCurrentPage('dashboard');
+    setCurrentPage(isCentralMode ? 'central-dashboard' : 'dashboard');
     
     // Load all data after login
     try {
@@ -469,7 +464,7 @@ function AppContent() {
   const handleLogout = () => {
     api.auth.logout(); // 清除 token
     setCurrentUser(null);
-    setCurrentPage('dashboard');
+    setCurrentPage(isCentralMode ? 'central-dashboard' : 'dashboard');
     setBoardTab('all');
     setSelectedTaskCategory(null);
     loadData(); 
@@ -502,34 +497,38 @@ function AppContent() {
           assignedToUserId: newTaskData.assignedToUserId
         } : t));
         setEditingTask(null);
-        alert('任務已更新');
+        showSuccess('任務已更新');
       } catch (error: any) {
-        alert(error?.message || '更新任務失敗');
+        showError(error?.message || '更新任務失敗');
       }
     } else {
       // 新建模式
-      const response = await api.tasks.create(backendData as any);
-      // 轉換後端返回的 snake_case 到 camelCase
-      const taskData = (response as any).task || response;
-      const createdTask: Task = {
-        id: taskData.id,
-        title: taskData.title,
-        description: taskData.description,
-        urgency: taskData.urgency,
-        deadline: taskData.deadline,
-        createdAt: taskData.created_at,
-        status: taskData.status,
-        targetDepartment: taskData.target_department,
-        assignedToUserId: taskData.assigned_to_user_id,
-        acceptedByUserId: taskData.accepted_by_user_id,
-        completionNotes: taskData.completion_notes,
-        progress: taskData.progress || 0,
-        createdBy: taskData.created_by,
-        isArchived: taskData.is_archived === 1 || taskData.is_archived === true,
-        timeline: taskData.timeline || [],
-        unreadUpdatesForUserIds: taskData.unread_updates_for_user_ids || []
-      };
-      setTasks([createdTask, ...tasks]);
+      try {
+        const response = await api.tasks.create(backendData as any);
+        // 轉換後端返回的 snake_case 到 camelCase
+        const taskData = (response as any).task || response;
+        const createdTask: Task = {
+          id: taskData.id,
+          title: taskData.title,
+          description: taskData.description,
+          urgency: taskData.urgency,
+          deadline: taskData.deadline,
+          createdAt: taskData.created_at,
+          status: taskData.status,
+          targetDepartment: taskData.target_department,
+          assignedToUserId: taskData.assigned_to_user_id,
+          acceptedByUserId: taskData.accepted_by_user_id,
+          completionNotes: taskData.completion_notes,
+          progress: taskData.progress || 0,
+          createdBy: taskData.created_by,
+          isArchived: taskData.is_archived === 1 || taskData.is_archived === true,
+          timeline: taskData.timeline || [],
+          unreadUpdatesForUserIds: taskData.unread_updates_for_user_ids || []
+        };
+        setTasks([createdTask, ...tasks]);
+      } catch (error: any) {
+        showError(error?.message || '建立任務失敗');
+      }
     }
   };
 
@@ -560,7 +559,7 @@ function AppContent() {
       };
       setTasks(tasks.map(t => t.id === taskId ? updatedTask : t));
     } catch (error: any) {
-      alert(error?.message || '接取任務失敗');
+      showError(error?.message || '接取任務失敗');
     }
   };
 
@@ -583,14 +582,16 @@ function AppContent() {
          if(supervisor && supervisor.id !== currentUser.id) unreadList.add(supervisor.id);
     }
 
-    const updatedTask = { 
-        ...task, 
-        status: isComplete ? TaskStatus.COMPLETED : TaskStatus.IN_PROGRESS, 
+    // 後端使用中文狀態值和 snake_case 欄位名
+    const newStatus = isComplete ? '已完成' : '進行中';
+
+    const updatedTask = {
+        ...task,
+        status: newStatus,
         completionNotes: isComplete ? note : task.completionNotes,
         progress: progress,
         timeline: [newEntry, ...(task.timeline || [])],
         unreadUpdatesForUserIds: Array.from(unreadList),
-        note: note
     };
 
     console.log('[App] 更新進度 - 發送數據:', {
@@ -598,22 +599,21 @@ function AppContent() {
         progress,
         note,
         isComplete,
-        updatedTask
+        status: newStatus
     });
-    
-    await api.tasks.update(updatedTask);
-    
-    // 重新從後端獲取完整的任務數據（包含 timeline）
+
+    // 發送 snake_case 欄位給後端 PUT API
+    await request('PUT', `/tasks/${taskId}`, {
+        status: newStatus,
+        progress: progress,
+        note: note || (isComplete ? '任務結案' : '進度更新'),
+        completion_notes: isComplete ? note : undefined,
+    });
+
+    // 重新獲取所有任務以刷新 UI（包含 timeline）
     try {
-        console.log('[App] 重新獲取任務數據:', taskId);
-        const refreshedTask = await api.tasks.getById(taskId);
-        console.log('[App] 獲取到的任務數據:', {
-            taskId: refreshedTask.id,
-            hasTimeline: !!refreshedTask.timeline,
-            timelineLength: refreshedTask.timeline?.length || 0,
-            timeline: refreshedTask.timeline
-        });
-        setTasks(tasks.map(t => t.id === taskId ? refreshedTask : t));
+        const refreshedTasks = await api.tasks.getAll();
+        setTasks(refreshedTasks);
     } catch (error) {
         console.error('[App] 重新獲取任務失敗:', error);
         // 如果獲取失敗，使用本地更新的數據
@@ -633,7 +633,7 @@ function AppContent() {
           console.log('✅ 任務封存成功:', taskId);
       } catch (error) {
           console.error('❌ 封存任務失敗:', error);
-          alert('封存任務失敗，請重試');
+          showError('封存任務失敗，請重試');
       }
   };
 
@@ -643,24 +643,24 @@ function AppContent() {
   };
 
   const handleCancelTask = async (taskId: string) => {
-      if (!confirm('確定要撤銷此任務嗎？撤銷後任務將移至已封存分頁，可隨時重新開啟。')) return;
+      if (!(await showConfirm('確定要撤銷此任務嗎？撤銷後任務將移至已封存分頁，可隨時重新開啟。'))) return;
       try {
           await api.tasks.updateProgress(taskId, { status: TaskStatus.CANCELLED });
           setTasks(tasks.map(t => t.id === taskId ? { ...t, status: TaskStatus.CANCELLED } : t));
-          alert('任務已撤銷，可在「已封存」分頁中重新開啟');
+          showSuccess('任務已撤銷，可在「已封存」分頁中重新開啟');
       } catch (error: any) {
-          alert(error?.message || '撤銷任務失敗');
+          showError(error?.message || '撤銷任務失敗');
       }
   };
 
   const handleReopenTask = async (taskId: string) => {
-      if (!confirm('確定要重新開啟此任務嗎？')) return;
+      if (!(await showConfirm('確定要重新開啟此任務嗎？'))) return;
       try {
           await api.tasks.updateProgress(taskId, { status: TaskStatus.OPEN });
           setTasks(tasks.map(t => t.id === taskId ? { ...t, status: TaskStatus.OPEN, progress: 0 } : t));
-          alert('任務已重新開啟');
+          showSuccess('任務已重新開啟');
       } catch (error: any) {
-          alert(error?.message || '重新開啟任務失敗');
+          showError(error?.message || '重新開啟任務失敗');
       }
   };
 
@@ -668,9 +668,9 @@ function AppContent() {
       try {
           await api.tasks.delete(taskId);
           setTasks(tasks.filter(t => t.id !== taskId));
-          alert('任務已刪除');
+          showSuccess('任務已刪除');
       } catch (error: any) {
-          alert(error?.message || '刪除任務失敗');
+          showError(error?.message || '刪除任務失敗');
       }
   };
 
@@ -679,10 +679,10 @@ function AppContent() {
       const newUser: User = { ...userData, id: `u-${Date.now()}` };
       const createdUser = await api.users.create(newUser);
       setUsers([...users, createdUser]);
-      alert('用戶創建成功！');
+      showSuccess('用戶創建成功！');
     } catch (error: any) {
       const errorMessage = error?.message || '創建用戶失敗';
-      alert(errorMessage);
+      showError(errorMessage);
       throw error; // 重新拋出錯誤，防止模態框關閉
     }
   };
@@ -722,40 +722,45 @@ function AppContent() {
 
   const handleAddDepartment = async (dept: DepartmentDef) => {
      try {
-         const createdDept = await api.departments.create(dept);
-         setDepartments([...departments, createdDept]);
+         await api.departments.create(dept);
+         // Re-fetch to get fresh hierarchical structure (includes subdepartments array)
+         setDepartments(await api.departments.getAll());
      } catch (error: any) {
-         alert(error?.message || '創建部門失敗');
+         showError(error?.message || '創建部門失敗');
      }
   };
 
   const handleUpdateDepartment = async (dept: DepartmentDef) => {
       try {
-          const updatedDept = await api.departments.update(dept);
-          setDepartments(prev => prev.map(d => d.id === dept.id ? updatedDept : d));
+          await api.departments.update(dept);
+          // Re-fetch to rebuild hierarchy in case parent_department_id changed
+          setDepartments(await api.departments.getAll());
       } catch (error: any) {
-          alert(error?.message || '更新部門失敗');
+          showError(error?.message || '更新部門失敗');
       }
   };
 
   const handleDeleteDepartment = async (id: string) => {
      const hasUsers = users.some(u => u.department === id);
      if (hasUsers) {
-         alert('無法刪除：該部門尚有員工，請先轉移人員。');
+         showError('無法刪除：該部門尚有員工，請先轉移人員。');
          return;
      }
      if (id === UNASSIGNED_DEPT_ID) {
-         alert('無法刪除系統預設部門。');
+         showError('無法刪除系統預設部門。');
          return;
      }
-     await api.departments.delete(id);
-     setDepartments(departments.filter(d => d.id !== id));
+     try {
+         await api.departments.delete(id);
+         // Re-fetch to rebuild hierarchy (deleted parent's children may become roots)
+         setDepartments(await api.departments.getAll());
+     } catch (error: any) {
+         showError(error?.message || '刪除部門失敗');
+     }
   };
 
   const handleCreateAnnouncement = async (data: any) => {
       if(!currentUser) return;
-      console.log('[App] Creating announcement with data:', data);
-      console.log('[App] Images from modal:', data.images);
       const newAnn: Announcement = {
           id: `ann-${Date.now()}`,
           ...data,
@@ -763,10 +768,13 @@ function AppContent() {
           createdBy: currentUser.id,
           readBy: []
       };
-      console.log('[App] Final announcement object:', newAnn);
-      console.log('[App] Images in final object:', newAnn.images);
-      await api.announcements.create(newAnn);
-      setAnnouncements([newAnn, ...announcements]);
+      try {
+          const result = await api.announcements.create(newAnn);
+          const savedAnn = { ...newAnn, id: (result as any)?.id || (result as any)?.announcement?.id || newAnn.id };
+          setAnnouncements([savedAnn, ...announcements]);
+      } catch (error: any) {
+          showError(error.message || '建立公告失敗');
+      }
   };
 
   const handleConfirmRead = async (annId: string) => {
@@ -855,8 +863,13 @@ function AppContent() {
           comments: [],
           createdAt: new Date().toISOString().split('T')[0]
       };
-      await api.forum.create(newSuggestion);
-      setSuggestions([newSuggestion, ...suggestions]);
+      try {
+          const result = await api.forum.create(newSuggestion);
+          const savedSuggestion = { ...newSuggestion, id: (result as any)?.id || (result as any)?.suggestion?.id || newSuggestion.id };
+          setSuggestions([savedSuggestion, ...suggestions]);
+      } catch (error: any) {
+          showError(error.message || '建立提案失敗');
+      }
   };
 
   const handleUpdateSuggestionStatus = async (id: string, status: SuggestionStatus) => {
@@ -1101,7 +1114,7 @@ function AppContent() {
         <button 
             key={id}
             onClick={() => { setCurrentPage(id); setIsCreatingReport(false); setIsMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? (id === 'settings' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700 shadow-sm') : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? ('bg-blue-50 text-blue-700 shadow-sm') : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
         >
             {isSidebarCollapsed ? (
               <span className="text-xl">{config.icon}</span>
@@ -1177,7 +1190,7 @@ function AppContent() {
         <div className={`p-6 ${isSidebarCollapsed ? 'px-2' : ''}`}>
           <button onClick={() => { setEditingUser(currentUser); setUserModalOpen(true); }} className={`w-full text-left bg-slate-50 rounded-2xl border border-slate-200 shadow-sm group hover:border-blue-300 transition ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
             <div className="flex items-center gap-3 justify-center">
-               <img src={currentUser.avatar} className="w-12 h-12 rounded-full border border-slate-200 flex-shrink-0" />
+               <img src={currentUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(currentUser.name || 'default')}`} className="w-12 h-12 rounded-full border border-slate-200 flex-shrink-0" />
                {!isSidebarCollapsed && (
                  <div className="min-w-0">
                     <h2 className="font-bold text-slate-800 truncate">{currentUser.name}</h2>
@@ -1189,6 +1202,17 @@ function AppContent() {
         </div>
 
         <nav className="flex-1 px-4 overflow-y-auto pb-4 space-y-4">
+          {isCentralMode && (
+            <div className="space-y-1">
+              {!isSidebarCollapsed && <h3 className="px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1 mt-2">總部管理</h3>}
+              <button
+                onClick={() => { setCurrentPage('central-dashboard'); setIsMobileMenuOpen(false); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === 'central-dashboard' ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
+              >
+                {isSidebarCollapsed ? <span className="text-xl">🏢</span> : <span>總部儀表板</span>}
+              </button>
+            </div>
+          )}
           {Array.isArray(menuGroups) && menuGroups.map(group => {
               if (!group || !Array.isArray(group.items)) return null;
               const items = group.items.map(id => renderSidebarItem(id)).filter(Boolean);
@@ -1360,6 +1384,7 @@ function AppContent() {
         </header>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-8 pb-20 md:pb-8">
+           <ErrorBoundary key={currentPage} fallbackTitle="此頁面載入時發生錯誤">
            <Suspense fallback={<PageSkeleton />}>
              {currentPage === 'dashboard' && <DashboardView currentUser={currentUser} tasks={tasks} announcements={announcements} reports={reports} departments={departments} onChangePage={setCurrentPage} onTaskUpdate={() => loadData(true)} onAnnouncementUpdate={() => loadData(true)} onOpenCreateTask={() => setCreateModalOpen(true)} />}
              {currentPage === 'bulletin' && <BulletinView currentUser={currentUser} announcements={announcements} users={users} departments={departments} onCreateAnnouncement={handleCreateAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onConfirmRead={handleConfirmRead} />}
@@ -1403,9 +1428,11 @@ function AppContent() {
              {currentPage === 'sop' && <SOPView currentUser={currentUser} users={users} departments={departments} />}
              {currentPage === 'ai-assistant' && <AIAssistantView currentUser={currentUser} />}
              {currentPage === 'backup-monitor' && <BackupMonitorView />}
+             {currentPage === 'central-dashboard' && <CentralDashboardView />}
              {currentPage === 'settings' && <SystemSettingsView currentUser={currentUser} onLogout={handleLogout} />}
            </Suspense>
-           
+           </ErrorBoundary>
+
            {currentPage === 'tasks' && (
              <div className="max-w-6xl mx-auto pb-20">
                <div className="flex items-center justify-between mb-8">
@@ -1560,6 +1587,7 @@ export default function App() {
   return (
     <ToastProvider>
       <AppContent />
+      <GlobalDialogs />
     </ToastProvider>
   );
 }

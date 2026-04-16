@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WorkLog, User, DepartmentDef, Role } from '../types';
 import { api } from '../services/api';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface WorkLogTabProps {
   currentUser: User;
@@ -13,11 +14,16 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
   const [loading, setLoading] = useState(false);
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [selectedUser, setSelectedUser] = useState<string>('ALL');
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const getLocalDate = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalDate());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState<WorkLog | null>(null);
+  const [formError, setFormError] = useState<string>('');
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDate(),
     todayTasks: '',
     tomorrowTasks: '',
     notes: ''
@@ -49,10 +55,10 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       }
 
       const response = await api.workLogs.getAll(params);
-      setLogs(response.logs);
+      setLogs(Array.isArray(response) ? response : (response.logs || []));
     } catch (error) {
       console.error('Failed to load work logs:', error);
-      alert('載入工作日誌失敗');
+      showError('載入工作日誌失敗');
     } finally {
       setLoading(false);
     }
@@ -79,6 +85,7 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       tomorrowTasks: '',
       notes: ''
     });
+    setFormError('');
     setIsModalOpen(true);
   };
 
@@ -96,8 +103,9 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    setFormError('');
     if (!formData.todayTasks.trim() || !formData.tomorrowTasks.trim()) {
-      alert('請填寫今日工作事項和明天工作事項');
+      showWarning('請填寫今日工作事項和明天工作事項');
       return;
     }
 
@@ -113,22 +121,26 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       }
       
       setIsModalOpen(false);
-      loadLogs();
+      showSuccess(editingLog ? '工作日誌已更新' : '工作日誌已建立');
+      await loadLogs();
     } catch (error: any) {
       console.error('Failed to save work log:', error);
-      alert(error.message || '保存失敗');
+      const msg = error.message || '保存失敗';
+      const displayMsg = msg.includes('already exists') ? '今天的工作日誌已存在，無法重複建立' : msg;
+      setFormError(displayMsg);
+      showError(displayMsg);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('確定要刪除這條工作日誌嗎？')) return;
-    
+    if (!(await showConfirm('確定要刪除這條工作日誌嗎？'))) return;
+
     try {
       await api.workLogs.delete(id);
       loadLogs();
     } catch (error) {
       console.error('Failed to delete work log:', error);
-      alert('刪除失敗');
+      showError('刪除失敗');
     }
   };
 
@@ -192,7 +204,7 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       {/* Logs List */}
       {loading ? (
         <div className="text-center py-8 text-gray-500">載入中...</div>
-      ) : logs.length === 0 ? (
+      ) : !logs || logs.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
           {selectedDate === new Date().toISOString().split('T')[0] 
             ? '今天還沒有工作日誌' 
@@ -261,6 +273,11 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
             </h2>
 
             <form onSubmit={handleSubmit}>
+              {formError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 font-bold flex items-center gap-2">
+                  <span>❌</span> {formError}
+                </div>
+              )}
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

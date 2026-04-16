@@ -158,7 +158,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                             : 'hover:bg-slate-50 border-2 border-transparent'}`}
                       >
                         <div className="relative">
-                          <img src={user.avatar} className="w-10 h-10 rounded-full border border-slate-200" />
+                          <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} className="w-10 h-10 rounded-full border border-slate-200" />
                           {isSelected && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
                               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">

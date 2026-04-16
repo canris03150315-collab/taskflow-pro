@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { DailyReportContent, ReportType } from '../types';
+import { showConfirm } from '../utils/dialogService';
 
 interface CreateReportViewProps {
   onCancel: () => void;
@@ -38,9 +39,9 @@ export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, on
   const conversionRate = (Number(lineLeads) > 0) ? Math.round((Number(registrations) / Number(lineLeads)) * 100) : 0;
   const firstDepositRate = (Number(registrations) > 0) ? Math.round((Number(firstDeposits) / Number(registrations)) * 100) : 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // 二次確認
     const confirmMessage = `確定要提交營運報表嗎？\n\n` +
       `📅 報表日期：${reportDate}\n` +
@@ -48,11 +49,11 @@ export const CreateReportView: React.FC<CreateReportViewProps> = ({ onCancel, on
       `💸 提現金額：$${Number(withdrawalAmount) || 0}\n` +
       `📊 淨入金額：$${netIncome}\n\n` +
       `提交後將無法修改。`;
-    
-    if (!window.confirm(confirmMessage)) {
+
+    if (!(await showConfirm(confirmMessage))) {
       return;
     }
-    
+
     onSubmit({
       lineLeads: Number(lineLeads) || 0,
       registrations: Number(registrations) || 0,

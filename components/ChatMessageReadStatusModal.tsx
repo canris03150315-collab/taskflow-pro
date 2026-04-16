@@ -26,7 +26,7 @@ export const ChatMessageReadStatusModal: React.FC<ChatMessageReadStatusModalProp
   // 計算邏輯：誰應該在這個頻道裡？
   const allParticipants = useMemo(() => {
     if (channel.type === 'DIRECT') {
-      return users.filter(u => channel.participants.includes(u.id));
+      return users.filter(u => (channel.participants || []).includes(u.id));
     } else if (channel.id === 'general' || channel.id === 'GENERAL') {
       // 假設 General 是全員
       return users;
@@ -36,17 +36,17 @@ export const ChatMessageReadStatusModal: React.FC<ChatMessageReadStatusModalProp
     }
     // Fallback: 如果有 participants 就用，沒有就假設是部門或全員
     if (channel.participants && channel.participants.length > 0) {
-        return users.filter(u => channel.participants.includes(u.id));
+        return users.filter(u => (channel.participants || []).includes(u.id));
     }
     return [];
   }, [channel, users]);
 
   // 過濾出已讀與未讀
   // 排除發送者自己 (雖然通常發送者在 readBy 裡，但已讀名單通常不顯示自己讀了自己)
-  const readUsers = allParticipants.filter(u => message.readBy.includes(u.id) && u.id !== message.userId);
-  
+  const readUsers = allParticipants.filter(u => (message.readBy || []).includes(u.id) && u.id !== message.userId);
+
   // 未讀：應該在頻道裡，但 ID 不在 readBy 列表，且不是發送者
-  const unreadUsers = allParticipants.filter(u => !message.readBy.includes(u.id) && u.id !== message.userId);
+  const unreadUsers = allParticipants.filter(u => !(message.readBy || []).includes(u.id) && u.id !== message.userId);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
@@ -89,7 +89,7 @@ export const ChatMessageReadStatusModal: React.FC<ChatMessageReadStatusModalProp
                  {readUsers.length === 0 && <p className="text-xs text-slate-300 italic pl-3">尚無人閱讀</p>}
                  {readUsers.map(u => (
                     <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition">
-                       <img src={u.avatar} className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200" />
+                       <img src={u.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(u.name || 'default')}`} className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200" />
                        <div className="min-w-0">
                           <div className="text-sm font-bold text-slate-700 truncate">{u.name}</div>
                           <div className="text-[10px] text-slate-400 font-bold">{getDeptName(u.department)}</div>
@@ -109,7 +109,7 @@ export const ChatMessageReadStatusModal: React.FC<ChatMessageReadStatusModalProp
                    {unreadUsers.map(u => (
                       <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition">
                          <div className="relative">
-                            <img src={u.avatar} className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 grayscale" />
+                            <img src={u.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(u.name || 'default')}`} className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 grayscale" />
                          </div>
                          <div className="min-w-0">
                             <div className="text-sm font-bold text-slate-700 truncate">{u.name}</div>

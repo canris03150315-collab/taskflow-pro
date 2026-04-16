@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DepartmentDef, RoutineTemplate, User, Role } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface SOPManagementProps {
   departments: DepartmentDef[];
@@ -78,7 +79,7 @@ export const SOPManagement: React.FC<SOPManagementProps> = ({ departments, curre
   };
 
   const handleDuplicate = async (tpl: RoutineTemplate) => {
-      if(!confirm(`確定要複製文件「${tpl.title}」嗎？`)) return;
+      if(!(await showConfirm(`確定要複製文件「${tpl.title}」嗎？`))) return;
       
       const newDoc: RoutineTemplate = {
           ...tpl,
@@ -182,7 +183,7 @@ export const SOPManagement: React.FC<SOPManagementProps> = ({ departments, curre
   };
 
   const handleDelete = async (id: string) => {
-      if (confirm('確定要刪除此文件嗎？')) {
+      if (await showConfirm('確定要刪除此文件嗎？')) {
           await api.routines.deleteTemplate(id);
           loadTemplates();
       }

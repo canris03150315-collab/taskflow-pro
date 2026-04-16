@@ -231,7 +231,7 @@ export const PerformanceView: React.FC<PerformanceViewProps> = ({ currentUser, u
                         <div key={user.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xl overflow-hidden">
-                                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" /> : '👤'}
+                                    <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} className="w-full h-full object-cover" />
                                 </div>
                                 <div>
                                     <div className="font-bold text-slate-800">{user.name}</div>

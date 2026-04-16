@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { User, Role, DepartmentDef, hasPermission } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface LeaveRequest {
   id: string;
@@ -128,7 +129,10 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
   // Get user name
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);
-    return user?.name || '未知用戶';
+    if (user) return user.name;
+    // Fallback: if it's the current user's own ID, show their name
+    if (userId === currentUser.id) return currentUser.name;
+    return userId || '未知用戶';
   };
 
   // Get department name
@@ -168,7 +172,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
 
   // Handle cancel
   const handleCancel = async (leaveId: string) => {
-    if (!confirm('確定要取消這個假期申請嗎？')) return;
+    if (!(await showConfirm('確定要取消這個假期申請嗎？'))) return;
     
     try {
       await api.leaves.delete(leaveId);
@@ -386,7 +390,7 @@ export function LeaveManagementView({ currentUser, users, departments, leaves, o
 
   // Handle delete schedule
   const handleDeleteSchedule = async (scheduleId: string, scheduleName: string, scheduleMonth: string) => {
-    if (!confirm(`確定要刪除 ${scheduleName} 的 ${scheduleMonth} 排班嗎？\n\n刪除後將無法恢復，該排班將被標記為已取消。`)) {
+    if (!(await showConfirm(`確定要刪除 ${scheduleName} 的 ${scheduleMonth} 排班嗎？\n\n刪除後將無法恢復，該排班將被標記為已取消。`))) {
       return;
     }
     

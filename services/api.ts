@@ -2,7 +2,7 @@
   User, Role, DepartmentDef, DEFAULT_DEPARTMENTS, Task, Announcement, 
   Report, FinanceRecord, Suggestion, Memo, RoutineTemplate, AttendanceRecord, 
   SystemLog, PerformanceReview, ChatChannel, ChatMessage, TaskStatus, Urgency,
-  MenuItemId, DEFAULT_MENU_GROUPS, MenuGroup, RoutineRecord, ReviewMetrics, WorkLog
+  MenuItemId, DEFAULT_MENU_GROUPS, MenuGroup, RoutineRecord, ReviewMetrics
 } from '../types';
 
 // ============================================================================
@@ -73,7 +73,7 @@ const getAuthHeaders = () => {
     };
 };
 
-const request = async <T>(method: string, endpoint: string, body?: any): Promise<T> => {
+export const request = async <T>(method: string, endpoint: string, body?: any): Promise<T> => {
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, {
             method,
@@ -86,12 +86,17 @@ const request = async <T>(method: string, endpoint: string, body?: any): Promise
         
         if (!response.ok) {
             const errorMessage = data.error || `API Error: ${response.statusText}`;
-            throw new Error(errorMessage);
+            const err = new Error(errorMessage);
+            (err as any).status = response.status;
+            throw err;
         }
-        
+
         return data;
     } catch (error) {
-        console.error(`Request failed: ${method} ${endpoint}`, error);
+        // Suppress console noise for 403 (expected for EMPLOYEE role on restricted endpoints)
+        if (!((error as any).status === 403)) {
+            console.error(`Request failed: ${method} ${endpoint}`, error);
+        }
         throw error;
     }
 };
@@ -102,7 +107,6 @@ const RealApi = {
             const res = await request<{ user: User, token: string }>('POST', '/auth/login', { username, password });
             if (res.token) {
                 localStorage.setItem('auth_token', res.token);
-                localStorage.setItem('user', JSON.stringify(res.user));
                 return res.user;
             }
             return undefined;
@@ -111,7 +115,6 @@ const RealApi = {
             const res = await request<{ user: User, token: string }>('POST', '/auth/setup', userData);
             if (res.token) {
                 localStorage.setItem('auth_token', res.token);
-                localStorage.setItem('user', JSON.stringify(res.user));
             }
             return res.user;
         },
@@ -145,36 +148,26 @@ const RealApi = {
                     permissions: u.permissions || []
                 }));
             } catch (error) {
-                console.error('Failed to get users', error);
+                // 403 is expected for EMPLOYEE role — silently return empty
+                if ((error as any).status !== 403) {
+                    console.error('Failed to get users', error);
+                }
                 return [];
-            }
-        },
-        getById: async (id: string): Promise<User | null> => {
-            try {
-                const user = await request<any>('GET', `/users/${id}`);
-                console.log('[API] getById 用戶數據:', {
-                    id: user.id,
-                    name: user.name,
-                    role: user.role,
-                    permissions: user.permissions
-                });
-                return {
-                    ...user,
-                    password: user.password || '',
-                    permissions: user.permissions || []
-                };
-            } catch (error) {
-                console.error('Failed to get user by id', error);
-                return null;
             }
         },
         create: async (user: User) => {
             const response = await request<{ user: User, message: string }>('POST', '/users', user);
             return response.user;
         },
-        update: async (user: User) => {
-            const response = await request<{ user: User, message: string }>('PUT', `/users/${user.id}`, user);
-            return response.user;
+        update: (user: User) => request<User>('PUT', `/users/${user.id}`, user),
+        getById: async (id: string): Promise<User | null> => {
+            try {
+                const response = await request<any>('GET', `/users/${id}`);
+                return response ? { ...response, password: response.password || '', permissions: response.permissions || [] } : null;
+            } catch (error) {
+                console.error('Failed to get user by id', error);
+                return null;
+            }
         },
         delete: (id: string) => request<void>('DELETE', `/users/${id}`),
         updateAvatar: async (userId: string, avatar: string) => {
@@ -203,21 +196,7 @@ const RealApi = {
     },
     tasks: {
         getAll: async (): Promise<Task[]> => {
-            // 獲取所有任務（包含封存的），前端自己篩選
-            const [normalResponse, archivedResponse] = await Promise.all([
-                request<{ tasks: any[], pagination?: any }>('GET', '/tasks?is_archived=false'),
-                request<{ tasks: any[], pagination?: any }>('GET', '/tasks?is_archived=true')
-            ]);
-            
-            const allTasks = [...(normalResponse.tasks || []), ...(archivedResponse.tasks || [])];
-            
-            console.log('[API] getAll 原始後端數據:', {
-                normalTasksLength: normalResponse.tasks?.length || 0,
-                archivedTasksLength: archivedResponse.tasks?.length || 0,
-                totalTasks: allTasks.length
-            });
-            
-            const response = { tasks: allTasks };
+            const response = await request<{ tasks: any[], pagination?: any }>('GET', '/tasks');
             return (response.tasks || []).map((task: any) => ({
                 id: task.id,
                 title: task.title,
@@ -234,63 +213,9 @@ const RealApi = {
                 progress: task.progress || 0,
                 createdBy: task.created_by,
                 isArchived: task.is_archived === 1 || task.is_archived === true,
-                timeline: (task.timeline || []).map((entry: any) => ({
-                    userId: entry.user_id,
-                    content: entry.content,
-                    timestamp: entry.timestamp,
-                    progress: entry.progress
-                })),
+                timeline: task.timeline || [],
                 unreadUpdatesForUserIds: task.unread_updates_for_user_ids || []
             }));
-        },
-        getById: async (id: string): Promise<Task> => {
-            const task = await request<any>('GET', `/tasks/${id}`);
-            console.log('[API] getById 原始後端數據:', {
-                taskId: task.id,
-                hasTimeline: !!task.timeline,
-                timelineLength: task.timeline?.length || 0,
-                timelineRaw: task.timeline
-            });
-            
-            const transformedTimeline = (task.timeline || []).map((entry: any) => {
-                console.log('[API] 轉換 timeline entry:', {
-                    原始: entry,
-                    轉換後: {
-                        userId: entry.user_id,
-                        content: entry.content,
-                        timestamp: entry.timestamp,
-                        progress: entry.progress
-                    }
-                });
-                return {
-                    userId: entry.user_id,
-                    content: entry.content,
-                    timestamp: entry.timestamp,
-                    progress: entry.progress
-                };
-            });
-            
-            console.log('[API] getById 轉換後 timeline:', transformedTimeline);
-            
-            return {
-                id: task.id,
-                title: task.title,
-                description: task.description,
-                urgency: task.urgency,
-                deadline: task.deadline,
-                createdAt: task.created_at,
-                status: task.status,
-                targetDepartment: task.target_department,
-                assignedToUserId: task.assigned_to_user_id,
-                assignedToDepartment: task.assigned_to_department,
-                acceptedByUserId: task.accepted_by_user_id,
-                completionNotes: task.completion_notes,
-                progress: task.progress || 0,
-                createdBy: task.created_by,
-                isArchived: task.is_archived === 1 || task.is_archived === true,
-                timeline: transformedTimeline,
-                unreadUpdatesForUserIds: task.unread_updates_for_user_ids || []
-            };
         },
         create: (task: Task) => request<Task>('POST', '/tasks', task),
         update: (task: Task) => request<Task>('PUT', `/tasks/${task.id}`, task),
@@ -305,28 +230,15 @@ const RealApi = {
                 return (response.announcements || []).map((a: any) => ({
                     ...a,
                     readBy: a.read_by || a.readBy || [],
-                    createdAt: a.created_at || a.createdAt,
-                    createdBy: a.createdBy || a.created_by
+                    createdAt: a.created_at || a.createdAt
                 }));
             } catch (error) {
                 console.error('Failed to get announcements', error);
                 return [];
             }
         },
-        create: (ann: Announcement) => {
-            console.log('[API] Creating announcement with data:', ann);
-            console.log('[API] Images in request:', ann.images);
-            return request<Announcement>('POST', '/announcements', ann);
-        },
-        update: async (id: string, data: Partial<Announcement>): Promise<Announcement> => {
-            const response = await request<any>('PUT', `/announcements/${id}`, data);
-            return {
-                ...response,
-                readBy: response.read_by || response.readBy || [],
-                createdAt: response.created_at || response.createdAt,
-                createdBy: response.createdBy || response.created_by
-            };
-        },
+        create: (ann: Announcement) => request<Announcement>('POST', '/announcements', ann),
+        update: (id: string, ann: Partial<Announcement>) => request<Announcement>('PUT', `/announcements/${id}`, ann),
         delete: (id: string) => request<void>('DELETE', `/announcements/${id}`),
         markRead: (id: string, userId: string) => request<void>('POST', `/announcements/${id}/read`, { userId })
     },
@@ -344,79 +256,43 @@ const RealApi = {
                 return [];
             }
         },
-        create: async (report: Report): Promise<Report> => {
-            const response = await request<{ report: Report }>('POST', '/reports', report);
-            return response.report || response as any;
-        },
+        create: (report: Report) => request<Report>('POST', '/reports', report),
         update: (id: string, content: any) => request<Report>('PUT', `/reports/${id}`, { content }),
         delete: (id: string) => request<void>('DELETE', `/reports/${id}`),
-        
-        // Approval APIs
         approval: {
-            request: async (approverId: string, reason: string) => {
-                return request<{ success: boolean; authorizationId: string; message: string }>(
-                    'POST', 
-                    '/reports/approval/request', 
-                    { approverId, reason }
-                );
+            checkStatus: async (authId: string): Promise<{ isAuthorized: boolean; authorization: any | null }> => {
+                try {
+                    return await request<{ isAuthorized: boolean; authorization: any | null }>('GET', '/reports/approval/status');
+                } catch (error) {
+                    console.error('Failed to check approval status', error);
+                    return { isAuthorized: false, authorization: null };
+                }
             },
-            approve: async (authorizationId: string, reason: string) => {
-                return request<{ success: boolean; message: string; requesterName: string }>(
-                    'POST', 
-                    '/reports/approval/approve', 
-                    { authorizationId, reason }
-                );
+            getPending: async (): Promise<{ pending: any[] }> => {
+                try {
+                    return await request<{ pending: any[] }>('GET', '/reports/approval/pending');
+                } catch (error) {
+                    console.error('Failed to get pending approvals', error);
+                    return { pending: [] };
+                }
             },
-            reject: async (authorizationId: string, reason: string) => {
-                return request<{ success: boolean; message: string; requesterName: string; rejectReason: string }>(
-                    'POST', 
-                    '/reports/approval/reject', 
-                    { authorizationId, reason }
-                );
+            revoke: async (authId: string | undefined): Promise<void> => {
+                return request<void>('POST', `/reports/approval/revoke`, { authorizationId: authId });
             },
-            checkStatus: async (sessionId: string) => {
-                const headers = {
-                    ...getAuthHeaders(),
-                    'x-session-id': sessionId
-                };
-                const response = await fetch(`${API_BASE_URL}/reports/approval/check`, {
-                    method: 'GET',
-                    headers
-                });
-                const data = await response.json();
-                return data;
-            },
-            getEligibleApprovers: async () => {
-                return request<{ success: boolean; approvers: any[] }>(
-                    'GET', 
-                    '/reports/approval/eligible-approvers'
-                );
-            },
-            getPending: async () => {
-                return request<{ success: boolean; pending: any[] }>(
-                    'GET', 
-                    '/reports/approval/pending'
-                );
-            },
-            revoke: async (authorizationId?: string) => {
-                return request<{ success: boolean; message: string }>(
-                    'POST', 
-                    '/reports/approval/revoke', 
-                    { authorizationId }
-                );
-            },
-            getAuditLog: async (filters?: { action?: string; startDate?: string; endDate?: string; limit?: number; offset?: number }) => {
-                const params = new URLSearchParams();
-                if (filters?.action) params.append('action', filters.action);
-                if (filters?.startDate) params.append('startDate', filters.startDate);
-                if (filters?.endDate) params.append('endDate', filters.endDate);
-                if (filters?.limit) params.append('limit', filters.limit.toString());
-                if (filters?.offset) params.append('offset', filters.offset.toString());
-                
-                return request<{ success: boolean; logs: any[]; total: number; limit: number; offset: number }>(
-                    'GET',
-                    `/reports/approval/audit-log?${params.toString()}`
-                );
+            getAuditLog: async (params: { action?: string; startDate?: string; endDate?: string; limit?: number; offset?: number }): Promise<{ logs: any[]; total: number }> => {
+                try {
+                    const query = new URLSearchParams();
+                    if (params.action && params.action !== 'ALL') query.append('action', params.action);
+                    if (params.startDate) query.append('startDate', params.startDate);
+                    if (params.endDate) query.append('endDate', params.endDate);
+                    if (params.limit) query.append('limit', params.limit.toString());
+                    if (params.offset) query.append('offset', params.offset.toString());
+                    const qs = query.toString();
+                    return await request<{ logs: any[]; total: number }>('GET', `/reports/approval/audit-log${qs ? '?' + qs : ''}`);
+                } catch (error) {
+                    console.error('Failed to get audit log', error);
+                    return { logs: [], total: 0 };
+                }
             }
         }
     },
@@ -483,51 +359,47 @@ const RealApi = {
     },
     routines: {
         getTemplates: async (): Promise<RoutineTemplate[]> => {
-            try {
-                const response = await request<{ templates: any[] }>('GET', '/routines/templates');
-                return (response.templates || []).map((t: any) => ({
-                    ...t,
-                    departmentId: t.departmentId || t.department_id,
-                    lastUpdated: t.lastUpdated || t.last_updated,
-                    isDaily: t.isDaily || t.is_daily,
-                    readBy: t.readBy || t.read_by || []
-                }));
-            } catch (error) {
-                console.error('Failed to get routine templates', error);
-                return [];
-            }
+            await delay();
+            return [...MOCK_DB.routineTemplates];
         },
         saveTemplate: async (tpl: RoutineTemplate): Promise<RoutineTemplate> => {
-            const response = await request<RoutineTemplate>('POST', '/routines/templates', tpl);
-            return response;
+            await delay();
+            const idx = MOCK_DB.routineTemplates.findIndex(t => t.id === tpl.id);
+            if (idx !== -1) {
+                MOCK_DB.routineTemplates[idx] = tpl;
+            } else {
+                MOCK_DB.routineTemplates.push(tpl);
+            }
+            saveToStorage();
+            return tpl;
         },
         deleteTemplate: async (id: string): Promise<void> => {
-            await request<void>('DELETE', `/routines/templates/${id}`);
+            await delay();
+            MOCK_DB.routineTemplates = MOCK_DB.routineTemplates.filter(t => t.id !== id);
+            saveToStorage();
         },
         markAsRead: async (userId: string, templateId: string): Promise<void> => {
-            await request<void>('POST', `/routines/templates/${templateId}/read`, { userId });
+            await delay();
+            const tpl = MOCK_DB.routineTemplates.find(t => t.id === templateId);
+            if (tpl) {
+                if (!tpl.readBy) tpl.readBy = [];
+                if (!tpl.readBy.includes(userId)) {
+                    tpl.readBy.push(userId);
+                    saveToStorage();
+                }
+            }
         },
         getTodayRecord: async (userId: string, deptId: string): Promise<RoutineRecord | null> => {
-            try {
-                const response = await request<RoutineRecord | null>('GET', '/routines/today');
-                return response;
-            } catch (error) {
-                console.error('Failed to get today record', error);
-                return null;
-            }
+            await delay();
+            // Simplified mock
+            return null; 
         },
-        getHistory: async (): Promise<any[]> => {
-            try {
-                const response = await request<{ records: any[] }>('GET', '/routines/history');
-                console.log('[API] getHistory response:', response);
-                return response.records || [];
-            } catch (error) {
-                console.error('Failed to get routine history', error);
-                return [];
-            }
+        getHistory: async (): Promise<RoutineRecord[]> => {
+            await delay();
+            return [];
         },
         toggleItem: async (recordId: string, index: number, isCompleted: boolean): Promise<void> => {
-            await request<void>('POST', `/routines/records/${recordId}/toggle`, { index, isCompleted });
+            await delay();
         }
     },
     attendance: {
@@ -550,28 +422,6 @@ const RealApi = {
                 return null;
             }
         },
-        manualEntry: async (userId: string, date: string, clockIn: string, clockOut: string, reason: string): Promise<void> => {
-            await request<{ success: boolean }>('POST', '/attendance/manual', {
-                userId,
-                date,
-                clockIn,
-                clockOut,
-                reason
-            });
-        },
-        updateManualEntry: async (id: string, clockIn: string, clockOut: string, reason: string): Promise<void> => {
-            await request<{ success: boolean }>('PUT', `/attendance/manual/${id}`, {
-                clockIn,
-                clockOut,
-                reason
-            });
-        },
-        update: async (id: string, data: { clock_in?: string; clock_out?: string; notes?: string }): Promise<void> => {
-            await request<{ success: boolean }>('PUT', `/attendance/${id}`, data);
-        },
-        delete: async (id: string): Promise<void> => {
-            await request<{ success: boolean }>('DELETE', `/attendance/${id}`);
-        },
         getHistory: async (): Promise<AttendanceRecord[]> => {
             const response = await request<{ records: any[] }>('GET', `/attendance`);
             return (response.records || []).map((r: any) => ({
@@ -583,8 +433,9 @@ const RealApi = {
                 durationMinutes: r.duration_minutes,
                 status: r.status,
                 isManual: Boolean(r.is_manual),
-                manualBy: r.manual_by,
-                manualReason: r.manual_reason
+                manualReason: r.manual_reason || null,
+                manualBy: r.manual_by || null,
+                manualAt: r.manual_at || null
             }));
         },
         clockIn: async (userId: string): Promise<AttendanceRecord> => {
@@ -612,6 +463,24 @@ const RealApi = {
                 durationMinutes: record.duration_minutes,
                 status: record.status || 'OFFLINE'
             };
+        },
+        manualEntry: async (userId: string, date: string, clockIn: string, clockOut: string, reason: string): Promise<any> => {
+            const response = await request<{ success: boolean; mode: string; record: any }>('POST', '/attendance/manual', {
+                userId,
+                date,
+                clockIn,
+                clockOut,
+                reason
+            });
+            return response;
+        },
+        updateManualEntry: async (id: string, clockIn: string, clockOut: string, reason: string): Promise<any> => {
+            const response = await request<{ success: boolean; record: any }>('PUT', `/attendance/manual/${id}`, {
+                clockIn,
+                clockOut,
+                reason
+            });
+            return response;
         }
     },
     chat: {
@@ -730,9 +599,6 @@ const RealApi = {
         leaveChannel: async (channelId: string): Promise<void> => {
             await request('POST', `/chat/channels/${channelId}/leave`, {});
         },
-        deleteChannel: async (channelId: string): Promise<void> => {
-            await request('DELETE', `/chat/channels/${channelId}`, {});
-        },
         editChannel: async (channelId: string, name: string, participantIds: string[]): Promise<ChatChannel> => {
             const response = await request<{ channel: any }>('PUT', `/chat/channels/${channelId}`, {
                 name: name,
@@ -750,29 +616,25 @@ const RealApi = {
     },
     performance: {
         getReviews: async (period: string, userId?: string): Promise<PerformanceReview[]> => {
-            await delay();
-            if (userId) return MOCK_DB.performance.filter(r => r.period === period && r.targetUserId === userId);
-            return MOCK_DB.performance.filter(r => r.period === period);
+            let endpoint = `/performance/reviews?period=${encodeURIComponent(period)}`;
+            if (userId) endpoint += `&userId=${encodeURIComponent(userId)}`;
+            return await request<PerformanceReview[]>('GET', endpoint);
         },
         getUserStats: async (userId: string, period: string): Promise<ReviewMetrics> => {
             await delay();
             return { taskCompletionRate: 85, sopCompletionRate: 90, attendanceRate: 100 };
         },
         saveReview: async (review: PerformanceReview): Promise<PerformanceReview> => {
-            await delay();
-            const idx = MOCK_DB.performance.findIndex(r => r.id === review.id);
-            if (idx !== -1) {
-                MOCK_DB.performance[idx] = review;
-            } else {
-                MOCK_DB.performance.push(review);
-            }
-            saveToStorage();
-            return review;
+            return await request<PerformanceReview>('POST', '/performance/reviews', review);
         }
     },
     system: {
         resetFactoryDefault: async (): Promise<void> => {
-            return request<void>('POST', '/system/reset-factory');
+            await delay(1000);
+            localStorage.removeItem(STORAGE_KEY);
+            // Reset in-memory
+            MOCK_DB.users = [];
+            // ... reset others
         },
         exportData: async (): Promise<string> => {
             await delay();
@@ -801,70 +663,41 @@ const RealApi = {
         },
         downloadBackup: async (): Promise<void> => {
             const token = localStorage.getItem('auth_token');
-            
-            if (!token) {
-                throw new Error('Not authenticated');
-            }
-            
-            const response = await fetch(`${API_BASE_URL}/backup/download`, {
+            const response = await fetch(`${API_BASE_URL}/system/backup/download`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            
             if (!response.ok) {
-                let errorMessage = 'Failed to download backup';
-                try {
-                    const error = await response.json();
-                    errorMessage = error.error || errorMessage;
-                } catch (e) {
-                    console.error('Failed to parse error response:', e);
-                }
-                throw new Error(errorMessage);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '下載備份失敗');
             }
-            
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `taskflow-backup-${new Date().toISOString().split('T')[0]}.db`;
+            a.download = `backup-${new Date().toISOString().slice(0,10)}.db`;
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         },
         uploadBackup: async (file: File): Promise<void> => {
             const token = localStorage.getItem('auth_token');
-            
-            if (!token) {
-                throw new Error('Not authenticated');
-            }
-            
             const formData = new FormData();
             formData.append('backup', file);
-            
-            const response = await fetch(`${API_BASE_URL}/backup/upload`, {
+            const response = await fetch(`${API_BASE_URL}/system/backup/upload`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
                 },
                 body: formData
             });
-            
             if (!response.ok) {
-                let errorMessage = 'Failed to upload backup';
-                try {
-                    const error = await response.json();
-                    errorMessage = error.error || errorMessage;
-                } catch (e) {
-                    console.error('Failed to parse error response:', e);
-                }
-                throw new Error(errorMessage);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '上傳備份失敗');
             }
-            
-            const result = await response.json();
-            return result;
         }
     },
     logs: {
@@ -875,404 +708,194 @@ const RealApi = {
     },
     leaves: {
         getAll: async (): Promise<any[]> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/leaves`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch leaves');
-            return response.json();
-        },
-        create: async (data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/leaves`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) throw new Error('Failed to create leave');
-            return response.json();
-        },
-        approve: async (id: string, data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/leaves/${id}/approve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to approve leave' }));
-                throw new Error(error.error || 'Failed to approve leave');
+            try {
+                const response = await request<any[] | { leaves: any[] }>('GET', '/leaves');
+                return Array.isArray(response) ? response : (response.leaves || []);
+            } catch (error) {
+                console.error('Failed to get leaves', error);
+                return [];
             }
-            return response.json();
         },
-        reject: async (id: string, data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/leaves/${id}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to reject leave' }));
-                throw new Error(error.error || 'Failed to reject leave');
-            }
-            return response.json();
-        },
-        delete: async (id: string): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/leaves/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to delete leave' }));
-                throw new Error(error.error || 'Failed to delete leave');
-            }
-            return response.json();
-        },
-        getRules: async (departmentId: string): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/leaves/rules/${departmentId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch rules');
-            return response.json();
-        },
-        updateRules: async (departmentId: string, data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/leaves/rules/${departmentId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) throw new Error('Failed to update rules');
-            return response.json();
-        }
+        create: async (data: any) => request<any>('POST', '/leaves', data),
+        update: async (id: string, data: any) => request<any>('PUT', `/leaves/${id}`, data),
+        delete: async (id: string) => request<void>('DELETE', `/leaves/${id}`),
+        approve: async (id: string, data?: any) => request<any>('POST', `/leaves/${id}/approve`, data || {}),
+        reject: async (id: string, data?: any) => request<any>('POST', `/leaves/${id}/reject`, data || {})
     },
     schedules: {
-        getAll: async (): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch schedules');
-            return response.json();
-        },
-        submit: async (data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to submit schedule' }));
-                throw new Error(error.error || 'Failed to submit schedule');
+        getAll: async (): Promise<any[]> => {
+            try {
+                const response = await request<any[] | { schedules: any[] }>('GET', '/schedules');
+                return Array.isArray(response) ? response : (response.schedules || []);
+            } catch (error) {
+                console.error('Failed to get schedules', error);
+                return [];
             }
-            return response.json();
         },
-        approve: async (id: string, data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules/${id}/approve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to approve schedule' }));
-                throw new Error(error.error || 'Failed to approve schedule');
-            }
-            return response.json();
-        },
-        reject: async (id: string, data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules/${id}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to reject schedule' }));
-                throw new Error(error.error || 'Failed to reject schedule');
-            }
-            return response.json();
-        },
+        submit: async (data: any) => request<any>('POST', '/schedules', data),
+        update: async (id: string, data: any) => request<any>('PUT', `/schedules/${id}`, data),
+        delete: async (id: string) => request<void>('DELETE', `/schedules/${id}`),
+        approve: async (id: string, data: any) => request<any>('POST', `/schedules/${id}/approve`, data),
+        reject: async (id: string, data: any) => request<any>('POST', `/schedules/${id}/reject`, data),
         getRules: async (departmentId: string): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules/rules/${departmentId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch rules');
-            return response.json();
-        },
-        updateRules: async (departmentId: string, data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules/rules/${departmentId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) throw new Error('Failed to update rules');
-            return response.json();
-        },
-        update: async (id: string, data: any): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to update schedule' }));
-                throw new Error(error.error || 'Failed to update schedule');
+            try {
+                return await request<any>('GET', `/schedules/rules/${departmentId}`);
+            } catch (error) {
+                console.error('Failed to get schedule rules', error);
+                return null;
             }
-            return response.json();
         },
-        delete: async (id: string): Promise<any> => {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Not authenticated');
-            
-            const response = await fetch(`${API_BASE_URL}/schedules/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) {
-                const error = await response.json().catch(() => ({ error: 'Failed to delete schedule' }));
-                throw new Error(error.error || 'Failed to delete schedule');
-            }
-            return response.json();
-        }
+        updateRules: async (departmentId: string, rules: any) => request<any>('PUT', `/schedules/rules/${departmentId}`, rules)
     },
-
     workLogs: {
-        getAll: async (params?: { departmentId?: string; userId?: string; date?: string; startDate?: string; endDate?: string }): Promise<{ logs: WorkLog[] }> => {
-            const queryParams = new URLSearchParams();
-            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
-            if (params?.userId) queryParams.append('userId', params.userId);
-            if (params?.date) queryParams.append('date', params.date);
-            if (params?.startDate) queryParams.append('startDate', params.startDate);
-            if (params?.endDate) queryParams.append('endDate', params.endDate);
-            
-            const queryString = queryParams.toString();
-            return request<{ logs: WorkLog[] }>('GET', `/work-logs${queryString ? '?' + queryString : ''}`);
+        getAll: async (params?: any): Promise<any> => {
+            try {
+                const query = params ? '?' + new URLSearchParams(params).toString() : '';
+                const response = await request<any>('GET', `/work-logs${query}`);
+                return response;
+            } catch (error) {
+                console.error('Failed to get work logs', error);
+                return [];
+            }
         },
-        
-        create: async (data: { date: string; todayTasks: string; tomorrowTasks: string; notes?: string }): Promise<{ success: boolean; log: WorkLog }> => {
-            return request<{ success: boolean; log: WorkLog }>('POST', '/work-logs', data);
+        create: async (data: { date: string; todayTasks: string; tomorrowTasks: string; notes?: string; specialNotes?: string }) => {
+            return request<any>('POST', '/work-logs', {
+                date: data.date,
+                todayTasks: data.todayTasks,
+                tomorrowTasks: data.tomorrowTasks,
+                notes: data.notes || data.specialNotes || ''
+            });
         },
-        
-        update: async (id: string, data: { todayTasks?: string; tomorrowTasks?: string; notes?: string }): Promise<{ success: boolean; log: WorkLog }> => {
-            return request<{ success: boolean; log: WorkLog }>('PUT', `/work-logs/${id}`, data);
+        update: async (id: string, data: { todayTasks: string; tomorrowTasks: string; notes?: string; specialNotes?: string }) => {
+            return request<any>('PUT', `/work-logs/${id}`, {
+                todayTasks: data.todayTasks,
+                tomorrowTasks: data.tomorrowTasks,
+                notes: data.notes || data.specialNotes || ''
+            });
         },
-        
-        delete: async (id: string): Promise<{ success: boolean; message: string }> => {
-            return request<{ success: boolean; message: string }>('DELETE', `/work-logs/${id}`);
+        delete: async (id: string) => request<void>('DELETE', `/work-logs/${id}`)
+    },
+    platformAccounts: {
+        uploadPreview: async (file: File, yearMonth: string): Promise<any> => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('yearMonth', yearMonth);
+            const token = localStorage.getItem('auth_token');
+            const res = await fetch(`${API_BASE_URL}/platform-accounts/upload-preview`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || res.statusText); }
+            return res.json();
+        },
+        uploadConfirm: async (pendingData: string, fileName: string): Promise<any> => {
+            return request<any>('POST', '/platform-accounts/upload-confirm', { pendingData, fileName });
+        },
+        getRecords: async (params: { month?: string; platform?: string; startDate?: string; endDate?: string }): Promise<any> => {
+            const qs = new URLSearchParams(params as any).toString();
+            return request<any>('GET', `/platform-accounts/records?${qs}`);
+        },
+        getPlatforms: async (): Promise<any> => {
+            return request<any>('GET', '/platform-accounts/platforms');
+        },
+        getSummary: async (month: string): Promise<any> => {
+            return request<any>('GET', `/platform-accounts/summary?month=${month}`);
+        },
+        getGrandTotal: async (month: string): Promise<any> => {
+            return request<any>('GET', `/platform-accounts/grand-total?month=${month}`);
+        },
+        getUploadHistory: async (): Promise<any> => {
+            return request<any>('GET', '/platform-accounts/upload-history');
+        },
+        deleteMonth: async (month: string): Promise<any> => {
+            return request<any>('DELETE', `/platform-accounts/records/${month}`);
+        },
+        getVersions: async (month: string): Promise<any> => {
+            return request<any>('GET', `/platform-accounts/versions?month=${month}`);
+        },
+        getDiff: async (batchA: string, batchB: string): Promise<any> => {
+            return request<any>('GET', `/platform-accounts/diff?batchA=${batchA}&batchB=${batchB}`);
         }
     },
-
     kol: {
         getProfiles: async (params?: { status?: string; search?: string; departmentId?: string }): Promise<{ profiles: any[] }> => {
-            const queryParams = new URLSearchParams();
-            if (params?.status) queryParams.append('status', params.status);
-            if (params?.search) queryParams.append('search', params.search);
-            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
-            console.log('[KOL API] getProfiles 請求:', { params, url: `/kol/profiles?${queryParams}` });
-            try {
-                const result = await request<{ profiles: any[] }>('GET', `/kol/profiles?${queryParams}`);
-                console.log('[KOL API] getProfiles 成功:', result);
-                return result;
-            } catch (error) {
-                console.error('[KOL API] getProfiles 失敗:', error);
-                throw error;
-            }
+            const qs = new URLSearchParams(Object.entries(params || {}).filter(([_, v]) => v !== undefined) as [string, string][]).toString();
+            return request<{ profiles: any[] }>('GET', `/kol/profiles${qs ? '?' + qs : ''}`);
         },
-
-        getProfile: async (id: string): Promise<{ profile: any; contracts: any[]; payments: any[] }> => {
-            return request<{ profile: any; contracts: any[]; payments: any[] }>('GET', `/kol/profiles/${id}`);
+        getStats: async (params?: { departmentId?: string }): Promise<any> => {
+            const qs = new URLSearchParams(Object.entries(params || {}).filter(([_, v]) => v !== undefined) as [string, string][]).toString();
+            return request<any>('GET', `/kol/stats${qs ? '?' + qs : ''}`);
         },
-
-        createProfile: async (data: any): Promise<{ profile: any }> => {
-            return request<{ profile: any }>('POST', '/kol/profiles', data);
+        createProfile: async (data: any): Promise<any> => {
+            return request<any>('POST', '/kol/profiles', data);
         },
-
-        updateProfile: async (id: string, data: any): Promise<{ profile: any }> => {
-            return request<{ profile: any }>('PUT', `/kol/profiles/${id}`, data);
+        updateProfile: async (id: string, data: any): Promise<any> => {
+            return request<any>('PUT', `/kol/profiles/${id}`, data);
         },
-
-        deleteProfile: async (id: string): Promise<{ success: boolean }> => {
-            return request<{ success: boolean }>('DELETE', `/kol/profiles/${id}`);
+        deleteProfile: async (id: string): Promise<void> => {
+            return request<void>('DELETE', `/kol/profiles/${id}`);
         },
-
-        getContracts: async (params?: any): Promise<{ contracts: any[] }> => {
-            const queryParams = new URLSearchParams();
-            if (params?.kolId) queryParams.append('kolId', params.kolId);
-            if (params?.startDate) queryParams.append('startDate', params.startDate);
-            if (params?.endDate) queryParams.append('endDate', params.endDate);
-            if (params?.contractType) queryParams.append('contractType', params.contractType);
-            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
-            return request<{ contracts: any[] }>('GET', `/kol/contracts?${queryParams}`);
-        },
-
-        createContract: async (data: any): Promise<{ contract: any }> => {
-            return request<{ contract: any }>('POST', '/kol/contracts', data);
-        },
-
-        updateContract: async (id: string, data: any): Promise<{ contract: any }> => {
-            return request<{ contract: any }>('PUT', `/kol/contracts/${id}`, data);
-        },
-
-        deleteContract: async (id: string): Promise<{ success: boolean }> => {
-            return request<{ success: boolean }>('DELETE', `/kol/contracts/${id}`);
-        },
-
-        getPayments: async (params?: any): Promise<{ payments: any[] }> => {
-            const queryParams = new URLSearchParams();
-            if (params?.contractId) queryParams.append('contractId', params.contractId);
-            if (params?.startDate) queryParams.append('startDate', params.startDate);
-            if (params?.endDate) queryParams.append('endDate', params.endDate);
-            return request<{ payments: any[] }>('GET', `/kol/payments?${queryParams}`);
-        },
-
-        createPayment: async (data: any): Promise<{ payment: any }> => {
-            return request<{ payment: any }>('POST', '/kol/payments', data);
-        },
-
-        deletePayment: async (id: string): Promise<{ success: boolean }> => {
-            return request<{ success: boolean }>('DELETE', `/kol/payments/${id}`);
-        },
-
-        getStats: async (params?: { startDate?: string; endDate?: string; departmentId?: string }): Promise<any> => {
-            const queryParams = new URLSearchParams();
-            if (params?.startDate) queryParams.append('startDate', params.startDate);
-            if (params?.endDate) queryParams.append('endDate', params.endDate);
-            if (params?.departmentId) queryParams.append('departmentId', params.departmentId);
-            return request<any>('GET', `/kol/stats?${queryParams}`);
-        },
-
-        batchCreatePayments: async (payments: any[]): Promise<{ success: boolean; count: number }> => {
-            return request<{ success: boolean; count: number }>('POST', '/kol/batch/payments', { payments });
-        },
-
-        batchUpdateStatus: async (kolIds: string[], status: string): Promise<{ success: boolean; count: number }> => {
-            return request<{ success: boolean; count: number }>('PUT', '/kol/batch/status', { kolIds, status });
-        },
-
-        getLogs: async (params?: any): Promise<{ logs: any[] }> => {
-            const queryParams = new URLSearchParams();
-            if (params?.targetType) queryParams.append('targetType', params.targetType);
-            if (params?.targetId) queryParams.append('targetId', params.targetId);
-            if (params?.limit) queryParams.append('limit', params.limit.toString());
-            return request<{ logs: any[] }>('GET', `/kol/logs?${queryParams}`);
-        },
-
-        importExcel: async (data: any[]): Promise<{ success: boolean; results: any; message: string }> => {
-            return request<{ success: boolean; results: any; message: string }>('POST', '/kol/import-excel', { data });
-        },
-
-        exportExcel: async (): Promise<{ profiles: any[] }> => {
-            return request<{ profiles: any[] }>('GET', '/kol/export-excel');
-        },
-
         getKolPayments: async (kolId: string, params?: { startDate?: string; endDate?: string }): Promise<{ payments: any[]; total: number }> => {
-            const queryParams = new URLSearchParams();
-            if (params?.startDate) queryParams.append('startDate', params.startDate);
-            if (params?.endDate) queryParams.append('endDate', params.endDate);
-            return request<{ payments: any[]; total: number }>('GET', `/kol/profiles/${kolId}/payments?${queryParams}`);
+            const qs = new URLSearchParams(Object.entries(params || {}).filter(([_, v]) => v !== undefined) as [string, string][]).toString();
+            return request<{ payments: any[]; total: number }>('GET', `/kol/profiles/${kolId}/payments${qs ? '?' + qs : ''}`);
         },
-
-        createKolPayment: async (data: { kolId: string; amount: number; paymentDate: string; notes?: string }): Promise<{ payment: any }> => {
-            return request<{ payment: any }>('POST', '/kol/payments', data);
+        createKolPayment: async (data: { kolId: string; amount: number; paymentDate: string; notes?: string }): Promise<any> => {
+            return request<any>('POST', `/kol/profiles/${data.kolId}/payments`, data);
         },
-
-        updateKolPayment: async (id: string, data: { amount: number; paymentDate: string; notes?: string }): Promise<{ payment: any }> => {
-            return request<{ payment: any }>('PUT', `/kol/payments/${id}`, data);
+        updateKolPayment: async (paymentId: string, data: any): Promise<any> => {
+            return request<any>('PUT', `/kol/payments/${paymentId}`, data);
         },
-
-        deleteKolPayment: async (id: string): Promise<{ success: boolean }> => {
-            return request<{ success: boolean }>('DELETE', `/kol/payments/${id}`);
+        deleteKolPayment: async (paymentId: string): Promise<void> => {
+            return request<void>('DELETE', `/kol/payments/${paymentId}`);
         },
-
-        getPaymentStats: async (params?: { startDate?: string; endDate?: string }): Promise<{ total: number }> => {
-            const queryParams = new URLSearchParams();
-            if (params?.startDate) queryParams.append('startDate', params.startDate);
-            if (params?.endDate) queryParams.append('endDate', params.endDate);
-            return request<{ total: number }>('GET', `/kol/payment-stats?${queryParams}`);
+        getPaymentStats: async (params?: any): Promise<any> => {
+            const qs = new URLSearchParams(Object.entries(params || {}).filter(([_, v]) => v !== undefined) as [string, string][]).toString();
+            return request<any>('GET', `/kol/payment-stats${qs ? '?' + qs : ''}`);
+        },
+        importExcel: async (data: any[]): Promise<any> => {
+            return request<any>('POST', '/kol/import', { profiles: data });
+        },
+        exportExcel: async (): Promise<{ profiles: any[] }> => {
+            return request<{ profiles: any[] }>('GET', '/kol/export');
         }
     },
-
     aiAssistant: {
-        getConversations: async (limit?: number): Promise<{ conversations: any[] }> => {
-            const queryParams = limit ? `?limit=${limit}` : '';
-            return request<{ conversations: any[] }>('GET', `/ai-assistant/conversations${queryParams}`);
+        getConversations: async (): Promise<{ conversations: any[] }> => {
+            return request<{ conversations: any[] }>('GET', '/ai-assistant/conversations');
         },
-
-        sendQuery: async (message: string): Promise<{ response: string; intent?: string; actionTaken?: string; actionResult?: any }> => {
-            return request<{ response: string; intent?: string; actionTaken?: string; actionResult?: any }>('POST', '/ai-assistant/query', { message });
+        sendQuery: async (message: string): Promise<any> => {
+            const isCentral = (import.meta as any).env?.VITE_INSTANCE_MODE === 'central';
+            return request<any>('POST', isCentral ? '/central/super-ai/query' : '/ai-assistant/query', { message });
         },
-
-        deleteConversation: async (id: string): Promise<{ success: boolean }> => {
-            return request<{ success: boolean }>('DELETE', `/ai-assistant/conversations/${id}`);
+        confirmAction: async (pendingActionId: string): Promise<any> => {
+            const isCentral = (import.meta as any).env?.VITE_INSTANCE_MODE === 'central';
+            return request<any>('POST', isCentral ? '/central/super-ai/confirm' : '/ai-assistant/confirm', { pendingActionId });
         },
-
-        clearConversations: async (): Promise<{ success: boolean }> => {
-            return request<{ success: boolean }>('DELETE', '/ai-assistant/conversations');
+        cancelAction: async (pendingActionId: string): Promise<any> => {
+            const isCentral = (import.meta as any).env?.VITE_INSTANCE_MODE === 'central';
+            return request<any>('POST', isCentral ? '/central/super-ai/cancel' : '/ai-assistant/cancel', { pendingActionId });
+        },
+        getAlerts: async (): Promise<{ alerts: any[] }> => {
+            const isCentral = (import.meta as any).env?.VITE_INSTANCE_MODE === 'central';
+            return request<{ alerts: any[] }>('GET', isCentral ? '/central/super-ai/alerts' : '/ai-assistant/alerts');
+        },
+        getMemory: async (): Promise<{ memory: any[] }> => {
+            return request<{ memory: any[] }>('GET', '/ai-assistant/memory');
+        },
+        deleteMemory: async (key: string): Promise<void> => {
+            return request<void>('DELETE', `/ai-assistant/memory/${key}`);
+        },
+        generateReport: async (params: any): Promise<any> => {
+            return request<any>('POST', '/ai-assistant/generate-report', params);
+        },
+        deleteConversation: async (id: string): Promise<void> => {
+            return request<void>('DELETE', `/ai-assistant/conversations/${id}`);
+        },
+        clearConversations: async (): Promise<void> => {
+            return request<void>('DELETE', '/ai-assistant/conversations');
         }
-    },
+    }
 };
 
 const MockApi = RealApi;

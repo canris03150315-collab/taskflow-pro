@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { KOLProfile, KOLWeeklyPayment, User, Role } from '../types';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 // 新增支付記錄 Modal
 export const AddPaymentModal: React.FC<{ 
@@ -16,7 +17,7 @@ export const AddPaymentModal: React.FC<{
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      alert('請輸入有效的支付金額');
+      showWarning('請輸入有效的支付金額');
       return;
     }
     onSubmit({
@@ -99,7 +100,7 @@ export const EditPaymentModal: React.FC<{
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      alert('請輸入有效的支付金額');
+      showWarning('請輸入有效的支付金額');
       return;
     }
     onSubmit({
@@ -269,8 +270,8 @@ export const PaymentHistoryModal: React.FC<{
                           ✏️ 編輯
                         </button>
                         <button
-                          onClick={() => {
-                            if (confirm('確定要刪除此支付記錄嗎？')) {
+                          onClick={async () => {
+                            if (await showConfirm('確定要刪除此支付記錄嗎？')) {
                               onDelete(payment.id);
                             }
                           }}

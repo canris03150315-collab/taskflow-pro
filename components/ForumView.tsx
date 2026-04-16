@@ -51,8 +51,12 @@ export const ForumView: React.FC<ForumViewProps> = ({
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [suggestions, filterCategory, filterStatus]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     onAddSuggestion({
       title,
       content,
@@ -62,6 +66,7 @@ export const ForumView: React.FC<ForumViewProps> = ({
       authorId: currentUser.id
     });
     setIsModalOpen(false);
+    setIsSubmitting(false);
     setTitle('');
     setContent('');
     setCategory('工作流程');
@@ -156,13 +161,13 @@ export const ForumView: React.FC<ForumViewProps> = ({
         {displayedSuggestions.map(suggestion => {
           const author = getUser(suggestion.authorId);
           const isMe = currentUser.id === suggestion.authorId;
-          const isUpvoted = suggestion.upvotes.includes(currentUser.id);
+          const isUpvoted = (suggestion.upvotes || []).includes(currentUser.id);
           const managerAccess = canManageStatus(suggestion);
 
           // Display Logic for Author
           const displayAvatar = (suggestion.isAnonymous && !isMe) 
              ? 'https://api.dicebear.com/9.x/avataaars/svg?seed=Secret&backgroundColor=e2e8f0' 
-             : (author?.avatar || '');
+             : (author?.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(author?.name || 'unknown')}&backgroundColor=e2e8f4`);
           
           const displayName = (suggestion.isAnonymous && !isMe)
              ? '某位熱心同仁'
@@ -253,10 +258,10 @@ export const ForumView: React.FC<ForumViewProps> = ({
                     onClick={() => onToggleUpvote(suggestion.id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition ${isUpvoted ? 'bg-indigo-100 text-indigo-700' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-100'}`}
                   >
-                     <span>👍</span> 附議 ({suggestion.upvotes.length})
+                     <span>👍</span> 附議 ({(suggestion.upvotes || []).length})
                   </button>
                   <div className="text-xs font-bold text-slate-400">
-                     💬 {suggestion.comments.length} 則討論
+                     💬 {(suggestion.comments || []).length} 則討論
                   </div>
                </div>
 

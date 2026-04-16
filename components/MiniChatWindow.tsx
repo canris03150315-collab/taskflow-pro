@@ -195,10 +195,10 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
                         : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
                     }`}
                   >
-                    {isImage ? (
-                      <img 
-                        src={imageUrl} 
-                        alt="圖片訊息" 
+                    {isImage && imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt="圖片訊息"
                         className="max-w-full rounded-xl cursor-pointer hover:opacity-90 transition"
                         style={{ maxHeight: '200px' }}
                         onClick={() => window.open(imageUrl, '_blank')}

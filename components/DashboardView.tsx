@@ -62,7 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     
     // 未讀公告
     const unreadAnnouncements = useMemo(() => 
-        Array.isArray(announcements) ? announcements.filter(a => !a.readBy.includes(currentUser.id)) : [],
+        Array.isArray(announcements) ? announcements.filter(a => !(a.readBy || []).includes(currentUser.id)) : [],
         [announcements, currentUser.id]
     );
     
@@ -173,7 +173,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
                      <div className="bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm text-center flex-shrink-0 min-w-[90px] md:min-w-[100px]">
-                         <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wide">待辦任務</div>
+                         <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wide">我的待辦</div>
                          <div className="text-xl md:text-2xl font-black text-slate-800 mt-1">{myActiveTasks.length + myPendingTasks.length + myCreatedTasks.filter(t => !myActiveTasks.find(a => a.id === t.id) && !myPendingTasks.find(p => p.id === t.id)).length}</div>
                      </div>
                      <div className="bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm text-center flex-shrink-0 min-w-[90px] md:min-w-[100px]">
@@ -335,7 +335,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                     <p className="text-xs text-slate-300 mt-1">有新公告時會顯示在這裡</p>
                                 </div>
                             ) : announcements.slice(0, 3).map((ann, index) => {
-                                const isUnread = !ann.readBy.includes(currentUser.id);
+                                const isUnread = !(ann.readBy || []).includes(currentUser.id);
                                 return (
                                     <div 
                                         key={ann.id} 
@@ -401,7 +401,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 <div className="flex justify-between items-end">
                                     <span className="text-slate-300 text-sm">淨入盈虧</span>
                                     <span className={`text-2xl font-black font-mono ${latestReport.content.netIncome >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                        {latestReport.content.netIncome >= 0 ? '+' : ''}{latestReport.content.netIncome.toLocaleString()}
+                                        {(latestReport.content.netIncome ?? 0) >= 0 ? '+' : ''}{(latestReport.content.netIncome ?? 0).toLocaleString()}
                                     </span>
                                 </div>
                                 <div className="w-full h-px bg-white/10"></div>

@@ -264,7 +264,7 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
            </button>
            <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full border border-slate-200 overflow-hidden">
-                <img src={selectedUser.avatar} alt={selectedUser.name} className="w-full h-full object-cover" />
+                <img src={selectedUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(selectedUser.name || 'default')}`} alt={selectedUser.name} className="w-full h-full object-cover" />
               </div>
               <div>
                 <h2 className="text-xl font-black text-slate-800 tracking-tight">
@@ -416,7 +416,7 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
               {/* User Info */}
               <div className="flex items-center gap-4 mb-6 relative z-10">
                 <div className="w-16 h-16 rounded-full p-1 bg-slate-100 border border-slate-200 group-hover:border-blue-300 transition">
-                  <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full bg-white" />
+                  <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-full h-full rounded-full bg-white" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-700 transition">{user.name}</h3>

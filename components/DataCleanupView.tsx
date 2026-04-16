@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, AlertTriangle, CheckCircle, Calendar, Database } from 'lucide-react';
+import { showSuccess, showError, showWarning } from '../utils/dialogService';
 
 interface DataCleanupViewProps {
   onClose: () => void;
@@ -62,7 +63,7 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
 
   const handlePreview = async () => {
     if (selectedCategories.length === 0) {
-      alert('請至少選擇一個資料分類');
+      showWarning('請至少選擇一個資料分類');
       return;
     }
 
@@ -87,7 +88,7 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
       setShowPreview(true);
     } catch (error) {
       console.error('預覽錯誤:', error);
-      alert('預覽失敗，請稍後再試');
+      showError('預覽失敗，請稍後再試');
     } finally {
       setIsLoading(false);
     }
@@ -111,14 +112,14 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
       if (!response.ok) throw new Error('刪除失敗');
 
       const data = await response.json();
-      alert(`✅ 刪除成功！\n共刪除 ${data.totalDeleted} 筆資料`);
+      showSuccess(`刪除成功！共刪除 ${data.totalDeleted} 筆資料`);
       setShowConfirmDialog(false);
       setShowPreview(false);
       setSelectedCategories([]);
       setPreviewCounts({});
     } catch (error) {
       console.error('刪除錯誤:', error);
-      alert('刪除失敗，請稍後再試');
+      showError('刪除失敗，請稍後再試');
     } finally {
       setIsLoading(false);
     }

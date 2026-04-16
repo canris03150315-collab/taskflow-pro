@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, ChatChannel, DepartmentDef } from '../types';
+import { showConfirm } from '../utils/dialogService';
 
 interface GroupInfoModalProps {
   isOpen: boolean;
@@ -71,7 +72,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   };
 
   const handleRemoveMember = async (memberId: string, memberName: string) => {
-    if (!confirm(`確定要將 ${memberName} 移出群組嗎？`)) {
+    if (!(await showConfirm(`確定要將 ${memberName} 移出群組嗎？`))) {
       return;
     }
     
@@ -88,8 +89,8 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
     }
   };
 
-  const handleLeave = () => {
-    if (confirm('確定要離開此群組嗎？')) {
+  const handleLeave = async () => {
+    if (await showConfirm('確定要離開此群組嗎？')) {
       onLeaveGroup();
       onClose();
     }
@@ -159,7 +160,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                       className={`w-full flex items-center gap-2 p-2 rounded-lg transition text-left
                         ${selectedMembers.includes(user.id) ? 'bg-blue-100' : 'hover:bg-blue-100/50'}`}
                     >
-                      <img src={user.avatar} className="w-8 h-8 rounded-full" />
+                      <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} className="w-8 h-8 rounded-full" />
                       <span className="text-sm text-slate-700">{user.name}</span>
                       {selectedMembers.includes(user.id) && (
                         <svg className="w-4 h-4 text-blue-500 ml-auto" fill="currentColor" viewBox="0 0 20 20">
@@ -184,7 +185,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                     className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition"
                   >
                     <div className="relative">
-                      <img src={member.avatar} className="w-10 h-10 rounded-full border border-slate-200" />
+                      <img src={member.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(member.name || 'default')}`} className="w-10 h-10 rounded-full border border-slate-200" />
                       {isMe && (
                         <div className="absolute -bottom-0.5 -right-0.5 bg-blue-500 text-white text-[8px] px-1 rounded-full">
                           你

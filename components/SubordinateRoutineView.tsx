@@ -274,7 +274,7 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
                       key={user.id}
                       className="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-orange-200"
                     >
-                      <img src={user.avatar} alt={user.name} className="w-5 h-5 rounded-full" />
+                      <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-5 h-5 rounded-full" />
                       <span className="text-sm font-bold text-slate-700">{user.name}</span>
                       <span className="text-xs font-bold text-orange-600">
                         {stats.completed}/{stats.total}
@@ -302,7 +302,7 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
               {/* User Info */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-full border-2 border-slate-200 overflow-hidden">
-                  <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                  <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-slate-800">{user.name}</h3>

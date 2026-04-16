@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, KOLProfile, KOLStats, KOL_PLATFORMS, KOLPlatform, DepartmentDef, Role, KOLWeeklyPayment } from '../types';
 import { api } from '../services/api';
 import { AddPaymentModal, PaymentHistoryModal } from './PaymentModals';
+import { showSuccess, showError, showWarning, showConfirm, showToast } from '../utils/dialogService';
 
 interface KOLManagementViewProps {
   currentUser: User;
@@ -95,7 +96,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       setPaymentStats(result);
     } catch (error) {
       console.error('Load payment stats error:', error);
-      alert('載入支付統計失敗');
+      showError('載入支付統計失敗');
     }
   };
 
@@ -106,7 +107,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       setPaymentTotal(result.total);
     } catch (error) {
       console.error('Load payment history error:', error);
-      alert('載入支付記錄失敗');
+      showError('載入支付記錄失敗');
     }
   };
 
@@ -115,18 +116,18 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     try {
       await api.kol.createKolPayment({ kolId: selectedProfile.id, ...data });
       setShowPaymentModal(false);
-      alert('支付記錄新增成功！');
+      showSuccess('支付記錄新增成功！');
       loadData();
     } catch (error) {
       console.error('Add payment error:', error);
-      alert('新增支付記錄失敗');
+      showError('新增支付記錄失敗');
     }
   };
 
   const handleEditPayment = async (paymentId: string, data: { amount: number; paymentDate: string; notes?: string }) => {
     try {
       await api.kol.updateKolPayment(paymentId, data);
-      alert('支付記錄更新成功！');
+      showSuccess('支付記錄更新成功！');
       if (selectedProfile) {
         await loadPaymentHistory(selectedProfile.id);
       }
@@ -134,9 +135,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     } catch (error: any) {
       console.error('Edit payment error:', error);
       if (error.message?.includes('Permission denied')) {
-        alert('權限不足：只有創建者或主管可以編輯支付記錄');
+        showError('權限不足：只有創建者或主管可以編輯支付記錄');
       } else {
-        alert('更新支付記錄失敗');
+        showError('更新支付記錄失敗');
       }
     }
   };
@@ -144,7 +145,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const handleDeletePayment = async (paymentId: string) => {
     try {
       await api.kol.deleteKolPayment(paymentId);
-      alert('支付記錄刪除成功！');
+      showSuccess('支付記錄刪除成功！');
       if (selectedProfile) {
         await loadPaymentHistory(selectedProfile.id);
       }
@@ -152,9 +153,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     } catch (error: any) {
       console.error('Delete payment error:', error);
       if (error.message?.includes('Permission denied')) {
-        alert('權限不足：只有創建者或主管可以刪除支付記錄');
+        showError('權限不足：只有創建者或主管可以刪除支付記錄');
       } else {
-        alert('刪除支付記錄失敗');
+        showError('刪除支付記錄失敗');
       }
     }
   };
@@ -193,7 +194,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       loadData();
     } catch (error) {
       console.error('Add profile error:', error);
-      alert('新增 KOL 失敗');
+      showError('新增 KOL 失敗');
     }
   };
 
@@ -203,22 +204,22 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       await api.kol.updateProfile(selectedProfile.id, data);
       setShowEditModal(false);
       setSelectedProfile(null);
-      alert('KOL 資料更新成功！');
+      showSuccess('KOL 資料更新成功！');
       loadData();
     } catch (error) {
       console.error('Edit profile error:', error);
-      alert('更新 KOL 資料失敗');
+      showError('更新 KOL 資料失敗');
     }
   };
 
   const handleDeleteProfile = async (id: string) => {
     try {
       await api.kol.deleteProfile(id);
-      alert('刪除成功');
+      showSuccess('刪除成功');
       loadData();
     } catch (error) {
       console.error('Delete profile error:', error);
-      alert('刪除失敗');
+      showError('刪除失敗');
     }
   };
 
@@ -259,13 +260,13 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           });
         }
         
-        alert(message);
+        showSuccess(message);
         loadData();
       };
       reader.readAsBinaryString(file);
     } catch (error) {
       console.error('Excel import error:', error);
-      alert('Excel 導入失敗');
+      showError('Excel 導入失敗');
     }
 
     if (fileInputRef.current) {
@@ -294,7 +295,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       XLSX.writeFile(workbook, `KOL名單-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (error) {
       console.error('Excel export error:', error);
-      alert('Excel 匯出失敗');
+      showError('Excel 匯出失敗');
     }
   };
 
@@ -490,8 +491,8 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                       ✏️ 編輯
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm(`確定要刪除 ${profile.platformId} 嗎？`)) {
+                      onClick={async () => {
+                        if (await showConfirm(`確定要刪除 ${profile.platformId} 嗎？`)) {
                           handleDeleteProfile(profile.id);
                         }
                       }}
@@ -702,7 +703,7 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.platformId || !formData.platformAccount) {
-      alert('請填寫平台 ID 和帳號');
+      showWarning('請填寫平台 ID 和帳號');
       return;
     }
     onSubmit(formData);
@@ -822,7 +823,7 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.platformId || !formData.platformAccount) {
-      alert('請填寫平台 ID 和帳號');
+      showWarning('請填寫平台 ID 和帳號');
       return;
     }
     onSubmit(formData);

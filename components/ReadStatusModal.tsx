@@ -14,8 +14,8 @@ export const ReadStatusModal: React.FC<ReadStatusModalProps> = ({ isOpen, onClos
 
   const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
 
-  const readUsers = users.filter(u => announcement.readBy.includes(u.id));
-  const unreadUsers = users.filter(u => !announcement.readBy.includes(u.id));
+  const readUsers = users.filter(u => (announcement.readBy || []).includes(u.id));
+  const unreadUsers = users.filter(u => !(announcement.readBy || []).includes(u.id));
 
   // Sort by department
   unreadUsers.sort((a, b) => a.department.localeCompare(b.department));
@@ -63,7 +63,7 @@ export const ReadStatusModal: React.FC<ReadStatusModalProps> = ({ isOpen, onClos
                  {unreadUsers.length === 0 && <p className="text-xs text-slate-400 italic">所有人都已閱讀！</p>}
                  {unreadUsers.map(u => (
                     <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-red-50 transition border border-transparent hover:border-red-100">
-                       <img src={u.avatar} className="w-8 h-8 rounded-full bg-slate-100" />
+                       <img src={u.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(u.name || 'default')}`} className="w-8 h-8 rounded-full bg-slate-100" />
                        <div className="min-w-0">
                           <div className="text-sm font-bold text-slate-700 truncate">{u.name}</div>
                           <div className="text-[10px] text-slate-400 font-bold">{getDeptName(u.department)}</div>
@@ -82,7 +82,7 @@ export const ReadStatusModal: React.FC<ReadStatusModalProps> = ({ isOpen, onClos
                  {readUsers.length === 0 && <p className="text-xs text-slate-400 italic">尚無人閱讀</p>}
                  {readUsers.map(u => (
                     <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-emerald-50 transition border border-transparent hover:border-emerald-100 opacity-70 hover:opacity-100">
-                       <img src={u.avatar} className="w-8 h-8 rounded-full bg-slate-100 grayscale" />
+                       <img src={u.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(u.name || 'default')}`} className="w-8 h-8 rounded-full bg-slate-100" />
                        <div className="min-w-0">
                           <div className="text-sm font-bold text-slate-700 truncate">{u.name}</div>
                           <div className="text-[10px] text-slate-400 font-bold">{getDeptName(u.department)}</div>

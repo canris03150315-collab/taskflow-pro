@@ -35,7 +35,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSubmit,
         setPassword(editingUser.password);
         setRole(editingUser.role);
         setDepartment(editingUser.department);
-        setAvatar(editingUser.avatar);
+        setAvatar(editingUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(editingUser.name || 'default')}&backgroundColor=b6e3f4`);
         setPermissions(editingUser.permissions || []);
       } else {
         // Default values for new user
@@ -108,22 +108,15 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSubmit,
     }
     
     try {
-      // 將 File 轉換為 base64
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64 = event.target?.result as string;
-        
-        // 壓縮圖片（頭像使用 200x200，約 85% 品質）
-        const compressedBase64 = await compressAvatar(base64);
-        
-        // 如果是編輯模式，直接上傳頭像
-        if (editingUser) {
-          await api.users.updateAvatar(editingUser.id, compressedBase64);
-          toast.success('頭像已更新');
-        }
-        setAvatar(compressedBase64);
-      };
-      reader.readAsDataURL(file);
+      // 壓縮圖片（頭像使用 200x200，約 70% 品質）— compressAvatar 內部會自己讀檔
+      const compressedBase64 = await compressAvatar(file);
+
+      // 如果是編輯模式，直接上傳頭像
+      if (editingUser) {
+        await api.users.updateAvatar(editingUser.id, compressedBase64);
+        toast.success('頭像已更新');
+      }
+      setAvatar(compressedBase64);
     } catch (error) {
       console.error('頭像處理失敗:', error);
       toast.error('頭像處理失敗，請重試');
@@ -188,7 +181,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSubmit,
           {/* Avatar Section */}
           <div className="flex flex-col items-center gap-4">
             <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-slate-200 overflow-hidden shadow-sm relative group">
-               <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
+               <img src={avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(name || 'default')}&backgroundColor=b6e3f4`} alt="Avatar" className="w-full h-full object-cover" />
                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold cursor-pointer" onClick={handleUploadClick}>
                  更換
                </div>
@@ -298,7 +291,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, onSubmit,
                 className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 disabled:bg-slate-100 disabled:text-slate-500"
               >
                 {flattenDepartments(departments).map(d => (
-                  <option key={d.id} value={d.id}>{d.fullPath}</option>
+                  <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
             </div>

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { User, MenuItemId, DEFAULT_MENU_GROUPS, MENU_LABELS } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface SystemSettingsViewProps {
   currentUser: User;
@@ -15,12 +16,12 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ currentU
   const [menuGroups, setMenuGroups] = useState(DEFAULT_MENU_GROUPS);
 
   const handleResetSystem = async () => {
-      if (confirm('⚠️ 危險操作：確定要重置系統嗎？所有資料將被清空！')) {
+      if (await showConfirm('⚠️ 危險操作：確定要重置系統嗎？所有資料將被清空！')) {
           const doubleCheck = prompt('請輸入 "RESET" 以確認重置');
           if (doubleCheck === 'RESET') {
               try {
                   await api.system.resetFactoryDefault();
-                  alert('系統已重置，將重新載入');
+                  showSuccess('系統已重置，將重新載入');
                   window.location.reload();
               } catch (e) {
                   toast.error('重置失敗');

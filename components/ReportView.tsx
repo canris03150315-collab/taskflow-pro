@@ -6,8 +6,9 @@ import WorkLogTab from './WorkLogTab';
 import { ApprovalModal } from './ApprovalModal';
 import { AuthorizationStatus } from './AuthorizationStatus';
 import { AuditLogView } from './AuditLogView';
-import { PlatformRevenueView } from './PlatformRevenueView';
+import PlatformAccountsView from './PlatformAccountsView';
 import { getAuthorization, isAuthorizationValid, clearAuthorization } from '../utils/authSession';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface ReportViewProps {
   currentUser: User;
@@ -144,7 +145,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
   };
 
   const handleRevokeAuthorization = async () => {
-    if (!confirm('確定要撤銷授權嗎？')) return;
+    if (!(await showConfirm('確定要撤銷授權嗎？'))) return;
     try {
       await api.reports.approval.revoke(authorization?.id);
       setIsAuthorized(false);
@@ -199,7 +200,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
   };
 
   const handleDelete = async (id: string) => {
-      if (!confirm('確定要刪除此報表嗎？')) return;
+      if (!(await showConfirm('確定要刪除此報表嗎？'))) return;
       try {
           await api.reports.delete(id);
           setReports(reports.filter(r => r.id !== id));
@@ -315,7 +316,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ currentUser, users, repo
                 users={users}
             />
         ) : activeTab === 'platform' ? (
-            <PlatformRevenueView currentUser={currentUser} />
+            <PlatformAccountsView currentUser={currentUser} />
         ) : activeTab === 'audit' ? (
             <AuditLogView currentUser={currentUser} />
         ) : (

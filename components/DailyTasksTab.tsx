@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, RoutineTemplate, DepartmentDef, Role } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import { showConfirm } from '../utils/dialogService';
 
 interface DailyTasksTabProps {
   templates: RoutineTemplate[];
@@ -30,8 +31,13 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
   }, []);
 
   const loadTemplates = async () => {
-    const data = await api.routines.getTemplates();
-    setAllTemplates(data);
+    try {
+      const data = await api.routines.getTemplates();
+      setAllTemplates(data || []);
+    } catch (error) {
+      console.error('載入每日任務失敗:', error);
+      setAllTemplates([]);
+    }
   };
 
   // 只顯示每日任務
@@ -57,7 +63,7 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('確定要刪除此每日任務嗎？')) return;
+    if (!(await showConfirm('確定要刪除此每日任務嗎？'))) return;
     await api.routines.deleteTemplate(id);
     toast.success('已刪除');
     loadTemplates();

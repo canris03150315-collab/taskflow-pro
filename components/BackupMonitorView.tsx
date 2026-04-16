@@ -28,18 +28,44 @@ export const BackupMonitorView: React.FC = () => {
     
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/backup/status`, {
+      const apiBase = (import.meta as any).env?.VITE_API_URL || '/api';
+      const response = await fetch(`${apiBase}/backup/status`, {
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         }
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch backup status');
+        const errorText = await response.text();
+        let errorMsg = 'Failed to fetch backup status';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMsg = errorData.error || errorMsg;
+        } catch {
+          // Response was not JSON (e.g. HTML from wrong endpoint)
+          if (errorText.includes('<!DOCTYPE') || errorText.includes('<html')) {
+            errorMsg = 'API endpoint not found - received HTML instead of JSON';
+          }
+        }
+        throw new Error(errorMsg);
       }
 
-      const data = await response.json();
-      setBackupStatus(data);
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('Invalid response from server - expected JSON');
+      }
+      setBackupStatus({
+        ...data,
+        backups: Array.isArray(data.backups) ? data.backups : [],
+        totalBackups: data.totalBackups ?? 0,
+        latestBackup: data.latestBackup ?? null,
+        hoursSinceLastBackup: data.hoursSinceLastBackup ?? null,
+        status: data.status ?? 'unknown',
+      });
       setLastRefresh(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -223,7 +249,7 @@ export const BackupMonitorView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {backupStatus.backups.map((backup, index) => (
+              {(backupStatus.backups || []).map((backup, index) => (
                 <tr key={backup.filename} className={index === 0 ? 'bg-blue-50' : 'hover:bg-slate-50'}>
                   <td className="px-6 py-4 text-sm font-mono text-slate-900">
                     {backup.filename}

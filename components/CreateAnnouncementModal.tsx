@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Announcement } from '../types';
+import { showWarning, showError } from '../utils/dialogService';
 
 interface CreateAnnouncementModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
   const [priority, setPriority] = useState<'NORMAL' | 'IMPORTANT'>('NORMAL');
   const [images, setImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -51,7 +53,7 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
     
     // 限制最多 5 張圖片
     if (images.length + files.length > 5) {
-      alert('最多只能上傳 5 張圖片');
+      showWarning('最多只能上傳 5 張圖片');
       return;
     }
     
@@ -64,13 +66,13 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
       
       // 檢查檔案大小（限制 2MB）
       if (file.size > 2 * 1024 * 1024) {
-        alert(`圖片 ${file.name} 超過 2MB，請壓縮後再上傳`);
+        showWarning(`圖片 ${file.name} 超過 2MB，請壓縮後再上傳`);
         continue;
       }
       
       // 檢查是否為圖片
       if (!file.type.startsWith('image/')) {
-        alert(`${file.name} 不是圖片檔案`);
+        showWarning(`${file.name} 不是圖片檔案`);
         continue;
       }
       
@@ -85,7 +87,7 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
         newImages.push(base64);
       } catch (error) {
         console.error('圖片讀取失敗:', error);
-        alert(`圖片 ${file.name} 讀取失敗`);
+        showError(`圖片 ${file.name} 讀取失敗`);
       }
     }
     
@@ -102,8 +104,11 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     onSubmit({ title, content, priority, images });
     onClose();
+    setIsSubmitting(false);
     setTitle('');
     setContent('');
     setPriority('NORMAL');

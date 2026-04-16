@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { DepartmentDef, User, UNASSIGNED_DEPT_ID } from '../types';
+import { showConfirm } from '../utils/dialogService';
 
 interface DepartmentManagerProps {
   departments: DepartmentDef[];
@@ -199,7 +200,7 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({ department
                 </button>
                 {memberCount === 0 && !hasChildren && (
                   <button 
-                    onClick={() => { if(window.confirm(`確定要刪除「${dept.name}」嗎？`)) onDelete(dept.id); }}
+                    onClick={async () => { if(await showConfirm(`確定要刪除「${dept.name}」嗎？`)) onDelete(dept.id); }}
                     className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition"
                     title="刪除"
                   >

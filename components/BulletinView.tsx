@@ -35,8 +35,8 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
 
   // Sort: Unread first, then Important, then Date desc
   const sortedAnnouncements = [...announcements].sort((a, b) => {
-    const aRead = a.readBy.includes(currentUser.id);
-    const bRead = b.readBy.includes(currentUser.id);
+    const aRead = (a.readBy || []).includes(currentUser.id);
+    const bRead = (b.readBy || []).includes(currentUser.id);
     
     // 1. Unread first
     if (!aRead && bRead) return -1;
@@ -84,7 +84,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
          )}
 
          {sortedAnnouncements.map(ann => {
-             const isRead = ann.readBy.includes(currentUser.id);
+             const isRead = (ann.readBy || []).includes(currentUser.id);
              const isImportant = ann.priority === 'IMPORTANT';
              const isCreator = ann.createdBy === currentUser.id;
              
@@ -214,7 +214,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                               className="text-slate-400 hover:text-blue-600 text-xs font-bold flex items-center gap-1 transition px-2 py-1 hover:bg-blue-50 rounded-lg"
                             >
                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                               查看已讀狀況 ({Array.isArray(ann.readBy) ? ann.readBy.length : 0}/{users.length})
+                               查看已讀狀況 ({Array.isArray(ann.readBy) ? new Set(ann.readBy.map((r: any) => typeof r === 'object' && r !== null ? (r.userId || r.id || JSON.stringify(r)) : String(r))).size : 0}/{users.length})
                             </button>
                          )}
                       </div>

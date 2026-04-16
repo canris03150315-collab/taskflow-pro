@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 const API_BASE_URL = '/api';
 
@@ -68,7 +69,7 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
   };
 
   const handleRestore = async (historyId: string) => {
-    if (!confirm('確定要還原此記錄嗎？')) return;
+    if (!(await showConfirm('確定要還原此記錄嗎？'))) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/platform-revenue/restore/${historyId}`, {
@@ -79,15 +80,15 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
       });
 
       if (response.ok) {
-        alert('還原成功');
+        showSuccess('還原成功');
         loadHistory();
       } else {
         const error = await response.json();
-        alert(error.error || '還原失敗');
+        showError(error.error || '還原失敗');
       }
     } catch (error) {
       console.error('Restore error:', error);
-      alert('還原失敗');
+      showError('還原失敗');
     }
   };
 

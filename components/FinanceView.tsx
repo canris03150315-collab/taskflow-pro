@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, lazy, Suspense } from 'react';
 import { User, FinanceRecord, DepartmentDef, Role, hasPermission } from '../types';
+import { showConfirm } from '../utils/dialogService';
 
 const KOLManagementView = lazy(() => import('./KOLManagementView').then(m => ({ default: m.KOLManagementView })));
 
@@ -192,7 +193,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       
       // Initialize Target Defaults
       if (activeTab === 'DEPT') {
-          setTargetDeptId(isBoss ? (filterDept !== 'ALL' ? filterDept : departments[0].id) : currentUser.department);
+          setTargetDeptId(isBoss ? (filterDept !== 'ALL' ? filterDept : (departments.length > 0 ? departments[0].id : '')) : currentUser.department);
       } else {
           // Personal
           if (isBoss || isSupervisor) {
@@ -277,7 +278,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       if (!(isBoss || (isSupervisor && activeTab !== 'ALL'))) return null;
       return (
           <button 
-              onClick={(e) => { e.stopPropagation(); if(window.confirm('確定要刪除這筆紀錄嗎？')) onDeleteRecord(record.id); }}
+              onClick={async (e) => { e.stopPropagation(); if(await showConfirm('確定要刪除這筆紀錄嗎？')) onDeleteRecord(record.id); }}
               className="text-slate-300 hover:text-red-500 transition p-1"
           >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -630,7 +631,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                                 >
                                     {selectedTargetUser ? (
                                         <div className="flex items-center gap-2">
-                                            <img src={selectedTargetUser.avatar} className="w-5 h-5 rounded-full" />
+                                            <img src={selectedTargetUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(selectedTargetUser.name || 'default')}`} className="w-5 h-5 rounded-full" />
                                             <span className="text-slate-800 font-bold">{selectedTargetUser.name}</span>
                                             <span className="text-xs text-slate-400">({getDeptName(selectedTargetUser.department)})</span>
                                         </div>
@@ -666,7 +667,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                                                     }}
                                                     className={`px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-3 border-b border-slate-50 last:border-0 transition ${targetUserId === u.id ? 'bg-blue-50' : ''}`}
                                                 >
-                                                    <img src={u.avatar} className="w-8 h-8 rounded-full border border-slate-100" />
+                                                    <img src={u.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(u.name || 'default')}`} className="w-8 h-8 rounded-full border border-slate-100" />
                                                     <div>
                                                         <div className="text-sm font-bold text-slate-700">{u.name}</div>
                                                         <div className="text-xs text-slate-400">{getDeptName(u.department)}</div>

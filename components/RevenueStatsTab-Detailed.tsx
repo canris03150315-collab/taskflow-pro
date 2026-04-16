@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, DepartmentDef } from '../types';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 const API_BASE_URL = '/api';
 
@@ -185,7 +186,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
       }
     } catch (error) {
       console.error('Export error:', error);
-      alert('匯出失敗');
+      showError('匯出失敗');
     }
   };
 

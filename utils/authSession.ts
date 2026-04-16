@@ -1,99 +1,54 @@
-// authSession.ts
-// Session management for report authorization
-import { ReportAuthorization } from '../types';
-
-const AUTH_STORAGE_KEY = 'report_authorization';
-
-// Generate session ID
-export const generateSessionId = (): string => {
-  return 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+export const getAuthToken = (): string | null => {
+  return localStorage.getItem('token');
 };
 
-// Save authorization to sessionStorage
-export const saveAuthorization = (auth: ReportAuthorization): void => {
-  try {
-    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
-  } catch (error) {
-    console.error('Failed to save authorization:', error);
-  }
+export const setAuthToken = (token: string): void => {
+  localStorage.setItem('token', token);
 };
 
-// Get authorization from sessionStorage
-export const getAuthorization = (): ReportAuthorization | null => {
+export const removeAuthToken = (): void => {
+  localStorage.removeItem('token');
+};
+
+export const isAuthenticated = (): boolean => {
+  return !!getAuthToken();
+};
+
+// Authorization helpers for report access
+const AUTH_KEY = 'report_authorization';
+
+export const saveAuthorization = (auth: any): void => {
+  localStorage.setItem(AUTH_KEY, JSON.stringify(auth));
+};
+
+export const getAuthorization = (): any | null => {
+  const data = localStorage.getItem(AUTH_KEY);
+  if (!data) return null;
   try {
-    const data = sessionStorage.getItem(AUTH_STORAGE_KEY);
-    if (!data) return null;
-    
-    const auth = JSON.parse(data) as ReportAuthorization;
-    
-    // Check if expired
-    if (new Date(auth.expiresAt) < new Date()) {
-      clearAuthorization();
-      return null;
-    }
-    
-    return auth;
-  } catch (error) {
-    console.error('Failed to get authorization:', error);
+    return JSON.parse(data);
+  } catch {
     return null;
   }
 };
 
-// Check if authorization is valid
 export const isAuthorizationValid = (): boolean => {
   const auth = getAuthorization();
-  if (!auth) return false;
-  
-  // Check if active and not expired
-  return auth.isActive && new Date(auth.expiresAt) > new Date();
+  if (!auth?.expiresAt) return false;
+  return new Date(auth.expiresAt).getTime() > Date.now();
 };
 
-// Clear authorization
 export const clearAuthorization = (): void => {
-  try {
-    sessionStorage.removeItem(AUTH_STORAGE_KEY);
-  } catch (error) {
-    console.error('Failed to clear authorization:', error);
-  }
+  localStorage.removeItem(AUTH_KEY);
 };
 
-// Get remaining time in seconds
-export const getRemainingTime = (): number => {
-  const auth = getAuthorization();
-  if (!auth) return 0;
-  
-  const expiresAt = new Date(auth.expiresAt);
-  const now = new Date();
-  const remaining = Math.floor((expiresAt.getTime() - now.getTime()) / 1000);
-  
-  return remaining > 0 ? remaining : 0;
+export const getRemainingTime = (auth: any): number => {
+  if (!auth?.expiresAt) return 0;
+  const remaining = Math.floor((new Date(auth.expiresAt).getTime() - Date.now()) / 1000);
+  return Math.max(0, remaining);
 };
 
-// Format time (seconds to MM:SS)
 export const formatTime = (seconds: number): string => {
-  const minutes = Math.floor(seconds / 60);
+  const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-};
-
-// Generate device fingerprint (simplified version)
-export const generateDeviceFingerprint = (): string => {
-  const data = {
-    userAgent: navigator.userAgent,
-    language: navigator.language,
-    platform: navigator.platform,
-    screenResolution: `${screen.width}x${screen.height}`,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-  };
-  
-  // Simple hash
-  const str = JSON.stringify(data);
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  
-  return Math.abs(hash).toString(36);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };

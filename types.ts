@@ -424,6 +424,8 @@ export type MenuItemId =
   | 'personnel' 
   | 'ai-assistant'
   | 'backup-monitor'
+  | 'central-dashboard'
+  | 'subsidiary-management'
   | 'settings';
 
 // NEW: Group Structure
@@ -480,6 +482,8 @@ export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = 
   personnel: { label: '人員帳號管理', icon: '👥' },
   'ai-assistant': { label: 'AI 智能助理', icon: '✨' },
   'backup-monitor': { label: '備份監控', icon: '💾' },
+  'central-dashboard': { label: '總部儀表板', icon: '🏢' },
+  'subsidiary-management': { label: '子公司管理', icon: '🌐' },
   settings: { label: '系統設定', icon: '⚙️' },
 };
 

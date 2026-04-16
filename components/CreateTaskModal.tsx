@@ -22,6 +22,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
   const [deadlineTime, setDeadlineTime] = useState('');
   
   const [assignType, setAssignType] = useState<'open' | 'department' | 'individual'>('open');
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const isHighLevel = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
   
@@ -63,6 +65,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
               setDeadlineDate('');
               setDeadlineTime('');
               setAssignType('open');
+              setSubmitted(false);
+              setIsSubmitting(false);
               setTargetDepartment(isHighLevel ? (departments[0]?.id || '') : currentUser.department);
               setAssignedToUserId('');
           }
@@ -88,7 +92,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValid) return;
+    setSubmitted(true);
+    if (!isValid || isSubmitting) return;
+    setIsSubmitting(true);
 
     let finalTargetDept = undefined;
     let finalAssignedUser = undefined;
@@ -146,25 +152,25 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
           <div>
             <label className="block text-sm font-bold text-slate-500 mb-1">任務標題 <span className="text-red-500">*</span></label>
             <input
-              required
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900 placeholder-slate-400 text-base"
+              className={`w-full px-4 py-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-900 placeholder-slate-400 text-base ${submitted && !title.trim() ? 'border-red-400' : 'border-slate-200'}`}
               placeholder="例如：製作 Q3 財務報表..."
             />
+            {submitted && !title.trim() && <p className="text-xs text-red-500 mt-1 font-bold">請輸入任務標題</p>}
           </div>
 
           <div>
             <label className="block text-sm font-bold text-slate-500 mb-1">任務內容 <span className="text-red-500">*</span></label>
             <textarea
-              required
               rows={5}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition resize-none text-slate-800 placeholder-slate-400 text-base"
+              className={`w-full px-4 py-3 bg-slate-50 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition resize-none text-slate-800 placeholder-slate-400 text-base ${submitted && !description.trim() ? 'border-red-400' : 'border-slate-200'}`}
               placeholder="請輸入任務詳細執行項目..."
             />
+            {submitted && !description.trim() && <p className="text-xs text-red-500 mt-1 font-bold">請輸入任務內容</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -287,10 +293,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ isOpen, onClos
             </button>
             <button
               type="submit"
-              disabled={!isValid}
+              disabled={isSubmitting}
               className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isEditMode ? '儲存變更' : '建立任務'}
+              {isSubmitting ? '處理中...' : (isEditMode ? '儲存變更' : '建立任務')}
             </button>
           </div>
         </form>

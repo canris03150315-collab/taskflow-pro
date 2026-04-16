@@ -76,7 +76,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentUser, messages, depar
              return (
                <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                  <div className="flex-shrink-0">
-                    <img src={msg.avatar} alt={msg.userName} className="w-8 h-8 rounded-full bg-slate-200" />
+                    <img src={msg.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(msg.userName || 'default')}`} alt={msg.userName} className="w-8 h-8 rounded-full bg-slate-200" />
                  </div>
                  <div className={`flex flex-col max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
                     <div className="flex items-center gap-2 mb-1">

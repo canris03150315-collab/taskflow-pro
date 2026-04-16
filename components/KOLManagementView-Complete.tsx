@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, KOLProfile, KOLContract, KOLPayment, KOLStats } from '../types';
 import { api } from '../services/api';
+import { showSuccess, showError, showWarning, showConfirm, showToast } from '../utils/dialogService';
 
 interface KOLManagementViewProps {
   currentUser: User;
@@ -47,7 +48,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       }
     } catch (error) {
       console.error('Load KOL data error:', error);
-      alert('載入資料失敗');
+      showError('載入資料失敗');
     } finally {
       setLoading(false);
     }
@@ -77,7 +78,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       // 獲取該 KOL 的合約
       const contractsRes = await api.kol.getContracts({ kolId: profile.id });
       if (contractsRes.contracts.length === 0) {
-        alert('此 KOL 沒有合約，請先新增合約');
+        showWarning('此 KOL 沒有合約，請先新增合約');
         return;
       }
 
@@ -91,11 +92,11 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         notes: '快速支付'
       });
 
-      alert('支付記錄成功');
+      showSuccess('支付記錄成功');
       loadData();
     } catch (error) {
       console.error('Quick payment error:', error);
-      alert('支付記錄失敗');
+      showError('支付記錄失敗');
     }
   };
 
@@ -110,12 +111,12 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       }));
 
       await api.kol.batchCreatePayments(payments);
-      alert(`批量支付成功，共 ${contractIds.length} 筆`);
+      showSuccess(`批量支付成功，共 ${contractIds.length} 筆`);
       setSelectedContracts([]);
       loadData();
     } catch (error) {
       console.error('Batch payment error:', error);
-      alert('批量支付失敗');
+      showError('批量支付失敗');
     }
   };
 
@@ -162,13 +163,13 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           });
         }
         
-        alert(message);
+        showSuccess(message);
         loadData();
       };
       reader.readAsBinaryString(file);
     } catch (error) {
       console.error('Excel import error:', error);
-      alert('Excel 導入失敗');
+      showError('Excel 導入失敗');
     }
 
     if (fileInputRef.current) {
@@ -204,7 +205,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       XLSX.writeFile(workbook, `KOL工資紀錄-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (error) {
       console.error('Excel export error:', error);
-      alert('Excel 匯出失敗');
+      showError('Excel 匯出失敗');
     }
   };
 
@@ -370,13 +371,13 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             setShowDetailModal(true);
           }}
           onDelete={async (id) => {
-            if (confirm('確定要刪除此 KOL 嗎？此操作無法復原。')) {
+            if (await showConfirm('確定要刪除此 KOL 嗎？此操作無法復原。')) {
               try {
                 await api.kol.deleteProfile(id);
-                alert('刪除成功');
+                showSuccess('刪除成功');
                 loadData();
               } catch (error) {
-                alert('刪除失敗');
+                showError('刪除失敗');
               }
             }
           }}
@@ -394,7 +395,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           }}
           onEdit={(contract) => {
             // TODO: 實作編輯合約
-            alert('編輯合約功能開發中');
+            showToast('編輯合約功能開發中');
           }}
         />
       )}

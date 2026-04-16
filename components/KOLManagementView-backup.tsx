@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User, KOLProfile, KOLContract, KOLPayment, KOLStats } from '../types';
 import { api } from '../services/api';
+import { showSuccess, showError, showWarning, showConfirm, showToast } from '../utils/dialogService';
 
 interface KOLManagementViewProps {
   currentUser: User;
@@ -74,7 +75,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       loadData();
     } catch (error) {
       console.error('Add profile error:', error);
-      alert('新增失敗');
+      showError('新增失敗');
     }
   };
 
@@ -86,11 +87,11 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const handleDeleteProfile = async (id: string) => {
     try {
       await api.kol.deleteProfile(id);
-      alert('刪除成功');
+      showSuccess('刪除成功');
       loadData();
     } catch (error) {
       console.error('Delete profile error:', error);
-      alert('刪除失敗');
+      showError('刪除失敗');
     }
   };
 
@@ -137,13 +138,13 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           });
         }
         
-        alert(message);
+        showSuccess(message);
         loadData();
       };
       reader.readAsBinaryString(file);
     } catch (error) {
       console.error('Excel import error:', error);
-      alert('Excel 導入失敗');
+      showError('Excel 導入失敗');
     }
 
     if (fileInputRef.current) {
@@ -179,7 +180,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       XLSX.writeFile(workbook, `KOL工資紀錄-${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (error) {
       console.error('Excel export error:', error);
-      alert('Excel 匯出失敗');
+      showError('Excel 匯出失敗');
     }
   };
 
@@ -280,9 +281,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   {getStatusText(profile.status)}
                 </span>
                 <button
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    if (confirm(`確定要刪除 ${profile.facebookId} 嗎？此操作無法復原。`)) {
+                    if (await showConfirm(`確定要刪除 ${profile.facebookId} 嗎？此操作無法復原。`)) {
                       handleDeleteProfile(profile.id);
                     }
                   }}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { WorkLog, User, Role, DepartmentDef } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 interface WorkLogViewProps {
   currentUser: User;
@@ -93,7 +94,7 @@ export const WorkLogView: React.FC<WorkLogViewProps> = ({ currentUser, users, de
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('確定要刪除此工作日誌嗎？')) return;
+    if (!(await showConfirm('確定要刪除此工作日誌嗎？'))) return;
     
     try {
       await api.workLogs.delete(id);
