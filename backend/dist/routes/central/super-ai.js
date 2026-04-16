@@ -201,9 +201,10 @@ function buildSuperSystemPrompt(superContext, localContext) {
   const today = getLocalDate();
 
   // --- Local (central hub) context section ---
-  const localUserList = localContext.users.map(u =>
-    `- ${u.name} (ID: ${u.id}, ${u.role}) - 部門: ${u.department || '無'}`
-  ).join('\n');
+  const localUserList = localContext.users.map(u => {
+    const exempt = u.exclude_from_attendance ? ' [🏖️ 免打卡]' : '';
+    return `- ${u.name} (ID: ${u.id}, ${u.role}) - 部門: ${u.department || '無'}${exempt}`;
+  }).join('\n');
 
   const localTaskList = localContext.activeTasks.map(t => {
     const assignee = localContext.users.find(u => u.id === t.assigned_to_user_id);
@@ -233,7 +234,10 @@ function buildSuperSystemPrompt(superContext, localContext) {
     // Users
     if (d.users && d.users.length > 0) {
       companyContextSections += `員工 (${d.userCount || d.users.length} 人):\n`;
-      companyContextSections += d.users.slice(0, 20).map(u => `  - ${u.name} (${u.role})`).join('\n') + '\n';
+      companyContextSections += d.users.slice(0, 20).map(u => {
+        const exempt = u.exclude_from_attendance ? ' [🏖️ 免打卡]' : '';
+        return `  - ${u.name} (${u.role})${exempt}`;
+      }).join('\n') + '\n';
     }
 
     // Tasks

@@ -107,7 +107,7 @@ router.get('/context', (req, res) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // --- Users ---
-    const users = safeQuery(db, 'SELECT id, name, role, department, username, created_at FROM users');
+    const users = safeQuery(db, 'SELECT id, name, role, department, username, exclude_from_attendance, created_at FROM users');
     const userCount = users.length;
 
     // --- Tasks ---

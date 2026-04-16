@@ -663,9 +663,10 @@ function generateAlerts(db, currentUser) {
 // SYSTEM PROMPT BUILDER (Enhanced)
 // ============================================================
 function buildSystemPrompt(context, currentUser, userMemory, summaries) {
-  const userList = context.users.map(u =>
-    `- ${u.name} (ID: ${u.id}, ${u.role}) - Dept: ${u.department || 'None'} - Username: ${u.username}`
-  ).join('\n');
+  const userList = context.users.map(u => {
+    const exempt = u.exclude_from_attendance ? ' [🏖️ 免打卡]' : '';
+    return `- ${u.name} (ID: ${u.id}, ${u.role}) - Dept: ${u.department || 'None'} - Username: ${u.username}${exempt}`;
+  }).join('\n');
 
   const taskList = context.activeTasks.map(t => {
     const assignee = context.users.find(u => u.id === t.assigned_to_user_id);
