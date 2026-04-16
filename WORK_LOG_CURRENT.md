@@ -1,8 +1,53 @@
 # TaskFlow Pro 當前工作日誌
 
-**最後更新**: 2026-02-05 18:10  
+**最後更新**: 2026-02-06 03:22  
 **版本**: v8.9.212 (Excel 靜默同步) / 69846dc11d668d0c82811a3b (前端)  
 **狀態**: ✅ 平台營收 Excel 靜默同步功能已上線
+
+---
+
+## 🎯 2026-02-06 更新記錄
+
+### 85. Moltbook 註冊 API 測試 (QuiQui-Test Agent) ⭐⭐⭐
+**完成時間**: 2026-02-06 03:22  
+**狀態**: ✅ 已完成
+
+**測試目標**:
+測試 Moltbook 註冊 API 對英文字元的支援，並驗證完整的註冊流程。
+
+**執行步驟**:
+1. **註冊 Agent**:
+   - 使用 PowerShell `Invoke-WebRequest` 執行註冊 API
+   - Agent 名稱: `QuiQui-Test` (原名 `QuiQui` 已被註冊)
+   - 描述: "Daddy's AI Agent, a professional yet humorous French Bulldog assistant."
+   - API 端點: `https://moltbook.com/api/v1/agents/register`
+
+2. **保存憑證**:
+   - 創建目錄: `~/.config/moltbook/`
+   - 保存文件: `credentials.json`
+   - 包含: agent_id, api_key, claim_url, verification_code, profile_url
+
+3. **驗證狀態**:
+   - 使用 `X-API-Key` header 檢查狀態 (注意：不是 `Authorization: Bearer`)
+   - API 端點: `https://moltbook.com/api/v1/agents/status`
+   - 狀態: `pending_claim` (等待認領)
+
+**執行結果**:
+- ✅ 註冊成功，獲得 Agent ID: `d5a6d792-7b18-401e-b4dc-72467fbb9db1`
+- ✅ API Key 已安全保存至 `C:\Users\USER\.config\moltbook\credentials.json`
+- ✅ Claim URL: `https://moltbook.com/claim/moltbook_claim_MEmbmnzyg4mYaEqhPwMNlUxxG2hluuzC`
+- ✅ Verification Code: `bubble-9DP5`
+- ✅ Profile URL: `https://moltbook.com/u/QuiQui-Test`
+- ✅ 狀態檢查成功，當前狀態為 `pending_claim`
+
+**關鍵發現**:
+- Moltbook API 使用 `X-API-Key` header 而非標準的 `Authorization: Bearer`
+- Agent 名稱必須唯一，重複註冊會返回 409 錯誤
+- 註冊後需要人類通過 X (Twitter) 認領帳號
+
+**下一步**:
+- 等待人類訪問 Claim URL 並完成認領流程
+- 認領後可開始在 Moltbook 上發文
 
 ---
 
