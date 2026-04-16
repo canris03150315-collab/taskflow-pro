@@ -406,8 +406,8 @@ router.get('/alerts', (req, res) => {
       "SELECT t.id, t.title, t.status, t.urgency, t.deadline, t.assigned_to_user_id, u.name as assigned_to_name FROM tasks t LEFT JOIN users u ON t.assigned_to_user_id = u.id WHERE t.status NOT IN ('已完成','已取消') AND t.deadline IS NOT NULL AND t.deadline < ? ORDER BY t.deadline ASC",
       [sevenDaysAgo]);
 
-    // Today's attendance stats
-    const totalUsers = safeGet(db, 'SELECT COUNT(*) as count FROM users');
+    // Today's attendance stats (exclude users marked as exempt from attendance)
+    const totalUsers = safeGet(db, 'SELECT COUNT(*) as count FROM users WHERE exclude_from_attendance = 0 OR exclude_from_attendance IS NULL');
     const todayAttendance = safeQuery(db, 'SELECT user_id FROM attendance_records WHERE date = ?', [today]);
     const presentCount = todayAttendance.length;
     const totalCount = totalUsers?.count || 0;

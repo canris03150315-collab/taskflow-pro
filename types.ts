@@ -1,5 +1,4 @@
-﻿
-export enum Role {
+﻿export enum Role {
   BOSS = 'BOSS',
   MANAGER = 'MANAGER', // 新增總經理/大主管層級
   SUPERVISOR = 'SUPERVISOR',
@@ -7,16 +6,16 @@ export enum Role {
 }
 
 // 定義細部權限
-export type Permission = 
-  | 'CREATE_TASK'       // 建立任務
-  | 'MANAGE_FINANCE'    // 管理公費/新增紀錄
+export type Permission =
+  | 'CREATE_TASK' // 建立任務
+  | 'MANAGE_FINANCE' // 管理公費/新增紀錄
   | 'POST_ANNOUNCEMENT' // 發布公告
-  | 'MANAGE_FORUM'      // 管理論壇提案
-  | 'MANAGE_USERS'      // 管理使用者帳號 (新增/修改員工)
+  | 'MANAGE_FORUM' // 管理論壇提案
+  | 'MANAGE_USERS' // 管理使用者帳號 (新增/修改員工)
   | 'MANAGE_DEPARTMENTS' // 管理部門 (新增/修改/刪除部門)
-  | 'APPROVE_LEAVES'    // 審核假期 (主管權限)
+  | 'APPROVE_LEAVES' // 審核假期 (主管權限)
   | 'MANAGE_LEAVE_RULES' // 設定部門排假規則 (主管權限)
-  | 'SYSTEM_RESET';     // 系統重置/格式化 (危險權限)
+  | 'SYSTEM_RESET'; // 系統重置/格式化 (危險權限)
 
 export interface DepartmentDef {
   id: string;
@@ -45,7 +44,7 @@ export enum Urgency {
 }
 
 export enum TaskStatus {
-  OPEN = 'Open',         // Available to be picked up
+  OPEN = 'Open', // Available to be picked up
   ASSIGNED = 'Assigned', // Assigned to someone but not started/accepted yet
   IN_PROGRESS = 'In Progress',
   COMPLETED = 'Completed',
@@ -58,9 +57,14 @@ export interface User {
   role: Role;
   department: string; // Changed from enum to string ID
   avatar: string;
-  username: string; 
+  username: string;
   password: string;
   permissions?: Permission[]; // Optional custom permissions
+  /**
+   * 免打卡標記：true 表示此使用者不列入出勤統計、AI 出勤異常提醒、
+   * 工作日誌缺漏提醒等。適用於管理層、顧問、外包等不需打卡的角色。
+   */
+  exclude_from_attendance?: boolean;
 }
 
 // 權限檢查輔助函式
@@ -69,7 +73,7 @@ export const hasPermission = (user: User, perm: Permission): boolean => {
   if (user.role === Role.BOSS || user.role === Role.MANAGER || user.role === Role.SUPERVISOR) {
     // SYSTEM_RESET 只有 BOSS 預設擁有，其他人必須明確被授權
     if (perm === 'SYSTEM_RESET' && user.role !== Role.BOSS) {
-        return user.permissions?.includes(perm) || false;
+      return user.permissions?.includes(perm) || false;
     }
     return true;
   }
@@ -89,19 +93,19 @@ export interface Task {
   title: string;
   description: string;
   urgency: Urgency;
-  deadline?: string; 
+  deadline?: string;
   createdAt: string;
   status: TaskStatus;
-  
+
   // Assignment Logic
   targetDepartment?: string; // Changed from enum to string ID
   assignedToDepartment?: string; // Department task is assigned to
-  assignedToUserId?: string; 
-  
+  assignedToUserId?: string;
+
   // Execution
-  acceptedByUserId?: string; 
+  acceptedByUserId?: string;
   completionNotes?: string;
-  
+
   // Progress Tracking
   progress: number; // 0-100
   timeline: TaskTimelineEntry[];
@@ -109,7 +113,7 @@ export interface Task {
   // Metadata
   createdBy: string;
   isArchived?: boolean; // 新增：是否已封存
-  
+
   // Notification Logic
   unreadUpdatesForUserIds?: string[]; // List of UserIDs (e.g. Creator) who haven't seen the latest update
 }
@@ -165,20 +169,20 @@ export enum ReportType {
 // Updated to match "Daily Operational Record" Excel structure
 export interface DailyReportContent {
   // User Growth Metrics
-  lineLeads: number;      // LINE 導入數量
-  registrations: number;  // 註冊人數
-  firstDeposits: number;  // 首充人數
+  lineLeads: number; // LINE 導入數量
+  registrations: number; // 註冊人數
+  firstDeposits: number; // 首充人數
 
   // Financial Metrics
-  depositAmount: number;    // 今日充值金額
+  depositAmount: number; // 今日充值金額
   withdrawalAmount: number; // 今日提現金額
-  netIncome: number;        // 淨入金額 (充值 - 提現) (Calculated or Input)
-  
-  // Rates (Calculated usually, but can be stored)
-  conversionRate?: number;    // 轉化率 (註冊/導入)
-  firstDepositRate?: number;  // 首充率 (首充/註冊)
+  netIncome: number; // 淨入金額 (充值 - 提現) (Calculated or Input)
 
-  notes: string;          // 備註 / 今日線路盤虧等文字說明
+  // Rates (Calculated usually, but can be stored)
+  conversionRate?: number; // 轉化率 (註冊/導入)
+  firstDepositRate?: number; // 首充率 (首充/註冊)
+
+  notes: string; // 備註 / 今日線路盤虧等文字說明
 }
 
 export interface Report {
@@ -186,13 +190,13 @@ export interface Report {
   type: ReportType;
   userId: string;
   createdAt: string; // Date string
-  
+
   content: DailyReportContent;
 
   // AI Generated Fields
-  aiSummary?: string;  // AI 針對營運數據的分析摘要
+  aiSummary?: string; // AI 針對營運數據的分析摘要
   aiMood?: 'POSITIVE' | 'NEUTRAL' | 'STRESSED'; // AI 根據盈虧判斷
-  
+
   managerFeedback?: string;
   reviewedBy?: string;
 }
@@ -201,7 +205,7 @@ export interface Report {
 
 export interface ReportAuthorization {
   id: string;
-  
+
   // 第一審核者
   firstApproverId: string;
   firstApproverName: string;
@@ -209,7 +213,7 @@ export interface ReportAuthorization {
   firstApprovedAt: string;
   firstApprovalReason: string;
   firstApprovalIp?: string;
-  
+
   // 第二審核者
   secondApproverId: string;
   secondApproverName: string;
@@ -217,27 +221,27 @@ export interface ReportAuthorization {
   secondApprovedAt: string;
   secondApprovalReason: string;
   secondApprovalIp?: string;
-  
+
   // 授權資訊
   authorizedAt: string;
   expiresAt: string;
   isActive: boolean;
   sessionId: string;
-  
+
   // 審計追蹤
   userAgent?: string;
   createdAt: string;
 }
 
 export interface ApprovalRequest {
-  approverId: string;  // 選擇的第二審核者 ID
-  reason: string;      // 審核原因（至少10字）
+  approverId: string; // 選擇的第二審核者 ID
+  reason: string; // 審核原因（至少10字）
 }
 
 export interface ApprovalStatus {
   isAuthorized: boolean;
   authorization?: ReportAuthorization;
-  remainingTime?: number;  // 剩餘秒數
+  remainingTime?: number; // 剩餘秒數
 }
 
 export interface EligibleApprover {
@@ -257,23 +261,23 @@ export interface FinanceRecord {
   status: 'PENDING' | 'COMPLETED'; // 新增狀態：待確認 vs 已入帳
   category: string; // e.g. 餐費, 交通, 文具, 撥款
   description: string;
-  
+
   scope: 'DEPARTMENT' | 'PERSONAL';
   departmentId: string; // The context dept
-  
+
   ownerId?: string; // If PERSONAL, which user owns this fund. If DEPARTMENT, usually managed by Supervisor.
   recordedBy: string; // Who entered the record
-  
+
   attachment?: string; // Base64 or URL of receipt/invoice image
 }
 
 // --- Forum / Suggestion Types ---
 
 export enum SuggestionStatus {
-  OPEN = 'OPEN',         // 提出
+  OPEN = 'OPEN', // 提出
   REVIEWING = 'REVIEWING', // 審核中
-  APPROVED = 'APPROVED',   // 已採納
-  REJECTED = 'REJECTED',   // 暫不考慮
+  APPROVED = 'APPROVED', // 已採納
+  REJECTED = 'REJECTED', // 暫不考慮
 }
 
 export interface SuggestionComment {
@@ -289,15 +293,15 @@ export interface Suggestion {
   title: string;
   content: string;
   category: string; // e.g., 薪資福利, 工作流程, 設施修繕
-  
+
   isAnonymous: boolean;
   authorId: string;
-  
+
   targetDeptId?: string; // Specific department (e.g. ask HR) or 'ALL' for General Management
-  
+
   status: SuggestionStatus;
   upvotes: string[]; // List of user IDs who upvoted
-  
+
   comments: SuggestionComment[];
   createdAt: string;
 }
@@ -387,18 +391,18 @@ export interface PerformanceReview {
   period: string; // "YYYY-MM"
   reviewerId?: string;
   updatedAt: string;
-  
+
   // Auto-calculated metrics
   metrics: ReviewMetrics;
-  
+
   // Manager Ratings (1-5)
   ratingWorkAttitude: number;
   ratingProfessionalism: number;
   ratingTeamwork: number;
-  
+
   // Feedback
   managerComment: string;
-  
+
   // Result
   totalScore: number; // 0-100
   grade: 'S' | 'A' | 'B' | 'C' | 'D';
@@ -407,21 +411,21 @@ export interface PerformanceReview {
 
 // --- Menu Navigation Types ---
 
-export type MenuItemId = 
-  | 'dashboard' 
-  | 'bulletin' 
-  | 'tasks' 
+export type MenuItemId =
+  | 'dashboard'
+  | 'bulletin'
+  | 'tasks'
   | 'leaves'
-  | 'sop' 
-  | 'performance' 
-  | 'team' 
-  | 'reports' 
-  | 'finance' 
-  | 'data_center' 
-  | 'forum' 
-  | 'chat' 
-  | 'memo' 
-  | 'personnel' 
+  | 'sop'
+  | 'performance'
+  | 'team'
+  | 'reports'
+  | 'finance'
+  | 'data_center'
+  | 'forum'
+  | 'chat'
+  | 'memo'
+  | 'personnel'
   | 'ai-assistant'
   | 'backup-monitor'
   | 'central-dashboard'
@@ -439,33 +443,47 @@ export const DEFAULT_MENU_GROUPS: MenuGroup[] = [
   {
     id: 'main',
     label: '管理核心',
-    items: ['dashboard', 'data_center', 'team', 'personnel']
+    items: ['dashboard', 'data_center', 'team', 'personnel'],
   },
   {
     id: 'work',
     label: '工作執行',
-    items: ['tasks', 'leaves', 'chat', 'reports', 'memo']
+    items: ['tasks', 'leaves', 'chat', 'reports', 'memo'],
   },
   {
     id: 'admin',
     label: '行政與資源',
-    items: ['bulletin', 'sop', 'finance', 'performance', 'forum']
+    items: ['bulletin', 'sop', 'finance', 'performance', 'forum'],
   },
   {
     id: 'system',
     label: '系統設定',
-    items: ['ai-assistant', 'backup-monitor', 'settings']
-  }
+    items: ['ai-assistant', 'backup-monitor', 'settings'],
+  },
 ];
 
 // Fallback for old compatibility (Flat list to Groups)
 export const DEFAULT_MENU_ORDER: MenuItemId[] = [
-  'dashboard', 'chat', 'bulletin', 'tasks', 'leaves', 'sop', 
-  'performance', 'team', 'reports', 'finance', 'data_center', 
-  'forum', 'memo', 'personnel', 'ai-assistant', 'backup-monitor', 'settings'
+  'dashboard',
+  'chat',
+  'bulletin',
+  'tasks',
+  'leaves',
+  'sop',
+  'performance',
+  'team',
+  'reports',
+  'finance',
+  'data_center',
+  'forum',
+  'memo',
+  'personnel',
+  'ai-assistant',
+  'backup-monitor',
+  'settings',
 ];
 
-export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = {
+export const MENU_LABELS: Record<MenuItemId, { label: string; icon: string }> = {
   dashboard: { label: '儀表板', icon: '📊' },
   bulletin: { label: '企業公告欄', icon: '📢' },
   tasks: { label: '任務列表', icon: '📋' },
@@ -475,7 +493,7 @@ export const MENU_LABELS: Record<MenuItemId, { label: string, icon: string }> = 
   team: { label: '團隊工作概況', icon: '📉' },
   reports: { label: '工作報表中心', icon: '📝' },
   finance: { label: '零用金與KOL', icon: '💰' },
-  data_center: { label: '部門數據中心', icon: '📥' }, 
+  data_center: { label: '部門數據中心', icon: '📥' },
   forum: { label: '提案討論區', icon: '💬' },
   chat: { label: '企業通訊', icon: '📨' },
   memo: { label: '個人備忘錄', icon: '✏️' },
@@ -521,12 +539,12 @@ export const KOL_PLATFORMS: { value: KOLPlatform; label: string; icon: string }[
 export interface KOLProfile {
   id: string;
   platform: KOLPlatform;
-  platformId: string;  // 原 facebookId，改為通用平台 ID
+  platformId: string; // 原 facebookId，改為通用平台 ID
   platformAccount: string;
   contactInfo?: string;
   status: KOLStatus;
-  statusColor?: 'green' | 'yellow' | 'red';  // 狀態顯示顏色
-  weeklyPayNote?: string;  // 週薪備註
+  statusColor?: 'green' | 'yellow' | 'red'; // 狀態顯示顏色
+  weeklyPayNote?: string; // 週薪備註
   notes?: string;
   createdAt: string;
   updatedAt: string;

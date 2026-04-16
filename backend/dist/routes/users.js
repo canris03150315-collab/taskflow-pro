@@ -71,7 +71,7 @@ router.post('/', auth_1.authenticateToken, (0, auth_1.requireRole)([types_1.Role
     try {
         const db = req.db;
         const currentUser = req.user;
-        const { name, username, password, role, department, avatar, permissions } = req.body;
+        const { name, username, password, role, department, avatar, permissions, exclude_from_attendance } = req.body;
         // 驗證必要欄位
         if (!name || !username || !password || !role || !department) {
             return res.status(400).json({
@@ -114,8 +114,8 @@ router.post('/', auth_1.authenticateToken, (0, auth_1.requireRole)([types_1.Role
         // 生成用戶 ID
         const userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         // 插入用戶
-        await db.run(`INSERT INTO users (id, name, role, department, avatar, username, password, permissions, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, [
+        await db.run(`INSERT INTO users (id, name, role, department, avatar, username, password, permissions, exclude_from_attendance, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`, [
             userId,
             name,
             role,
@@ -123,7 +123,8 @@ router.post('/', auth_1.authenticateToken, (0, auth_1.requireRole)([types_1.Role
             avatar || '',
             username,
             hashedPassword,
-            permissions ? JSON.stringify(permissions) : null
+            permissions ? JSON.stringify(permissions) : null,
+            exclude_from_attendance ? 1 : 0
         ]);
         // 記錄日誌
         const newUser = {
@@ -163,7 +164,7 @@ router.put('/:id', auth_1.authenticateToken, (0, auth_1.requireSelfOrAdmin)('id'
         const db = req.db;
         const currentUser = req.user;
         const { id } = req.params;
-        const { name, role, department, avatar, permissions } = req.body;
+        const { name, role, department, avatar, permissions, exclude_from_attendance } = req.body;
         // 獲取現有用戶
         const existingUser = await db.get('SELECT * FROM users WHERE id = ?', [id]);
         if (!existingUser) {
@@ -229,6 +230,8 @@ router.put('/:id', auth_1.authenticateToken, (0, auth_1.requireSelfOrAdmin)('id'
         if (department !== undefined && !isSelf) updateData.department = department;
         if (avatar !== undefined) updateData.avatar = avatar;
         if (permissions !== undefined && !isSelf) updateData.permissions = permissions;
+        // exclude_from_attendance: 只有管理員可改別人，但自己也可以改自己（為自己 toggle 免打卡）
+        if (exclude_from_attendance !== undefined) updateData.exclude_from_attendance = exclude_from_attendance;
         
         await UserService.updateUser(db, id, updateData);
         // 記錄日誌

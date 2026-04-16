@@ -102,7 +102,7 @@ function ensureTables(db) {
 function getSystemContext(db) {
   db = getRawDb(db);
 
-  const users = safeQuery(db, 'SELECT id, name, role, department, username, created_at FROM users');
+  const users = safeQuery(db, 'SELECT id, name, role, department, username, created_at, exclude_from_attendance FROM users');
   const departments = safeQuery(db, 'SELECT id, name FROM departments');
   const activeTasks = safeQuery(db, "SELECT id, title, status, urgency, assigned_to_user_id, deadline, description, created_at FROM tasks WHERE status NOT IN ('已完成','已取消') ORDER BY created_at DESC LIMIT 50");
   const completedTasksCount = safeGet(db, "SELECT COUNT(*) as count FROM tasks WHERE status = '已完成'");
@@ -171,6 +171,7 @@ const ACTION_DEFINITIONS = {
   FLAG_OVERDUE_TASKS: { level: 'confirm', description: '標記逾期任務並通知', requiredRoles: ['BOSS','MANAGER','SUPERVISOR'] },
   ATTENDANCE_ANOMALY_ALERT: { level: 'confirm', description: '出勤異常批量提醒', requiredRoles: ['BOSS','MANAGER','SUPERVISOR'] },
   QUERY_PLATFORM_DATA: { level: 'direct', description: '查詢平台帳務資料', requiredRoles: ['BOSS','MANAGER','SUPERVISOR'] },
+  SET_USER_EXCLUSION: { level: 'confirm', description: '設定使用者免打卡（不列入出勤統計）', requiredRoles: ['BOSS','MANAGER'] },
 };
 
 // ============================================================
@@ -415,7 +416,7 @@ function executeAction(db, action, params, currentUser) {
 
     case 'REMIND_MISSING_WORKLOGS': {
       const targetDate = params.date || today;
-      const allEmployees = safeQuery(db, 'SELECT id, name FROM users');
+      const allEmployees = safeQuery(db, 'SELECT id, name FROM users WHERE exclude_from_attendance = 0 OR exclude_from_attendance IS NULL');
       const logsToday = safeQuery(db, 'SELECT user_id FROM work_logs WHERE date = ?', [targetDate]);
       const loggedUserIds = new Set(logsToday.map(l => l.user_id));
       const missing = allEmployees.filter(u => !loggedUserIds.has(u.id));
@@ -465,7 +466,7 @@ function executeAction(db, action, params, currentUser) {
 
     case 'ATTENDANCE_ANOMALY_ALERT': {
       const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const allEmps = safeQuery(db, 'SELECT id, name, department FROM users');
+      const allEmps = safeQuery(db, 'SELECT id, name, department FROM users WHERE exclude_from_attendance = 0 OR exclude_from_attendance IS NULL');
       const records = safeQuery(db, 'SELECT user_id, date FROM attendance_records WHERE date >= ?', [last7Days]);
       const attendMap = {};
       records.forEach(r => {
@@ -485,6 +486,20 @@ function executeAction(db, action, params, currentUser) {
 
       const details2 = anomalies.map(a => `${a.name}（${a.department || '未分部'}）: 僅出勤 ${a.days} 天`);
       return { success: true, message: `發現 ${anomalies.length} 人出勤異常（近 7 天出勤不足 3 天）：\n${details2.join('\n')}` };
+    }
+
+    case 'SET_USER_EXCLUSION': {
+      // params: { userName: string, exclude: boolean }
+      const targetUser3 = findUserByName(db, params.userName);
+      if (!targetUser3) {
+        return { success: false, message: `找不到使用者「${params.userName}」` };
+      }
+      const newValue = params.exclude === false ? 0 : 1;
+      const r10 = safeRun(db, "UPDATE users SET exclude_from_attendance = ?, updated_at = ? WHERE id = ?",
+        [newValue, now, targetUser3.id]);
+      if (r10?.error) return { success: false, message: '設定失敗：' + r10.error };
+      const action = newValue === 1 ? '已標記為「免打卡」' : '已取消「免打卡」標記';
+      return { success: true, message: `${targetUser3.name} ${action}，未來將${newValue === 1 ? '不' : ''}列入出勤統計與提醒。` };
     }
 
     case 'QUERY_PLATFORM_DATA': {
@@ -636,7 +651,7 @@ function generateAlerts(db, currentUser) {
     if (!attendSet[r.user_id]) attendSet[r.user_id] = new Set();
     attendSet[r.user_id].add(r.date);
   });
-  const absentees = allUsers.filter(u => !attendSet[u.id] || attendSet[u.id].size === 0);
+  const absentees = allUsers.filter(u => (u.exclude_from_attendance !== 1) && (!attendSet[u.id] || attendSet[u.id].size === 0));
   if (absentees.length > 0 && ['BOSS','MANAGER','SUPERVISOR'].includes(currentUser.role)) {
     alerts.push({ type: 'warning', icon: '🚨', title: `${absentees.length} 人連續 3 天未打卡`, detail: absentees.map(u => u.name).slice(0, 3).join('、') + (absentees.length > 3 ? '...' : '') });
   }
@@ -797,6 +812,10 @@ ${actionList}
   - summary: 所有平台月份摘要（充值/提款/營利/餘額）
   - detail: 指定平台的每日明細（需搭配 platform 參數）
   - total: 全平台合計數據
+- SET_USER_EXCLUSION: { userName(人名), exclude(true 設定免打卡 / false 取消免打卡) }
+  - 用於將特定使用者排除於出勤統計、AI 出勤異常提醒、未交工作日誌提醒之外
+  - 適合管理層、顧問、外包人員等不需要打卡的角色
+  - 使用範例：「把 SSS 設定為免打卡」→ { userName: "SSS", exclude: true }
 
 === 重要規則 ===
 
