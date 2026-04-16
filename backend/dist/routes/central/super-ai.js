@@ -233,11 +233,21 @@ function buildSuperSystemPrompt(superContext, localContext) {
 
     // Users
     if (d.users && d.users.length > 0) {
-      companyContextSections += `員工 (${d.userCount || d.users.length} 人):\n`;
+      const totalCount = d.userCount || d.users.length;
+      const eligibleCount = d.attendanceSummary?.eligibleUsers ?? totalCount;
+      const exemptCount = d.attendanceSummary?.exemptUsers ?? 0;
+      companyContextSections += `員工 (共 ${totalCount} 人，其中 ${eligibleCount} 人需打卡，${exemptCount} 人免打卡):\n`;
       companyContextSections += d.users.slice(0, 20).map(u => {
         const exempt = u.exclude_from_attendance ? ' [🏖️ 免打卡]' : '';
         return `  - ${u.name} (${u.role})${exempt}`;
       }).join('\n') + '\n';
+    }
+
+    // Today's attendance
+    if (d.attendanceSummary) {
+      const a = d.attendanceSummary;
+      const rate = a.eligibleUsers > 0 ? Math.round((a.todayPresent / a.eligibleUsers) * 100) : 0;
+      companyContextSections += `今日出勤: ${a.todayPresent}/${a.eligibleUsers} (${rate}%) — 計算分母已排除 ${a.exemptUsers} 位免打卡人員\n`;
     }
 
     // Tasks

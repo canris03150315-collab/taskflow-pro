@@ -125,10 +125,15 @@ router.get('/context', (req, res) => {
     // --- Attendance (last 7 days) ---
     const attendanceRecords = safeQuery(db, 'SELECT user_id, date, status, clock_in, clock_out FROM attendance_records WHERE date >= ? ORDER BY date DESC LIMIT 200', [sevenDaysAgo]);
     const todayAttendance = safeQuery(db, 'SELECT user_id, status, clock_in, clock_out FROM attendance_records WHERE date = ?', [today]);
+    // Count users who should be tracked for attendance (exclude exempt users)
+    const eligibleUsers = users.filter(u => !u.exclude_from_attendance).length;
+    const exemptUsers = userCount - eligibleUsers;
     const attendanceSummary = {
       last7Days: attendanceRecords.length,
       todayPresent: todayAttendance.length,
-      totalUsers: userCount
+      totalUsers: userCount,         // 全部使用者（含免打卡）
+      eligibleUsers,                  // 應計入出勤人數（排除免打卡）
+      exemptUsers,                    // 免打卡人數
     };
 
     // --- Finance ---
