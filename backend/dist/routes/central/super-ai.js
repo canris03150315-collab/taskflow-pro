@@ -77,6 +77,13 @@ function ensureAITables(db) {
     created_at TEXT NOT NULL
   )`);
 
+  // Idempotent migration: subsidiary ai-assistant.js may have created an older
+  // 5-column ai_conversations table. CREATE TABLE IF NOT EXISTS won't upgrade
+  // the schema, so explicitly ALTER. Errors (column exists) are silently ignored.
+  ['intent', 'action_taken', 'action_result'].forEach(col => {
+    safeRun(db, `ALTER TABLE ai_conversations ADD COLUMN ${col} TEXT`);
+  });
+
   safeRun(db, `CREATE TABLE IF NOT EXISTS ai_pending_actions (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
