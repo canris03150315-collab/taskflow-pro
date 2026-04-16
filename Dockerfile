@@ -32,6 +32,7 @@ RUN apk add --no-cache \
     make \
     g++ \
     nginx \
+    sqlite \
     pkgconfig \
     pixman-dev \
     cairo-dev \
@@ -51,6 +52,9 @@ RUN cd backend && npm ci --omit=dev && cd .. \
 # Copy pre-compiled backend JavaScript (NO TypeScript compilation needed)
 COPY backend/dist/ ./backend/dist/
 COPY backend/services/ ./backend/services/
+# Copy Knex config + migrations (run on container startup via entrypoint.sh)
+COPY backend/knexfile.js ./backend/knexfile.js
+COPY backend/migrations/ ./backend/migrations/
 
 # Copy frontend build output from stage 1
 COPY --from=frontend-build /build/dist/ ./frontend/dist/
