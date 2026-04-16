@@ -7,10 +7,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
 *.local
+frontend/dist
+# Exception: backend/dist/ is the compiled production code — must be tracked
+!backend/dist/
+!backend/dist/**
+backend/dist/*.map
+backend/dist/**/*.map
 
 # Editor directories and files
 .vscode/*
@@ -25,3 +34,54 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# === Environment variables (敏感資訊絕不入 git) ===
+.env
+.env.*
+!.env.example
+
+# === Database files (用 migration，不追 db 檔) ===
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+backend/data/taskflow.db*
+backend/data/database.sqlite
+backend/data/backups/
+backend/data/uploads/
+backend/data/reports/
+backend/data-central/
+
+# === Secrets (絕對不能進 git) ===
+backend/data/.db-key
+backend/data-central/.db-key
+backend/data/certificates/
+backend/.env-raw
+backend/.env
+
+# === Test artifacts ===
+test-results/
+report/
+playwright-report/
+
+# === Backup files & old archives ===
+archive-backups/
+archive-scripts/
+backups/
+*.tar.gz
+*.zip
+*.bak
+*.bak.*
+*.backup
+*.backup-*
+*.backup-before-*
+
+# === Docker / deploy temp ===
+deploy-tmp/
+*.deploy.tar.gz
+
+# === OS ===
+Thumbs.db
+desktop.ini
