@@ -292,7 +292,8 @@ function buildSuperSystemPrompt(superContext, localContext) {
     'COMPLETE_TASK: 標記任務完成 (需確認)',
     'DELETE_TASK: 刪除任務 (⚠️ 危險操作需二次確認)',
     'DELETE_ANNOUNCEMENT: 刪除公告 (⚠️ 危險操作需二次確認)',
-    'MANUAL_ATTENDANCE: 手動補出勤紀錄 (需確認)'
+    'MANUAL_ATTENDANCE: 手動補出勤紀錄 (需確認)',
+    'SET_USER_EXCLUSION: 設定使用者免打卡 (需確認)'
   ].map(a => `  - ${a}`).join('\n');
 
   return `你是 TaskFlow Pro 中央管理系統的 Super AI 智能助理。你是總部 BOSS 的最高級別 AI 顧問，擁有跨公司全域數據存取權限。請用繁體中文回覆。
@@ -371,6 +372,15 @@ ${actionList}
 - APPROVE_LEAVE: { leaveId }
 - REJECT_LEAVE: { leaveId }
 - MANUAL_ATTENDANCE: { userName, date?(YYYY-MM-DD), clockIn?, clockOut?, notes? }
+- SET_USER_EXCLUSION: { userName(人名), exclude(true=設定免打卡 / false=取消免打卡) }
+  - 用於將特定使用者排除於出勤統計、AI 出勤異常提醒、未交工作日誌提醒之外
+  - 適合管理層、顧問、外包人員等不需要打卡的角色
+  - **跨公司操作**：若使用者要求「在 alpha/bravo/charlie 把某人設為免打卡」，
+    使用 companyId 指定子公司（companyId 為 subsidiaries 表中的 id）
+  - **多公司同步操作**：若使用者要求「把 SSS 在三個子公司都設為免打卡」，
+    請對每個子公司分別建立一個 SET_USER_EXCLUSION action（共 3 個 actions）
+  - 範例：用戶說「把 SSS 在所有子公司設為免打卡」→ 建立 3 個 actions，
+    每個指向一個 subsidiary 的 companyId
 
 === 安全等級 ===
 - **direct（直接執行）**：CREATE_MEMO, CREATE_WORK_LOG, UPDATE_TASK_STATUS — 系統自動執行
@@ -416,6 +426,7 @@ const ACTION_DEFINITIONS = {
   DELETE_TASK: { level: 'danger', description: '刪除任務' },
   DELETE_ANNOUNCEMENT: { level: 'danger', description: '刪除公告' },
   MANUAL_ATTENDANCE: { level: 'confirm', description: '手動補出勤紀錄' },
+  SET_USER_EXCLUSION: { level: 'confirm', description: '設定使用者免打卡（不列入出勤統計）' },
 };
 
 // ============================================================

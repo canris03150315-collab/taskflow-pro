@@ -374,6 +374,18 @@ router.post('/execute', (req, res) => {
         break;
       }
 
+      case 'SET_USER_EXCLUSION': {
+        const targetUser2 = findUserByName(req.db, params.userName);
+        if (!targetUser2) { result = { success: false, message: `找不到用戶「${params.userName}」` }; break; }
+        const newValue = params.exclude === false ? 0 : 1;
+        const r = safeRun(db, "UPDATE users SET exclude_from_attendance = ?, updated_at = ? WHERE id = ?",
+          [newValue, now, targetUser2.id]);
+        if (r?.error) { result = { success: false, message: '設定失敗：' + r.error }; break; }
+        const action = newValue === 1 ? '已標記為「免打卡」' : '已取消「免打卡」標記';
+        result = { success: true, message: `${targetUser2.name} ${action}` };
+        break;
+      }
+
       default:
         result = { success: false, message: `Unknown action: ${action}` };
     }
