@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  taskflow:
+    image: taskflow-pro:latest
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - INSTANCE_MODE=${INSTANCE_MODE:-subsidiary}
+      - SERVICE_TOKEN=${SERVICE_TOKEN:-}
+    volumes:
+      - taskflow_data:/app/backend/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/api/health", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  taskflow_data:

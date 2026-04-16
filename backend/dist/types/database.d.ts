@@ -1,0 +1,37 @@
+export interface IDatabase {
+    get(sql: string, params?: any[]): any;
+    all(sql: string, params?: any[]): any[];
+    run(sql: string, params?: any[]): void;
+    transaction(fn: () => void): void;
+    close(): void;
+    backup(backupPath: string): void;
+    getStats(): Promise<any>;
+    getSyncQueue(userId: string): any[];
+    addToSyncQueue(userId: string, action: string, table: string, recordId: string, data: any): void;
+    markSyncCompleted(queueId: string): void;
+    getFailedSyncs(userId: string): any[];
+    retryFailedSync(userId: string, queueId: string): boolean;
+    getUsers(): any[];
+    getUserById(id: string): any;
+    getUserByUsername(username: string): any;
+    createUser(user: any): void;
+    updateUser(id: string, updates: any): void;
+    deleteUser(id: string): void;
+    getDepartments(): any[];
+    getDepartmentById(id: string): any;
+    createDepartment(department: any): void;
+    updateDepartment(id: string, updates: any): void;
+    deleteDepartment(id: string): void;
+    getTasks(filters?: any): any[];
+    getTaskById(id: string): any;
+    createTask(task: any): void;
+    updateTask(id: string, updates: any): void;
+    deleteTask(id: string): void;
+    getAttendanceRecords(userId: string, filters?: any): any[];
+    getAttendanceById(id: string): any;
+    createAttendance(record: any): void;
+    updateAttendance(id: string, updates: any): void;
+    logAction(userId: string, userName: string, action: string, details: string, level: string): void;
+}
+export declare function isSecureDatabase(db: any): db is import('../database-v2').SecureDatabase;
+export declare function isLegacyDatabase(db: any): db is import('../database').Database;

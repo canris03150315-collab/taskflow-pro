@@ -1,34 +1,68 @@
+# ============================================================
+# TaskFlow Pro - Multi-stage Docker Build
+# Single image: nginx (frontend) + Node.js (backend)
+# ============================================================
+
+# ----- Stage 1: Build frontend -----
+FROM node:20-alpine AS frontend-build
+
+# Build arg for instance mode (central or subsidiary)
+ARG VITE_INSTANCE_MODE=subsidiary
+ENV VITE_INSTANCE_MODE=$VITE_INSTANCE_MODE
+
+WORKDIR /build
+
+# Install frontend dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# Copy frontend source and build
+COPY index.html index.tsx index.css vite.config.ts tsconfig*.json App.tsx types.ts ./
+COPY components/ ./components/
+COPY services/ ./services/
+COPY utils/ ./utils/
+RUN npm run build
+
+# ----- Stage 2: Production -----
 FROM node:20-alpine
 
-# 安裝必要的建置工具
-RUN apk add --no-cache python3 make g++
+# Install build tools for native modules (better-sqlite3, canvas) + nginx
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    nginx \
+    pkgconfig \
+    pixman-dev \
+    cairo-dev \
+    pango-dev \
+    libjpeg-turbo-dev \
+    giflib-dev \
+    librsvg-dev \
+    && rm -rf /var/cache/apk/*
 
-# 設定工作目錄
 WORKDIR /app
 
-# 複製 server 目錄的 package.json 和 package-lock.json
-COPY server/package*.json ./
+# Install backend dependencies
+COPY backend/package.json backend/package-lock.json* ./backend/
+RUN cd backend && npm ci --omit=dev && cd .. \
+    && apk del python3 make g++
 
-# 安裝依賴
-RUN npm install
+# Copy pre-compiled backend JavaScript (NO TypeScript compilation needed)
+COPY backend/dist/ ./backend/dist/
+COPY backend/services/ ./backend/services/
 
-# 複製 server 目錄的源代碼
-COPY server/ ./
+# Copy frontend build output from stage 1
+COPY --from=frontend-build /build/dist/ ./frontend/dist/
 
-# 創建必要的資料目錄
-RUN mkdir -p /app/data /app/data/uploads /app/data/backups /app/data/certificates /app/data/logs
+# Create data directories
+RUN mkdir -p /app/backend/data /app/backend/data/uploads /app/backend/data/backups /app/backend/data/logs
 
-# 建置應用程式（允許 TypeScript 錯誤）
-RUN npm run build || echo "Build completed with TypeScript errors"
+# Copy nginx config and entrypoint
+COPY deploy/nginx.conf /etc/nginx/http.d/default.conf
+COPY deploy/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-# 驗證關鍵文件是否生成
-RUN ls -la dist/ && \
-    test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1) && \
-    test -f dist/server.js || (echo "ERROR: dist/server.js not found!" && exit 1) && \
-    echo "✓ All required files generated"
+EXPOSE 80 443
 
-# 暴露端口
-EXPOSE 3000
-
-# 啟動應用程式
-CMD ["npm", "start"]
+CMD ["/app/entrypoint.sh"]

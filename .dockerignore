@@ -1,0 +1,56 @@
+# Dependencies (will be installed during build)
+node_modules
+backend/node_modules
+
+# Data and runtime files
+data/
+backend/data/
+*.db
+*.db-journal
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Build artifacts (frontend dist rebuilt in Docker, but keep backend/dist)
+/dist
+
+# Logs
+*.log
+logs/
+
+# Environment files (sensitive - but backend/.env needed for build context)
+.env
+!backend/.env
+
+# Certificates
+certificates/
+*.pem
+*.key
+*.crt
+
+# Deploy scripts (keep entrypoint.sh and nginx.conf for image)
+deploy/*.md
+deploy/*.sh.bak
+
+# Documentation
+*.md
+LICENSE
+
+# Old Dockerfiles
+Dockerfile.server
+
+# Misc
+*.tar.gz
+*.zip
