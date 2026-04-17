@@ -2026,6 +2026,11 @@ function AppContent() {
               </div>
             </div>
           )}
+
+          {/* Brand Footer */}
+          <div className="text-center text-xs text-slate-400 py-4 border-t border-slate-100 mt-8">
+            &copy; 2026 TaskFlow Pro
+          </div>
         </div>
       </main>
 
@@ -2156,11 +2161,6 @@ function AppContent() {
             isMinimized={window.isMinimized}
           />
         ))}
-      </div>
-
-      {/* 版本號顯示 */}
-      <div className="hidden md:block fixed bottom-2 right-2 text-xs text-slate-400 bg-white/80 px-2 py-1 rounded shadow-sm">
-        後端版本: {backendVersion}
       </div>
     </div>
   );
