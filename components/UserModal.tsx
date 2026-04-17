@@ -53,7 +53,7 @@ export const UserModal: React.FC<UserModalProps> = ({
         // Default values for new user
         setName('');
         setUsername('');
-        setPassword('1234');
+        setPassword('');
         setRole(Role.EMPLOYEE);
         // Supervisors default to their own department, else first available
         setDepartment(
@@ -293,7 +293,7 @@ export const UserModal: React.FC<UserModalProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-800"
-                    placeholder={editingUser ? '留空則不修改' : '1234'}
+                    placeholder={editingUser ? '留空則不修改' : '請輸入至少 6 位密碼'}
                   />
                 </div>
               </div>
