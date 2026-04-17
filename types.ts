@@ -625,3 +625,6 @@ export interface KOLOperationLog {
   changes: string;
   createdAt: string;
 }
+
+// Build-time injected version
+declare const __APP_VERSION__: string;

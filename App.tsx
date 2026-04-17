@@ -1910,7 +1910,11 @@ function AppContent() {
               {currentPage === 'backup-monitor' && <BackupMonitorView />}
               {currentPage === 'central-dashboard' && <CentralDashboardView />}
               {currentPage === 'settings' && (
-                <SystemSettingsView currentUser={currentUser} onLogout={handleLogout} />
+                <SystemSettingsView
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
+                  backendVersion={backendVersion}
+                />
               )}
             </Suspense>
           </ErrorBoundary>
