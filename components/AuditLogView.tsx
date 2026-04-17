@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from './Toast';
+import { EmptyState } from './EmptyState';
 import { User } from '../types';
 
 interface AuditLog {
@@ -31,7 +32,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
   const [actionFilter, setActionFilter] = useState('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  
+
   const pageSize = 20;
 
   useEffect(() => {
@@ -46,9 +47,9 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         limit: pageSize,
-        offset: (currentPage - 1) * pageSize
+        offset: (currentPage - 1) * pageSize,
       });
-      
+
       setLogs(response.logs);
       setTotal(response.total);
     } catch (error: any) {
@@ -64,11 +65,11 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       REQUEST: { bg: 'bg-blue-100', text: 'text-blue-800', label: '📤 申請' },
       APPROVE: { bg: 'bg-green-100', text: 'text-green-800', label: '✅ 批准' },
       REJECT: { bg: 'bg-red-100', text: 'text-red-800', label: '❌ 拒絕' },
-      REVOKE: { bg: 'bg-gray-100', text: 'text-gray-800', label: '🔄 撤銷' }
+      REVOKE: { bg: 'bg-gray-100', text: 'text-gray-800', label: '🔄 撤銷' },
     };
-    
+
     const badge = badges[action] || { bg: 'bg-gray-100', text: 'text-gray-800', label: action };
-    
+
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
         {badge.label}
@@ -82,7 +83,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -96,9 +97,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">📋 審核歷史記錄</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            查看所有報表審核操作記錄 · 共 {total} 條記錄
-          </p>
+          <p className="text-sm text-gray-600 mt-1">查看所有報表審核操作記錄 · 共 {total} 條記錄</p>
         </div>
       </div>
 
@@ -107,9 +106,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Action Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              操作類型
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">操作類型</label>
             <select
               value={actionFilter}
               onChange={(e) => {
@@ -128,9 +125,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
 
           {/* Start Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              開始日期
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">開始日期</label>
             <input
               type="date"
               value={startDate}
@@ -144,9 +139,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
 
           {/* End Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              結束日期
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">結束日期</label>
             <input
               type="date"
               value={endDate}
@@ -178,13 +171,9 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       {/* Audit Logs Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">
-            載入中...
-          </div>
+          <div className="p-8 text-center text-gray-500">載入中...</div>
         ) : logs.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            沒有找到審核記錄
-          </div>
+          <EmptyState icon="🔍" title="沒有找到審核記錄" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -213,13 +202,13 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(log.created_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getActionBadge(log.action)}
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{getActionBadge(log.action)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
                         <div className="font-medium text-gray-900">{log.user_name}</div>
-                        <div className="text-gray-500">{log.user_dept} · {log.user_role}</div>
+                        <div className="text-gray-500">
+                          {log.user_dept} · {log.user_role}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -240,11 +229,12 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       {totalPages > 1 && (
         <div className="flex items-center justify-between bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
           <div className="text-sm text-gray-700">
-            顯示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, total)} 條，共 {total} 條記錄
+            顯示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, total)}{' '}
+            條，共 {total} 條記錄
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -262,7 +252,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
                 } else {
                   pageNum = currentPage - 2 + i;
                 }
-                
+
                 return (
                   <button
                     key={pageNum}
@@ -279,7 +269,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
               })}
             </div>
             <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >

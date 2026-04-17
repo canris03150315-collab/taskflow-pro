@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, RoutineTemplate, Role, DepartmentDef } from '../types';
 import { api } from '../services/api';
 import { showConfirm } from '../utils/dialogService';
+import { EmptyState } from './EmptyState';
 
 interface DocumentLibraryViewProps {
   currentUser: User;
@@ -9,10 +10,10 @@ interface DocumentLibraryViewProps {
   departments: DepartmentDef[];
 }
 
-export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({ 
-  currentUser, 
-  users, 
-  departments 
+export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
+  currentUser,
+  users,
+  departments,
 }) => {
   const [documents, setDocuments] = useState<RoutineTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +34,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
     try {
       const templates = await api.routines.getTemplates();
       // 只取部門文件（非每日任務）
-      const docs = templates.filter(t => !t.isDaily);
+      const docs = templates.filter((t) => !t.isDaily);
       setDocuments(docs);
     } catch (error) {
       console.error('載入文件失敗:', error);
@@ -44,29 +45,29 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
 
   // 過濾文件
   const filteredDocuments = useMemo(() => {
-    return documents.filter(doc => {
+    return documents.filter((doc) => {
       // 強制過濾：絕對不顯示每日任務
       if (doc.isDaily === true) return false;
-      
+
       // 部門過濾
       if (doc.departmentId !== selectedDept) return false;
-      
+
       // 搜尋過濾
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        return doc.title.toLowerCase().includes(term) ||
-               doc.items?.some(item => item.toLowerCase().includes(term));
+        return (
+          doc.title.toLowerCase().includes(term) ||
+          doc.items?.some((item) => item.toLowerCase().includes(term))
+        );
       }
-      
+
       return true;
     });
   }, [documents, selectedDept, searchTerm]);
 
   // 計算未讀文件數量
   const unreadCount = useMemo(() => {
-    return filteredDocuments.filter(doc => 
-      !doc.readBy?.includes(currentUser.id)
-    ).length;
+    return filteredDocuments.filter((doc) => !doc.readBy?.includes(currentUser.id)).length;
   }, [filteredDocuments, currentUser.id]);
 
   const handleConfirmRead = async (docId: string) => {
@@ -75,11 +76,11 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
     setReadingDocId(null);
   };
 
-  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
+  const getDeptName = (id: string) => departments.find((d) => d.id === id)?.name || id;
 
   // 閱讀模式
   if (readingDocId) {
-    const doc = documents.find(d => d.id === readingDocId);
+    const doc = documents.find((d) => d.id === readingDocId);
     if (!doc) return null;
 
     const isRead = doc.readBy?.includes(currentUser.id);
@@ -93,7 +94,12 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
             className="flex items-center gap-2 text-slate-600 hover:text-slate-800 font-bold mb-6 transition"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
             返回文件列表
           </button>
@@ -119,9 +125,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
                 <span className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-600 border-2 border-blue-200">
                   {idx + 1}
                 </span>
-                <p className="text-slate-700 leading-relaxed whitespace-pre-line flex-1">
-                  {item}
-                </p>
+                <p className="text-slate-700 leading-relaxed whitespace-pre-line flex-1">{item}</p>
               </div>
             ))}
           </div>
@@ -169,8 +173,18 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
-          <svg className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
         </div>
 
@@ -180,8 +194,10 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
             onChange={(e) => setSelectedDept(e.target.value)}
             className="px-4 py-3 bg-white border-2 border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
             ))}
           </select>
         )}
@@ -210,15 +226,14 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
       {/* 文件卡片列表 */}
       <div className="grid grid-cols-1 gap-4">
         {filteredDocuments.length === 0 ? (
-          <div className="text-center py-16 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-            <div className="text-4xl mb-2 grayscale opacity-30">📂</div>
-            <p>{searchTerm ? '找不到符合的文件' : '目前沒有文件'}</p>
-          </div>
+          <EmptyState icon="📂" title={searchTerm ? '找不到符合的文件' : '目前沒有文件'} />
         ) : (
-          filteredDocuments.map(doc => {
+          filteredDocuments.map((doc) => {
             const isRead = doc.readBy?.includes(currentUser.id);
             const readCount = doc.readBy?.length || 0;
-            const totalUsers = users.filter(u => u.department === doc.departmentId && u.role === Role.EMPLOYEE).length;
+            const totalUsers = users.filter(
+              (u) => u.department === doc.departmentId && u.role === Role.EMPLOYEE
+            ).length;
             const readPercentage = totalUsers > 0 ? Math.round((readCount / totalUsers) * 100) : 0;
 
             return (
@@ -242,8 +257,18 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
 
                     {isRead ? (
                       <div className="flex items-center gap-2 bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-bold border border-emerald-200">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
                         已確認
                       </div>
@@ -259,7 +284,9 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
                     <div className="mb-4 p-3 bg-slate-50 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-bold text-slate-600">閱讀狀態</span>
-                        <span className="text-sm font-bold text-blue-600">{readCount}/{totalUsers} 人已讀 ({readPercentage}%)</span>
+                        <span className="text-sm font-bold text-blue-600">
+                          {readCount}/{totalUsers} 人已讀 ({readPercentage}%)
+                        </span>
                       </div>
                       <div className="w-full bg-slate-200 rounded-full h-2">
                         <div
@@ -272,7 +299,8 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
 
                   {/* 文件資訊 */}
                   <p className="text-sm text-slate-500 mb-4">
-                    包含 {doc.items?.length || 0} 個段落 • 預計閱讀時間 {Math.ceil((doc.items?.length || 0) * 0.5)} 分鐘
+                    包含 {doc.items?.length || 0} 個段落 • 預計閱讀時間{' '}
+                    {Math.ceil((doc.items?.length || 0) * 0.5)} 分鐘
                   </p>
 
                   {/* 操作按鈕 */}

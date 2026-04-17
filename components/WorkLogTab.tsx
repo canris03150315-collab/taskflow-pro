@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { WorkLog, User, DepartmentDef, Role } from '../types';
 import { api } from '../services/api';
 import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
+import { EmptyState } from './EmptyState';
 
 interface WorkLogTabProps {
   currentUser: User;
@@ -26,36 +27,35 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
     date: getLocalDate(),
     todayTasks: '',
     tomorrowTasks: '',
-    notes: ''
+    notes: '',
   });
 
   // Permission check
   const canViewAllDepts = currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
-  const availableDepts = canViewAllDepts 
-    ? departments 
-    : departments.filter(d => d.id === currentUser.department);
+  const availableDepts = canViewAllDepts
+    ? departments
+    : departments.filter((d) => d.id === currentUser.department);
 
   // Filter users by selected department
-  const filteredUsers = selectedDept === 'ALL' 
-    ? users 
-    : users.filter(u => u.department === selectedDept);
+  const filteredUsers =
+    selectedDept === 'ALL' ? users : users.filter((u) => u.department === selectedDept);
 
   // Load logs
   const loadLogs = async () => {
     setLoading(true);
     try {
       const params: any = { date: selectedDate };
-      
+
       if (selectedDept !== 'ALL') {
         params.departmentId = selectedDept;
       }
-      
+
       if (selectedUser !== 'ALL') {
         params.userId = selectedUser;
       }
 
       const response = await api.workLogs.getAll(params);
-      setLogs(Array.isArray(response) ? response : (response.logs || []));
+      setLogs(Array.isArray(response) ? response : response.logs || []);
     } catch (error) {
       console.error('Failed to load work logs:', error);
       showError('載入工作日誌失敗');
@@ -83,7 +83,7 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       date: selectedDate,
       todayTasks: '',
       tomorrowTasks: '',
-      notes: ''
+      notes: '',
     });
     setFormError('');
     setIsModalOpen(true);
@@ -95,14 +95,14 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       date: log.date,
       todayTasks: log.todayTasks,
       tomorrowTasks: log.tomorrowTasks,
-      notes: log.notes
+      notes: log.notes,
     });
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     setFormError('');
     if (!formData.todayTasks.trim() || !formData.tomorrowTasks.trim()) {
       showWarning('請填寫今日工作事項和明天工作事項');
@@ -114,19 +114,21 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
         await api.workLogs.update(editingLog.id, {
           todayTasks: formData.todayTasks,
           tomorrowTasks: formData.tomorrowTasks,
-          notes: formData.notes
+          notes: formData.notes,
         });
       } else {
         await api.workLogs.create(formData);
       }
-      
+
       setIsModalOpen(false);
       showSuccess(editingLog ? '工作日誌已更新' : '工作日誌已建立');
       await loadLogs();
     } catch (error: any) {
       console.error('Failed to save work log:', error);
       const msg = error.message || '保存失敗';
-      const displayMsg = msg.includes('already exists') ? '今天的工作日誌已存在，無法重複建立' : msg;
+      const displayMsg = msg.includes('already exists')
+        ? '今天的工作日誌已存在，無法重複建立'
+        : msg;
       setFormError(displayMsg);
       showError(displayMsg);
     }
@@ -160,8 +162,10 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">全部部門</option>
-              {availableDepts.map(dept => (
-                <option key={dept.id} value={dept.id}>{dept.name}</option>
+              {availableDepts.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
               ))}
             </select>
           </div>
@@ -175,8 +179,10 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
             <option value="ALL">全部員工</option>
-            {filteredUsers.map(user => (
-              <option key={user.id} value={user.id}>{user.name}</option>
+            {filteredUsers.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
             ))}
           </select>
         </div>
@@ -205,14 +211,17 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       {loading ? (
         <div className="text-center py-8 text-gray-500">載入中...</div>
       ) : !logs || logs.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          {selectedDate === new Date().toISOString().split('T')[0] 
-            ? '今天還沒有工作日誌' 
-            : '這天沒有工作日誌'}
-        </div>
+        <EmptyState
+          icon="📓"
+          title={
+            selectedDate === new Date().toISOString().split('T')[0]
+              ? '今天還沒有工作日誌'
+              : '這天沒有工作日誌'
+          }
+        />
       ) : (
         <div className="space-y-4">
-          {logs.map(log => (
+          {logs.map((log) => (
             <div key={log.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -280,9 +289,7 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
               )}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    日期
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">日期</label>
                   <input
                     type="date"
                     value={formData.date}

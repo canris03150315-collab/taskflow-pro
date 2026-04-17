@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { User, Task, Role, TaskStatus, DepartmentDef } from '../types';
 import { Badge } from './Badge';
+import { EmptyState } from './EmptyState';
 import { api } from '../services/api';
 
 interface RoutineRecord {
@@ -18,7 +19,12 @@ interface SubordinateViewProps {
   departments: DepartmentDef[];
 }
 
-export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, users, tasks, departments }) => {
+export const SubordinateView: React.FC<SubordinateViewProps> = ({
+  currentUser,
+  users,
+  tasks,
+  departments,
+}) => {
   const [routineRecords, setRoutineRecords] = useState<Record<string, RoutineRecord>>({});
   const [showRoutines, setShowRoutines] = useState(false);
 
@@ -29,31 +35,31 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
   const [viewMode, setViewMode] = useState<'DASHBOARD' | 'DEPT_LIST' | 'USER_DETAIL'>(
     currentUser.role === Role.BOSS ? 'DASHBOARD' : 'DEPT_LIST'
   );
-  
+
   // Selection State
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
 
   // Init for supervisor
   if (currentUser.role === Role.SUPERVISOR && selectedDept === 'ALL') {
-      setSelectedDept(currentUser.department);
+    setSelectedDept(currentUser.department);
   }
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Department Helpers
-  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
-  const getDeptDef = (id: string) => departments.find(d => d.id === id);
+  const getDeptName = (id: string) => departments.find((d) => d.id === id)?.name || id;
+  const getDeptDef = (id: string) => departments.find((d) => d.id === id);
 
   const getDeptColorClass = (id: string) => {
     const theme = getDeptDef(id)?.theme || 'slate';
     const map: Record<string, string> = {
-        slate: 'bg-slate-800 text-white',
-        blue: 'bg-blue-600 text-white',
-        purple: 'bg-purple-600 text-white',
-        rose: 'bg-rose-500 text-white',
-        emerald: 'bg-emerald-600 text-white',
-        orange: 'bg-orange-600 text-white',
-        cyan: 'bg-cyan-600 text-white'
+      slate: 'bg-slate-800 text-white',
+      blue: 'bg-blue-600 text-white',
+      purple: 'bg-purple-600 text-white',
+      rose: 'bg-rose-500 text-white',
+      emerald: 'bg-emerald-600 text-white',
+      orange: 'bg-orange-600 text-white',
+      cyan: 'bg-cyan-600 text-white',
     };
     return map[theme] || map['slate'];
   };
@@ -81,50 +87,65 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
 
   const getDeptStats = (deptId: string) => {
     // 包含部門內所有成員（不只是 EMPLOYEE）
-    const deptMembers = users.filter(u => u.department === deptId);
-    const memberIds = deptMembers.map(u => u.id);
-    
+    const deptMembers = users.filter((u) => u.department === deptId);
+    const memberIds = deptMembers.map((u) => u.id);
+
     // 任務來源：指派給部門成員、部門成員接取、或目標部門為此部門
-    const deptTasks = tasks.filter(t => 
-      (t.assignedToUserId && memberIds.includes(t.assignedToUserId)) || 
-      (t.acceptedByUserId && memberIds.includes(t.acceptedByUserId)) ||
-      (t.targetDepartment === deptId)
+    const deptTasks = tasks.filter(
+      (t) =>
+        (t.assignedToUserId && memberIds.includes(t.assignedToUserId)) ||
+        (t.acceptedByUserId && memberIds.includes(t.acceptedByUserId)) ||
+        t.targetDepartment === deptId
     );
 
-    const activeCount = deptTasks.filter(t => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS).length;
-    const pendingCount = deptTasks.filter(t => {
+    const activeCount = deptTasks.filter(
+      (t) => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS
+    ).length;
+    const pendingCount = deptTasks.filter((t) => {
       const normalized = normalizeStatus(t.status);
       return normalized === TaskStatus.ASSIGNED || normalized === TaskStatus.OPEN;
     }).length;
-    const completedCount = deptTasks.filter(t => normalizeStatus(t.status) === TaskStatus.COMPLETED).length;
+    const completedCount = deptTasks.filter(
+      (t) => normalizeStatus(t.status) === TaskStatus.COMPLETED
+    ).length;
 
-    return { 
-        employeeCount: deptMembers.length, 
-        activeCount,
-        pendingCount,
-        completedCount,
-        totalTasks: deptTasks.length
+    return {
+      employeeCount: deptMembers.length,
+      activeCount,
+      pendingCount,
+      completedCount,
+      totalTasks: deptTasks.length,
     };
   };
 
   const getEmployeeStats = (userId: string) => {
     // 包含指派給用戶、用戶接取、或用戶創建的任務
-    const userTasks = tasks.filter(t => 
-      t.assignedToUserId === userId || 
-      t.acceptedByUserId === userId ||
-      t.createdBy === userId
+    const userTasks = tasks.filter(
+      (t) =>
+        t.assignedToUserId === userId || t.acceptedByUserId === userId || t.createdBy === userId
     );
 
-    const pending = userTasks.filter(t => {
+    const pending = userTasks.filter((t) => {
       const normalized = normalizeStatus(t.status);
       return normalized === TaskStatus.ASSIGNED || normalized === TaskStatus.OPEN;
     }).length;
-    const active = userTasks.filter(t => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS).length;
-    const completed = userTasks.filter(t => normalizeStatus(t.status) === TaskStatus.COMPLETED).length;
-    
-    const currentTask = userTasks.find(t => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS);
+    const active = userTasks.filter(
+      (t) => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS
+    ).length;
+    const completed = userTasks.filter(
+      (t) => normalizeStatus(t.status) === TaskStatus.COMPLETED
+    ).length;
 
-    return { total: userTasks.length, pending, active, completed, currentTask, allTasks: userTasks };
+    const currentTask = userTasks.find((t) => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS);
+
+    return {
+      total: userTasks.length,
+      pending,
+      active,
+      completed,
+      currentTask,
+      allTasks: userTasks,
+    };
   };
 
   // --- Filter Logic ---
@@ -133,14 +154,16 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
 
     if (currentUser.role === Role.SUPERVISOR) {
       // 主管只能看自己部門的一般員工
-      targets = users.filter(u => u.role === Role.EMPLOYEE && u.department === currentUser.department);
+      targets = users.filter(
+        (u) => u.role === Role.EMPLOYEE && u.department === currentUser.department
+      );
     } else if (currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER) {
       // BOSS/MANAGER 可以看到所有非 BOSS 的成員（包含 MANAGER、SUPERVISOR、EMPLOYEE）
       // 當查看特定部門時，顯示所有該部門成員（包含自己）
       if (selectedDept !== 'ALL') {
-        targets = users.filter(u => u.department === selectedDept && u.role !== Role.BOSS);
+        targets = users.filter((u) => u.department === selectedDept && u.role !== Role.BOSS);
       } else {
-        targets = users.filter(u => u.role !== Role.BOSS && u.id !== currentUser.id);
+        targets = users.filter((u) => u.role !== Role.BOSS && u.id !== currentUser.id);
       }
     } else {
       return [];
@@ -153,11 +176,11 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
 
   // Reset pagination when dept changes
   useMemo(() => {
-      setVisibleCount(20);
+    setVisibleCount(20);
   }, [selectedDept, viewMode]);
 
   const visibleSubordinates = useMemo(() => {
-      return subordinates.slice(0, visibleCount);
+    return subordinates.slice(0, visibleCount);
   }, [subordinates, visibleCount]);
 
   // --- Handlers ---
@@ -187,176 +210,240 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
   // --- RENDER: LEVEL 1 - DASHBOARD VIEW (Boss Only) ---
   if (viewMode === 'DASHBOARD' && currentUser.role === Role.BOSS) {
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="border-b border-slate-200 pb-4">
-                <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                    <span>📊</span> 團隊工作總覽
-                </h2>
-                <p className="text-sm text-slate-500 font-bold mt-1">
-                    請選擇部門以查看詳細人員清單
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {departments.map(dept => {
-                    const stats = getDeptStats(dept.id);
-                    return (
-                        <button 
-                            key={dept.id} 
-                            onClick={() => handleDeptClick(dept.id)}
-                            className={`relative rounded-xl border p-6 text-left transition-all shadow-sm hover:shadow-lg group ${getDeptBgClass(dept.id)}`}
-                        >
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-md ${getDeptColorClass(dept.id)}`}>
-                                        <span className="text-lg font-bold">{dept.name[0]}</span>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-slate-800">{dept.name}</h3>
-                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                            {stats.employeeCount} 位成員
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="p-2 bg-white/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-2">
-                                <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
-                                    <div className="text-2xl font-black text-slate-700">{stats.activeCount}</div>
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase">進行中</div>
-                                </div>
-                                <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
-                                    <div className="text-2xl font-black text-slate-700">{stats.pendingCount}</div>
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase">待處理</div>
-                                </div>
-                                <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
-                                    <div className="text-2xl font-black text-slate-700">{stats.completedCount}</div>
-                                    <div className="text-[10px] font-bold text-slate-500 uppercase">已完成</div>
-                                </div>
-                            </div>
-                        </button>
-                    );
-                })}
-            </div>
+      <div className="space-y-6 animate-fade-in">
+        <div className="border-b border-slate-200 pb-4">
+          <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+            <span>📊</span> 團隊工作總覽
+          </h2>
+          <p className="text-sm text-slate-500 font-bold mt-1">請選擇部門以查看詳細人員清單</p>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {departments.map((dept) => {
+            const stats = getDeptStats(dept.id);
+            return (
+              <button
+                key={dept.id}
+                onClick={() => handleDeptClick(dept.id)}
+                className={`relative rounded-xl border p-6 text-left transition-all shadow-sm hover:shadow-lg group ${getDeptBgClass(dept.id)}`}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-md ${getDeptColorClass(dept.id)}`}
+                    >
+                      <span className="text-lg font-bold">{dept.name[0]}</span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-800">{dept.name}</h3>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        {stats.employeeCount} 位成員
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-2 bg-white/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg
+                      className="w-5 h-5 text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M9 5l7 7-7 7"
+                      ></path>
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
+                    <div className="text-2xl font-black text-slate-700">{stats.activeCount}</div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase">進行中</div>
+                  </div>
+                  <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
+                    <div className="text-2xl font-black text-slate-700">{stats.pendingCount}</div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase">待處理</div>
+                  </div>
+                  <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
+                    <div className="text-2xl font-black text-slate-700">{stats.completedCount}</div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase">已完成</div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   }
 
   // --- RENDER: LEVEL 3 - USER TASK DETAIL VIEW ---
   if (viewMode === 'USER_DETAIL' && selectedUser) {
     const stats = getEmployeeStats(selectedUser.id);
-    const activeTasks = stats.allTasks.filter(t => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS);
-    const pendingTasks = stats.allTasks.filter(t => {
+    const activeTasks = stats.allTasks.filter(
+      (t) => normalizeStatus(t.status) === TaskStatus.IN_PROGRESS
+    );
+    const pendingTasks = stats.allTasks.filter((t) => {
       const normalized = normalizeStatus(t.status);
       return normalized === TaskStatus.ASSIGNED || normalized === TaskStatus.OPEN;
     });
-    const completedTasks = stats.allTasks.filter(t => normalizeStatus(t.status) === TaskStatus.COMPLETED);
+    const completedTasks = stats.allTasks.filter(
+      (t) => normalizeStatus(t.status) === TaskStatus.COMPLETED
+    );
 
     return (
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center gap-4 border-b border-slate-200 pb-4">
-           <button onClick={handleBack} className="p-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-           </button>
-           <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full border border-slate-200 overflow-hidden">
-                <img src={selectedUser.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(selectedUser.name || 'default')}`} alt={selectedUser.name} className="w-full h-full object-cover" />
+          <button
+            onClick={handleBack}
+            className="p-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-blue-600 transition"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              ></path>
+            </svg>
+          </button>
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full border border-slate-200 overflow-hidden">
+              <img
+                src={
+                  selectedUser.avatar ||
+                  `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(selectedUser.name || 'default')}`
+                }
+                alt={selectedUser.name}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">
+                {selectedUser.name} 的工作詳情
+              </h2>
+              <div className="flex items-center gap-2 text-sm text-slate-500 font-bold">
+                <span>{getDeptName(selectedUser.department)}</span>
+                <span className="text-slate-300">|</span>
+                <span>{selectedUser.username}</span>
               </div>
-              <div>
-                <h2 className="text-xl font-black text-slate-800 tracking-tight">
-                  {selectedUser.name} 的工作詳情
-                </h2>
-                <div className="flex items-center gap-2 text-sm text-slate-500 font-bold">
-                   <span>{getDeptName(selectedUser.department)}</span>
-                   <span className="text-slate-300">|</span>
-                   <span>{selectedUser.username}</span>
-                </div>
-              </div>
-           </div>
+            </div>
+          </div>
         </div>
 
         {/* Task Columns */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-250px)] overflow-hidden">
-           
-           {/* Column 1: Active */}
-           <div className="flex flex-col bg-blue-50/50 rounded-xl border border-blue-100 overflow-hidden">
-              <div className="p-4 bg-blue-100/50 border-b border-blue-200 flex justify-between items-center">
-                 <h3 className="font-bold text-blue-800 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> 進行中
-                 </h3>
-                 <span className="bg-white text-blue-600 px-2 py-0.5 rounded text-xs font-bold">{activeTasks.length}</span>
-              </div>
-              <div className="p-3 overflow-y-auto space-y-3 flex-1">
-                 {activeTasks.length === 0 && <div className="text-center py-10 text-slate-400 text-sm italic">無進行中任務</div>}
-                 {activeTasks.map(task => (
-                    <div key={task.id} className="bg-white p-4 rounded-lg shadow-sm border border-blue-200 border-l-4 border-l-blue-500">
-                       <div className="flex justify-between items-start mb-2">
-                          <Badge type="urgency" value={task.urgency} />
-                          {task.deadline && <span className="text-xs font-bold text-red-500">{task.deadline.split('T')[0]}</span>}
-                       </div>
-                       <h4 className="font-bold text-slate-800 mb-2">{task.title}</h4>
-                       <p className="text-xs text-slate-500 line-clamp-2">{task.description}</p>
-                    </div>
-                 ))}
-              </div>
-           </div>
+          {/* Column 1: Active */}
+          <div className="flex flex-col bg-blue-50/50 rounded-xl border border-blue-100 overflow-hidden">
+            <div className="p-4 bg-blue-100/50 border-b border-blue-200 flex justify-between items-center">
+              <h3 className="font-bold text-blue-800 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span> 進行中
+              </h3>
+              <span className="bg-white text-blue-600 px-2 py-0.5 rounded text-xs font-bold">
+                {activeTasks.length}
+              </span>
+            </div>
+            <div className="p-3 overflow-y-auto space-y-3 flex-1">
+              {activeTasks.length === 0 && (
+                <div className="text-center py-10 text-slate-400 text-sm italic">無進行中任務</div>
+              )}
+              {activeTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="bg-white p-4 rounded-lg shadow-sm border border-blue-200 border-l-4 border-l-blue-500"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge type="urgency" value={task.urgency} />
+                    {task.deadline && (
+                      <span className="text-xs font-bold text-red-500">
+                        {task.deadline.split('T')[0]}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-slate-800 mb-2">{task.title}</h4>
+                  <p className="text-xs text-slate-500 line-clamp-2">{task.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
-           {/* Column 2: Pending */}
-           <div className="flex flex-col bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-              <div className="p-4 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
-                 <h3 className="font-bold text-slate-700 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-400"></span> 待處理
-                 </h3>
-                 <span className="bg-white text-slate-600 px-2 py-0.5 rounded text-xs font-bold">{pendingTasks.length}</span>
-              </div>
-              <div className="p-3 overflow-y-auto space-y-3 flex-1">
-                 {pendingTasks.length === 0 && <div className="text-center py-10 text-slate-400 text-sm italic">無待處理任務</div>}
-                 {pendingTasks.map(task => (
-                    <div key={task.id} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 hover:border-slate-300 transition">
-                       <div className="flex justify-between items-start mb-2">
-                          <Badge type="urgency" value={task.urgency} />
-                          {task.deadline && <span className="text-xs font-mono text-slate-400">{task.deadline.split('T')[0]}</span>}
-                       </div>
-                       <h4 className="font-bold text-slate-700 mb-1">{task.title}</h4>
-                       <div className="text-xs text-slate-400 mt-2 flex items-center gap-1">
-                          <span>分派人:</span>
-                          <span className="font-bold">{users.find(u => u.id === task.createdBy)?.name}</span>
-                       </div>
-                    </div>
-                 ))}
-              </div>
-           </div>
+          {/* Column 2: Pending */}
+          <div className="flex flex-col bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-4 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
+              <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-slate-400"></span> 待處理
+              </h3>
+              <span className="bg-white text-slate-600 px-2 py-0.5 rounded text-xs font-bold">
+                {pendingTasks.length}
+              </span>
+            </div>
+            <div className="p-3 overflow-y-auto space-y-3 flex-1">
+              {pendingTasks.length === 0 && (
+                <div className="text-center py-10 text-slate-400 text-sm italic">無待處理任務</div>
+              )}
+              {pendingTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 hover:border-slate-300 transition"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge type="urgency" value={task.urgency} />
+                    {task.deadline && (
+                      <span className="text-xs font-mono text-slate-400">
+                        {task.deadline.split('T')[0]}
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-bold text-slate-700 mb-1">{task.title}</h4>
+                  <div className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                    <span>分派人:</span>
+                    <span className="font-bold">
+                      {users.find((u) => u.id === task.createdBy)?.name}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-           {/* Column 3: Completed */}
-           <div className="flex flex-col bg-emerald-50/30 rounded-xl border border-emerald-100 overflow-hidden">
-              <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center">
-                 <h3 className="font-bold text-emerald-700 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> 已完成
-                 </h3>
-                 <span className="bg-white text-emerald-600 px-2 py-0.5 rounded text-xs font-bold">{completedTasks.length}</span>
-              </div>
-              <div className="p-3 overflow-y-auto space-y-3 flex-1">
-                 {completedTasks.length === 0 && <div className="text-center py-10 text-slate-400 text-sm italic">無已完成任務</div>}
-                 {completedTasks.map(task => (
-                    <div key={task.id} className="bg-white p-4 rounded-lg shadow-sm border border-emerald-100 opacity-80 hover:opacity-100 transition">
-                       <div className="flex items-center gap-2 mb-2">
-                          <span className="text-emerald-500">✔</span>
-                          <h4 className="font-bold text-slate-600 line-through decoration-slate-300">{task.title}</h4>
-                       </div>
-                       {task.completionNotes && (
-                          <div className="text-xs bg-emerald-50 text-emerald-700 p-2 rounded mt-1 italic">
-                             "{task.completionNotes}"
-                          </div>
-                       )}
+          {/* Column 3: Completed */}
+          <div className="flex flex-col bg-emerald-50/30 rounded-xl border border-emerald-100 overflow-hidden">
+            <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center">
+              <h3 className="font-bold text-emerald-700 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> 已完成
+              </h3>
+              <span className="bg-white text-emerald-600 px-2 py-0.5 rounded text-xs font-bold">
+                {completedTasks.length}
+              </span>
+            </div>
+            <div className="p-3 overflow-y-auto space-y-3 flex-1">
+              {completedTasks.length === 0 && (
+                <div className="text-center py-10 text-slate-400 text-sm italic">無已完成任務</div>
+              )}
+              {completedTasks.map((task) => (
+                <div
+                  key={task.id}
+                  className="bg-white p-4 rounded-lg shadow-sm border border-emerald-100 opacity-80 hover:opacity-100 transition"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-emerald-500">✔</span>
+                    <h4 className="font-bold text-slate-600 line-through decoration-slate-300">
+                      {task.title}
+                    </h4>
+                  </div>
+                  {task.completionNotes && (
+                    <div className="text-xs bg-emerald-50 text-emerald-700 p-2 rounded mt-1 italic">
+                      "{task.completionNotes}"
                     </div>
-                 ))}
-              </div>
-           </div>
-
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -365,19 +452,28 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
   // --- RENDER: LEVEL 2 - DEPT LIST VIEW ---
   return (
     <div className="space-y-6 animate-fade-in">
-      
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4 border-b border-slate-200 pb-4">
         <div>
           <div className="flex items-center gap-2">
-              {currentUser.role === Role.BOSS && (
-                  <button onClick={handleBack} className="text-slate-400 hover:text-blue-600 transition p-1 -ml-1">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                  </button>
-              )}
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                  <span>👥</span> {selectedDept === 'ALL' ? '所有人員' : getDeptName(selectedDept)}
-              </h2>
+            {currentUser.role === Role.BOSS && (
+              <button
+                onClick={handleBack}
+                className="text-slate-400 hover:text-blue-600 transition p-1 -ml-1"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  ></path>
+                </svg>
+              </button>
+            )}
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+              <span>👥</span> {selectedDept === 'ALL' ? '所有人員' : getDeptName(selectedDept)}
+            </h2>
           </div>
           <p className="text-sm text-slate-500 font-bold mt-1 pl-1">
             人員工作概況清單 <span className="text-blue-500">(點擊卡片查看詳情)</span>
@@ -386,13 +482,15 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
 
         {/* Boss Dropdown */}
         {currentUser.role === Role.BOSS && (
-          <select 
+          <select
             value={selectedDept}
             onChange={(e) => handleDeptClick(e.target.value)}
             className="px-4 py-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
             ))}
           </select>
         )}
@@ -400,13 +498,14 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {visibleSubordinates.map(user => {
+        {visibleSubordinates.map((user) => {
           const stats = getEmployeeStats(user.id);
-          const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-          
+          const completionRate =
+            stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+
           return (
-            <button 
-              key={user.id} 
+            <button
+              key={user.id}
               onClick={() => handleUserClick(user)}
               className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:border-blue-300 hover:-translate-y-1 transition p-5 flex flex-col relative overflow-hidden group text-left w-full"
             >
@@ -416,11 +515,22 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
               {/* User Info */}
               <div className="flex items-center gap-4 mb-6 relative z-10">
                 <div className="w-16 h-16 rounded-full p-1 bg-slate-100 border border-slate-200 group-hover:border-blue-300 transition">
-                  <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-full h-full rounded-full bg-white" />
+                  <img
+                    src={
+                      user.avatar ||
+                      `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`
+                    }
+                    alt={user.name}
+                    className="w-full h-full rounded-full bg-white"
+                  />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-700 transition">{user.name}</h3>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{getDeptName(user.department)}</div>
+                  <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-700 transition">
+                    {user.name}
+                  </h3>
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    {getDeptName(user.department)}
+                  </div>
                   <div className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded inline-block">
                     {user.username}
                   </div>
@@ -430,16 +540,16 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
               {/* Stats Grid */}
               <div className="grid grid-cols-3 gap-2 mb-6">
                 <div className="text-center p-2 bg-slate-50 rounded-lg border border-slate-100 group-hover:bg-white group-hover:border-slate-200 transition">
-                   <div className="text-xs text-slate-400 font-bold mb-1">待處理</div>
-                   <div className="text-xl font-black text-slate-700">{stats.pending}</div>
+                  <div className="text-xs text-slate-400 font-bold mb-1">待處理</div>
+                  <div className="text-xl font-black text-slate-700">{stats.pending}</div>
                 </div>
                 <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-100 group-hover:bg-blue-100 group-hover:border-blue-200 transition">
-                   <div className="text-xs text-blue-400 font-bold mb-1">進行中</div>
-                   <div className="text-xl font-black text-blue-600">{stats.active}</div>
+                  <div className="text-xs text-blue-400 font-bold mb-1">進行中</div>
+                  <div className="text-xl font-black text-blue-600">{stats.active}</div>
                 </div>
                 <div className="text-center p-2 bg-emerald-50 rounded-lg border border-emerald-100 group-hover:bg-emerald-100 group-hover:border-emerald-200 transition">
-                   <div className="text-xs text-emerald-500 font-bold mb-1">已完成</div>
-                   <div className="text-xl font-black text-emerald-600">{stats.completed}</div>
+                  <div className="text-xs text-emerald-500 font-bold mb-1">已完成</div>
+                  <div className="text-xl font-black text-emerald-600">{stats.completed}</div>
                 </div>
               </div>
 
@@ -459,41 +569,47 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({ currentUser, u
               {/* Completion Progress */}
               <div className="mt-auto w-full">
                 <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
-                   <span>任務完成率</span>
-                   <span>{completionRate}%</span>
+                  <span>任務完成率</span>
+                  <span>{completionRate}%</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                   <div 
-                     className={`h-full rounded-full transition-all duration-500 ${completionRate === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`} 
-                     style={{ width: `${completionRate}%` }}
-                   ></div>
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${completionRate === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                    style={{ width: `${completionRate}%` }}
+                  ></div>
                 </div>
               </div>
-              
-              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
-              </div>
 
+              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M13 7l5 5m0 0l-5 5m5-5H6"
+                  ></path>
+                </svg>
+              </div>
             </button>
           );
         })}
 
         {subordinates.length === 0 && (
-           <div className="col-span-full py-10 text-center text-slate-400">
-              該部門目前沒有一般員工資料
-           </div>
+          <div className="col-span-full">
+            <EmptyState icon="👥" title="該部門目前沒有一般員工資料" />
+          </div>
         )}
       </div>
 
       {subordinates.length > visibleCount && (
-          <div className="text-center py-4">
-              <button 
-                  onClick={() => setVisibleCount(prev => prev + 20)}
-                  className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-full transition shadow-sm"
-              >
-                  Load More ({subordinates.length - visibleCount} remaining)...
-              </button>
-          </div>
+        <div className="text-center py-4">
+          <button
+            onClick={() => setVisibleCount((prev) => prev + 20)}
+            className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-full transition shadow-sm"
+          >
+            Load More ({subordinates.length - visibleCount} remaining)...
+          </button>
+        </div>
       )}
     </div>
   );

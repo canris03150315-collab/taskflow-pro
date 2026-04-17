@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, Role, DepartmentDef } from '../types';
+import { EmptyState } from './EmptyState';
 import { api } from '../services/api';
 
 interface RoutineRecord {
@@ -16,21 +17,21 @@ interface SubordinateRoutineViewProps {
   departments: DepartmentDef[];
 }
 
-export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({ 
-  currentUser, 
-  users, 
-  departments 
+export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
+  currentUser,
+  users,
+  departments,
 }) => {
   const [routineRecords, setRoutineRecords] = useState<RoutineRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDept, setSelectedDept] = useState<string>(
     currentUser.role === Role.SUPERVISOR ? currentUser.department : 'ALL'
   );
-  
+
   // 日期篩選狀態 - 使用台灣時區 (UTC+8)
   const getTaiwanDate = () => {
     const now = new Date();
-    const taiwanTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
     return taiwanTime.toISOString().split('T')[0];
   };
   const today = getTaiwanDate();
@@ -43,12 +44,14 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
     let targets: User[] = [];
 
     if (currentUser.role === Role.SUPERVISOR) {
-      targets = users.filter(u => u.role === Role.EMPLOYEE && u.department === currentUser.department);
+      targets = users.filter(
+        (u) => u.role === Role.EMPLOYEE && u.department === currentUser.department
+      );
     } else if (currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER) {
       if (selectedDept !== 'ALL') {
-        targets = users.filter(u => u.department === selectedDept && u.role !== Role.BOSS);
+        targets = users.filter((u) => u.department === selectedDept && u.role !== Role.BOSS);
       } else {
-        targets = users.filter(u => u.role !== Role.BOSS && u.id !== currentUser.id);
+        targets = users.filter((u) => u.role !== Role.BOSS && u.id !== currentUser.id);
       }
     }
     return targets;
@@ -63,10 +66,13 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
         console.log('[SubordinateRoutineView] Raw API response:', records);
         console.log('[SubordinateRoutineView] Selected date:', selectedDate);
         // 按選定日期過濾
-        const filteredRecords = records.filter(r => r.date === selectedDate);
+        const filteredRecords = records.filter((r) => r.date === selectedDate);
         console.log('[SubordinateRoutineView] Filtered records:', filteredRecords);
         if (filteredRecords.length > 0) {
-          console.log('[SubordinateRoutineView] First record structure:', JSON.stringify(filteredRecords[0], null, 2));
+          console.log(
+            '[SubordinateRoutineView] First record structure:',
+            JSON.stringify(filteredRecords[0], null, 2)
+          );
         }
         setRoutineRecords(filteredRecords as any);
       } catch (error) {
@@ -81,37 +87,37 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
 
   // 計算用戶的每日任務完成狀況
   const getUserRoutineStats = (userId: string) => {
-    const userRecord = routineRecords.find(r => r.user_id === userId);
-    
+    const userRecord = routineRecords.find((r) => r.user_id === userId);
+
     // DEBUG: 檢查 Se7en 的數據
     if (userId === 'user-1767451212149-7rxqt4f6d') {
       console.log('[DEBUG] Se7en record:', userRecord);
       console.log('[DEBUG] Se7en items:', userRecord?.items);
     }
-    
+
     if (!userRecord || !userRecord.items) {
       return { total: 0, completed: 0, percentage: 0, hasRecord: false };
     }
 
     const total = userRecord.items.length;
-    const completed = userRecord.items.filter(item => item.completed).length;
+    const completed = userRecord.items.filter((item) => item.completed).length;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return { total, completed, percentage, hasRecord: true };
   };
 
-  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
+  const getDeptName = (id: string) => departments.find((d) => d.id === id)?.name || id;
 
   // 計算整體統計
   const overallStats = useMemo(() => {
-    const subordinateIds = subordinates.map(u => u.id);
-    const relevantRecords = routineRecords.filter(r => subordinateIds.includes(r.user_id));
-    
+    const subordinateIds = subordinates.map((u) => u.id);
+    const relevantRecords = routineRecords.filter((r) => subordinateIds.includes(r.user_id));
+
     let totalTasks = 0;
     let completedTasks = 0;
     const incompleteUsers: { user: User; stats: any }[] = [];
-    
-    subordinates.forEach(user => {
+
+    subordinates.forEach((user) => {
       const stats = getUserRoutineStats(user.id);
       if (stats.hasRecord) {
         totalTasks += stats.total;
@@ -121,18 +127,18 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
         }
       }
     });
-    
+
     const overallPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-    const usersWithRecords = subordinates.filter(u => getUserRoutineStats(u.id).hasRecord).length;
+    const usersWithRecords = subordinates.filter((u) => getUserRoutineStats(u.id).hasRecord).length;
     const usersWithoutRecords = subordinates.length - usersWithRecords;
-    
+
     return {
       totalTasks,
       completedTasks,
       overallPercentage,
       incompleteUsers,
       usersWithRecords,
-      usersWithoutRecords
+      usersWithoutRecords,
     };
   }, [subordinates, routineRecords]);
 
@@ -160,21 +166,21 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
             <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
               <span>📋</span> 下屬每日任務執行狀況
             </h2>
-            <p className="text-sm text-slate-500 font-bold mt-1">
-              查看團隊成員的每日任務完成進度
-            </p>
+            <p className="text-sm text-slate-500 font-bold mt-1">查看團隊成員的每日任務完成進度</p>
           </div>
 
           {/* Department Filter */}
           {currentUser.role === Role.BOSS && (
-            <select 
+            <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
               className="px-4 py-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
             >
               <option value="ALL">所有部門</option>
-              {departments.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
               ))}
             </select>
           )}
@@ -193,7 +199,7 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
                 className="px-3 py-2 bg-white border-2 border-blue-300 rounded-lg font-bold text-slate-700 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
-            
+
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-slate-500 font-bold">快速選擇：</span>
               <button
@@ -241,7 +247,7 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white shadow-lg">
             <div className="text-sm font-bold opacity-90 mb-1">已完成人數</div>
             <div className="text-3xl font-black">
-              {subordinates.filter(u => getUserRoutineStats(u.id).percentage === 100).length}
+              {subordinates.filter((u) => getUserRoutineStats(u.id).percentage === 100).length}
             </div>
             <div className="text-xs opacity-75 mt-1">
               / {overallStats.usersWithRecords} 人有記錄
@@ -274,7 +280,14 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
                       key={user.id}
                       className="inline-flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-orange-200"
                     >
-                      <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-5 h-5 rounded-full" />
+                      <img
+                        src={
+                          user.avatar ||
+                          `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`
+                        }
+                        alt={user.name}
+                        className="w-5 h-5 rounded-full"
+                      />
                       <span className="text-sm font-bold text-slate-700">{user.name}</span>
                       <span className="text-xs font-bold text-orange-600">
                         {stats.completed}/{stats.total}
@@ -290,19 +303,26 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subordinates.map(user => {
+        {subordinates.map((user) => {
           const stats = getUserRoutineStats(user.id);
-          const userRecord = routineRecords.find(r => r.user_id === user.id);
-          
+          const userRecord = routineRecords.find((r) => r.user_id === user.id);
+
           return (
-            <div 
-              key={user.id} 
+            <div
+              key={user.id}
               className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition p-5"
             >
               {/* User Info */}
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 rounded-full border-2 border-slate-200 overflow-hidden">
-                  <img src={user.avatar || `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`} alt={user.name} className="w-full h-full object-cover" />
+                  <img
+                    src={
+                      user.avatar ||
+                      `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(user.name || 'default')}`
+                    }
+                    alt={user.name}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-slate-800">{user.name}</h3>
@@ -319,16 +339,21 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
                       <span className="text-2xl font-black text-blue-600">{stats.percentage}%</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                      <div 
+                      <div
                         className={`h-full rounded-full transition-all duration-500 ${
-                          stats.percentage === 100 ? 'bg-emerald-500' : 
-                          stats.percentage >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+                          stats.percentage === 100
+                            ? 'bg-emerald-500'
+                            : stats.percentage >= 50
+                              ? 'bg-blue-500'
+                              : 'bg-orange-500'
                         }`}
                         style={{ width: `${stats.percentage}%` }}
                       ></div>
                     </div>
                     <div className="flex justify-between items-center mt-1 text-xs text-slate-500">
-                      <span>已完成 {stats.completed} / {stats.total} 項</span>
+                      <span>
+                        已完成 {stats.completed} / {stats.total} 項
+                      </span>
                       {stats.percentage === 100 && (
                         <span className="text-emerald-600 font-bold">✓ 全部完成</span>
                       )}
@@ -338,20 +363,16 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
                   {/* Task List */}
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {userRecord?.items.map((item, index) => (
-                      <div 
+                      <div
                         key={index}
                         className={`flex items-start gap-2 p-2 rounded text-sm ${
-                          item.completed 
-                            ? 'bg-emerald-50 text-emerald-700' 
+                          item.completed
+                            ? 'bg-emerald-50 text-emerald-700'
                             : 'bg-slate-50 text-slate-600'
                         }`}
                       >
-                        <span className="flex-shrink-0 mt-0.5">
-                          {item.completed ? '✓' : '○'}
-                        </span>
-                        <span className={item.completed ? 'line-through' : ''}>
-                          {item.text}
-                        </span>
+                        <span className="flex-shrink-0 mt-0.5">{item.completed ? '✓' : '○'}</span>
+                        <span className={item.completed ? 'line-through' : ''}>{item.text}</span>
                       </div>
                     ))}
                   </div>
@@ -367,8 +388,8 @@ export const SubordinateRoutineView: React.FC<SubordinateRoutineViewProps> = ({
         })}
 
         {subordinates.length === 0 && (
-          <div className="col-span-full py-10 text-center text-slate-400">
-            該部門目前沒有下屬資料
+          <div className="col-span-full">
+            <EmptyState icon="👥" title="該部門目前沒有下屬資料" />
           </div>
         )}
       </div>
