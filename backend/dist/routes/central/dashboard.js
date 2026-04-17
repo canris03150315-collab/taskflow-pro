@@ -177,7 +177,7 @@ router.get('/overview', async (req, res) => {
     });
   } catch (error) {
     console.error('[Central - Dashboard] Overview error:', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard overview', message: error.message });
+    res.status(500).json({ error: '取得儀表板資料失敗', message: error.message });
   }
 });
 
@@ -287,7 +287,7 @@ router.get('/notifications', async (req, res) => {
     res.json({ immediate, daily_summary });
   } catch (error) {
     console.error('[Central - Dashboard] Notifications error:', error);
-    res.status(500).json({ error: 'Failed to fetch notifications', message: error.message });
+    res.status(500).json({ error: '取得通知失敗', message: error.message });
   }
 });
 

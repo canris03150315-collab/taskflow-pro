@@ -66,7 +66,7 @@ router.get('/', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('[Attendance V37.3] History error:', error.message);
-        res.status(500).json({ success: false, error: 'Failed to fetch attendance history' });
+        res.status(500).json({ success: false, error: '取得出勤記錄失敗' });
     }
 });
 
@@ -106,7 +106,7 @@ router.post('/clock-in', authenticateToken, async (req, res) => {
 
         if (activeRecord) {
             console.log(`[Attendance V37.3] Already clocked in today for ${currentUser.name}`);
-            return res.status(400).json({ success: false, error: 'Already clocked in today. Please clock out first.' });
+            return res.status(400).json({ success: false, error: '今日已打卡，請先簽退' });
         }
 
         // B8 fix: Prevent multiple clock-ins on the same day
@@ -131,12 +131,12 @@ router.post('/clock-in', authenticateToken, async (req, res) => {
         console.log(`[Attendance V37.3] Clock-in success for ${currentUser.name}`);
         res.json({
             success: true,
-            message: 'Clock-in success',
+            message: '打卡成功',
             record: { id, user_id: currentUser.id, date: today, clock_in: clockInTime.toISOString(), status: 'ONLINE' }
         });
     } catch (error) {
         console.error('[Attendance V37.3] Clock-in error:', error.message);
-        res.status(500).json({ success: false, error: 'Server error during clock-in' });
+        res.status(500).json({ success: false, error: '打卡時發生伺服器錯誤' });
     }
 });
 
@@ -155,7 +155,7 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         
         if (!activeRecord) {
             console.log(`[Attendance V37.3] No active record found for ${currentUser.name}`);
-            return res.status(400).json({ success: false, error: 'No active session found. Please clock-in first.' });
+            return res.status(400).json({ success: false, error: '尚未打卡，請先簽到' });
         }
         
         const clockOutTime = client_timestamp ? new Date(client_timestamp) : new Date();
@@ -172,7 +172,7 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         // B9 fix: Warn if shift exceeds 16 hours (960 minutes)
         const response = {
             success: true,
-            message: 'Clock-out success',
+            message: '簽退成功',
             record: { ...activeRecord, clock_out: clockOutTime.toISOString(), duration_minutes: durationMinutes, status: 'OFFLINE' }
         };
         if (durationMinutes > 960) {
@@ -181,7 +181,7 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         res.json(response);
     } catch (error) {
         console.error('[Attendance V37.3] Clock-out error:', error.message);
-        res.status(500).json({ success: false, error: 'Server error during clock-out' });
+        res.status(500).json({ success: false, error: '簽退時發生伺服器錯誤' });
     }
 });
 
@@ -249,7 +249,7 @@ router.get('/status', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('[Attendance V37.3] Status error:', error.message);
-        res.status(500).json({ success: false, error: 'Failed to fetch status' });
+        res.status(500).json({ success: false, error: '取得狀態失敗' });
     }
 });
 

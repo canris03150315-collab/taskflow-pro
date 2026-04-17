@@ -1,5 +1,5 @@
-﻿import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+﻿import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -10,30 +10,37 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: false,
-        drop_debugger: true
-      }
+        drop_console: true, // Production: 移除所有 console.log
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.debug'], // 只 drop log/debug，保留 error/warn/info
+      },
     },
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom']
-        }
-      }
-    }
+          vendor: ['react', 'react-dom'],
+        },
+      },
+    },
   },
   server: {
     port: 3000,
     proxy: {
       '/api': {
-        target: process.env.VITE_INSTANCE_MODE === 'central' ? 'http://localhost:4001' : 'http://localhost:3001',
+        target:
+          process.env.VITE_INSTANCE_MODE === 'central'
+            ? 'http://localhost:4001'
+            : 'http://localhost:3001',
         secure: false,
-        changeOrigin: true
+        changeOrigin: true,
       },
       '/ws': {
-        target: process.env.VITE_INSTANCE_MODE === 'central' ? 'ws://localhost:4001' : 'ws://localhost:3001',
-        ws: true
-      }
-    }
-  }
-})
+        target:
+          process.env.VITE_INSTANCE_MODE === 'central'
+            ? 'ws://localhost:4001'
+            : 'ws://localhost:3001',
+        ws: true,
+      },
+    },
+  },
+});

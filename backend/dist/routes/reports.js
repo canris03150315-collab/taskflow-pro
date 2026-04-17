@@ -73,7 +73,7 @@ router.get('/', authenticateToken, async (req, res) => {
     res.json({ reports: results });
   } catch (error) {
     console.error('GET /reports error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -129,7 +129,7 @@ router.post('/', authenticateToken, async (req, res) => {
     res.json({ success: true, report });
   } catch (error) {
     console.error('POST /reports error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -143,11 +143,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
     
     const report = await dbCall(db, 'get', 'SELECT * FROM reports WHERE id = ?', [id]);
     if (!report) {
-      return res.status(404).json({ error: 'Report not found' });
+      return res.status(404).json({ error: '報表不存在' });
     }
     
     if (report.user_id !== currentUser.id && currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({ error: '權限不足' });
     }
     
     const now = new Date().toISOString();
@@ -167,7 +167,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     res.json({ success: true, report: updated });
   } catch (error) {
     console.error('PUT /reports/:id error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -180,18 +180,18 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     
     const report = await dbCall(db, 'get', 'SELECT * FROM reports WHERE id = ?', [id]);
     if (!report) {
-      return res.status(404).json({ error: 'Report not found' });
+      return res.status(404).json({ error: '報表不存在' });
     }
     
     if (report.user_id !== currentUser.id && currentUser.role !== 'BOSS') {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({ error: '權限不足' });
     }
     
     await dbCall(db, 'run', 'DELETE FROM reports WHERE id = ?', [id]);
     res.json({ success: true });
   } catch (error) {
     console.error('DELETE /reports/:id error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -238,7 +238,7 @@ router.get('/approval/eligible-approvers', authenticateToken, async (req, res) =
     res.json({ success: true, approvers });
   } catch (error) {
     console.error('GET /approval/eligible-approvers error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -253,7 +253,7 @@ router.post('/approval/request', authenticateToken, async (req, res) => {
     
     const approver = await dbCall(db, 'get', 'SELECT * FROM users WHERE id = ?', [approverId]);
     if (!approver) {
-      return res.status(404).json({ error: 'Approver not found' });
+      return res.status(404).json({ error: '找不到審核者' });
     }
     
     const authId = `auth-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -273,7 +273,7 @@ router.post('/approval/request', authenticateToken, async (req, res) => {
     res.json({ success: true, authorizationId: authId, message: '\u8acb\u6c42\u5df2\u767c\u9001' });
   } catch (error) {
     console.error('POST /approval/request error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -325,7 +325,7 @@ router.get('/approval/check', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error('GET /approval/check error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -344,7 +344,7 @@ router.post('/approval/approve', authenticateToken, async (req, res) => {
     );
     
     if (!auth) {
-      return res.status(404).json({ error: 'Authorization not found' });
+      return res.status(404).json({ error: '找不到該授權' });
     }
     
     const now = new Date().toISOString();
@@ -367,7 +367,7 @@ router.post('/approval/approve', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('POST /approval/approve error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -386,7 +386,7 @@ router.post('/approval/reject', authenticateToken, async (req, res) => {
     );
     
     if (!auth) {
-      return res.status(404).json({ error: 'Authorization not found' });
+      return res.status(404).json({ error: '找不到該授權' });
     }
     
     await dbCall(db, 'run',
@@ -402,7 +402,7 @@ router.post('/approval/reject', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('POST /approval/reject error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -430,7 +430,7 @@ router.post('/approval/revoke', authenticateToken, async (req, res) => {
     res.json({ success: true, message: '\u6388\u6b0a\u5df2\u64a4\u92b7' });
   } catch (error) {
     console.error('POST /approval/revoke error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -441,7 +441,7 @@ router.get('/approval/audit-log', authenticateToken, async (req, res) => {
     const currentUser = req.user;
     
     if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({ error: '權限不足' });
     }
     
     await initAuthTable(db);
@@ -467,7 +467,7 @@ router.get('/approval/audit-log', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('GET /approval/audit-log error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 

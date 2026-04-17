@@ -164,7 +164,7 @@ router.get('/today', authenticateToken, async (req, res) => {
     res.json(record);
   } catch (error) {
     console.error('Error in GET /today:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -213,7 +213,7 @@ router.get('/history', authenticateToken, async (req, res) => {
     res.json({ records: mappedRecords });
   } catch (error) {
     console.error('Get routine history error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -251,13 +251,13 @@ router.post('/records/:recordId/toggle', authenticateToken, async (req, res) => 
     const record = await dbCall(db, 'get', 'SELECT * FROM routine_records WHERE id = ?', [recordId]);
     
     if (!record) {
-      return res.status(404).json({ error: 'Record not found' });
+      return res.status(404).json({ error: '找不到該紀錄' });
     }
     
     const items = JSON.parse(record.completed_items || '[]');
     
     if (index < 0 || index >= items.length) {
-      return res.status(400).json({ error: 'Invalid index' });
+      return res.status(400).json({ error: '無效的索引' });
     }
     
     items[index].completed = isCompleted;
@@ -270,7 +270,7 @@ router.post('/records/:recordId/toggle', authenticateToken, async (req, res) => 
     res.json({ success: true });
   } catch (error) {
     console.error('Error in toggle:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 

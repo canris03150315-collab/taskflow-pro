@@ -1382,7 +1382,7 @@ router.get('/alerts', authenticateToken, requireManager, (req, res) => {
     res.json({ alerts });
   } catch (error) {
     console.error('Get alerts error:', error);
-    res.status(500).json({ error: 'Failed to get alerts', alerts: [] });
+    res.status(500).json({ error: '取得提醒失敗', alerts: [] });
   }
 });
 
@@ -1400,7 +1400,7 @@ router.get('/conversations', authenticateToken, requireManager, async (req, res)
     res.json({ conversations });
   } catch (error) {
     console.error('Get conversations error:', error);
-    res.status(500).json({ error: 'Failed to get conversations' });
+    res.status(500).json({ error: '取得對話記錄失敗' });
   }
 });
 
@@ -1413,7 +1413,7 @@ router.get('/memory', authenticateToken, requireManager, (req, res) => {
     res.json({ memory });
   } catch (error) {
     console.error('Get memory error:', error);
-    res.status(500).json({ error: 'Failed to get memory' });
+    res.status(500).json({ error: '取得記憶資料失敗' });
   }
 });
 
@@ -1426,7 +1426,7 @@ router.delete('/memory/:key', authenticateToken, requireManager, (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Delete memory error:', error);
-    res.status(500).json({ error: 'Failed to delete memory' });
+    res.status(500).json({ error: '刪除記憶失敗' });
   }
 });
 
@@ -1439,7 +1439,7 @@ router.post('/query', authenticateToken, requireManager, async (req, res) => {
     const userId = req.user.id;
 
     if (!message || message.trim() === '') {
-      return res.status(400).json({ error: 'Message is required' });
+      return res.status(400).json({ error: '請輸入訊息內容' });
     }
 
     const now = new Date().toISOString();
@@ -1587,7 +1587,7 @@ router.post('/query', authenticateToken, requireManager, async (req, res) => {
     });
   } catch (error) {
     console.error('Query error:', error);
-    res.status(500).json({ error: 'Failed to process query' });
+    res.status(500).json({ error: '處理查詢失敗' });
   }
 });
 
@@ -1654,7 +1654,7 @@ router.post('/confirm', authenticateToken, requireManager, async (req, res) => {
     res.json({ results });
   } catch (error) {
     console.error('Confirm error:', error);
-    res.status(500).json({ error: 'Failed to confirm actions' });
+    res.status(500).json({ error: '確認操作失敗' });
   }
 });
 
@@ -1668,7 +1668,7 @@ router.post('/cancel', authenticateToken, requireManager, (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Cancel error:', error);
-    res.status(500).json({ error: 'Failed to cancel actions' });
+    res.status(500).json({ error: '取消操作失敗' });
   }
 });
 
@@ -1690,7 +1690,7 @@ router.get('/reports/:id/download', authenticateToken, (req, res) => {
   const filePath = path.join(reportsDir, `${req.params.id}.pdf`);
 
   if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'Report not found' });
+    return res.status(404).json({ error: '報表不存在' });
   }
 
   res.setHeader('Content-Type', 'application/pdf');
@@ -1707,7 +1707,7 @@ router.delete('/conversations/:id', authenticateToken, requireManager, (req, res
     res.json({ success: true });
   } catch (error) {
     console.error('Delete conversation error:', error);
-    res.status(500).json({ error: 'Failed to delete conversation' });
+    res.status(500).json({ error: '刪除對話失敗' });
   }
 });
 
@@ -1721,7 +1721,7 @@ router.delete('/conversations', authenticateToken, requireManager, (req, res) =>
     res.json({ success: true });
   } catch (error) {
     console.error('Clear conversations error:', error);
-    res.status(500).json({ error: 'Failed to clear conversations' });
+    res.status(500).json({ error: '清除對話失敗' });
   }
 });
 

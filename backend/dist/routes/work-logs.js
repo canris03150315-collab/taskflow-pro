@@ -92,7 +92,7 @@ router.get('/', authenticateToken, async (req, res) => {
     res.json({ logs: mappedLogs });
   } catch (error) {
     console.error('Error fetching work logs:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -105,7 +105,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // Validation
     if (!date || !todayTasks || !tomorrowTasks) {
-      return res.status(400).json({ error: 'Date, today tasks, and tomorrow tasks are required' });
+      return res.status(400).json({ error: '請填寫日期、今日任務及明日計畫' });
     }
 
     // Check if log already exists for this user and date
@@ -115,7 +115,7 @@ router.post('/', authenticateToken, async (req, res) => {
     );
 
     if (existing) {
-      return res.status(400).json({ error: 'Work log already exists for this date' });
+      return res.status(400).json({ error: '該日期已有工作日誌' });
     }
 
     const id = `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -173,7 +173,7 @@ router.post('/', authenticateToken, async (req, res) => {
     res.json({ success: true, log: mappedLog });
   } catch (error) {
     console.error('Error creating work log:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -192,11 +192,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
     );
 
     if (!existing) {
-      return res.status(404).json({ error: 'Work log not found' });
+      return res.status(404).json({ error: '找不到該工作日誌' });
     }
 
     if (existing.user_id !== currentUser.id) {
-      return res.status(403).json({ error: 'You can only edit your own work logs' });
+      return res.status(403).json({ error: '只能編輯自己的工作日誌' });
     }
 
     const now = new Date().toISOString();
@@ -259,7 +259,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     res.json({ success: true, log: mappedLog });
   } catch (error) {
     console.error('Error updating work log:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -277,11 +277,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     );
 
     if (!existing) {
-      return res.status(404).json({ error: 'Work log not found' });
+      return res.status(404).json({ error: '找不到該工作日誌' });
     }
 
     if (existing.user_id !== currentUser.id) {
-      return res.status(403).json({ error: 'You can only delete your own work logs' });
+      return res.status(403).json({ error: '只能刪除自己的工作日誌' });
     }
 
     await dbCall(db, 'run', 'DELETE FROM work_logs WHERE id = ?', [id]);
@@ -291,10 +291,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       req.wsServer.broadcastToAll('work_log_deleted', { id });
     }
 
-    res.json({ success: true, message: 'Work log deleted successfully' });
+    res.json({ success: true, message: '工作日誌已刪除' });
   } catch (error) {
     console.error('Error deleting work log:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 

@@ -30,7 +30,7 @@ router.get('/', authenticateToken, async (req, res) => {
     res.json(leaves);
   } catch (error) {
     console.error('Get leaves error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -44,7 +44,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     const leave = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
 
     if (!leave) {
-      return res.status(404).json({ error: 'Leave request not found' });
+      return res.status(404).json({ error: '找不到該請假申請' });
     }
 
     // S1 fix: EMPLOYEE can only view own leave requests
@@ -55,7 +55,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     res.json(leave);
   } catch (error) {
     console.error('Get leave error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -68,7 +68,7 @@ router.post('/', authenticateToken, async (req, res) => {
     
     // Validate required fields
     if (!leave_type || !start_date || !end_date || !days) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: '缺少必要欄位' });
     }
 
     // B2 fix: Prevent leave requests for past dates
@@ -125,7 +125,7 @@ router.post('/', authenticateToken, async (req, res) => {
     res.json(leave);
   } catch (error) {
     console.error('Create leave error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -145,13 +145,13 @@ router.post('/:id/approve', authenticateToken, async (req, res) => {
       (currentUser.permissions && currentUser.permissions.includes('APPROVE_LEAVES'));
     
     if (!canApprove) {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({ error: '權限不足' });
     }
     
     const leave = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
 
     if (!leave) {
-      return res.status(404).json({ error: 'Leave request not found' });
+      return res.status(404).json({ error: '找不到該請假申請' });
     }
 
     // B3 fix: Prevent approving own leave request
@@ -191,7 +191,7 @@ router.post('/:id/approve', authenticateToken, async (req, res) => {
     res.json(updatedLeave);
   } catch (error) {
     console.error('Approve leave error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -211,13 +211,13 @@ router.post('/:id/reject', authenticateToken, async (req, res) => {
       (currentUser.permissions && currentUser.permissions.includes('APPROVE_LEAVES'));
     
     if (!canApprove) {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({ error: '權限不足' });
     }
     
     const leave = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
 
     if (!leave) {
-      return res.status(404).json({ error: 'Leave request not found' });
+      return res.status(404).json({ error: '找不到該請假申請' });
     }
 
     // L2/L8 fix: Only PENDING leaves can be rejected
@@ -251,7 +251,7 @@ router.post('/:id/reject', authenticateToken, async (req, res) => {
     res.json(updatedLeave);
   } catch (error) {
     console.error('Reject leave error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -265,7 +265,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     const leave = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
     
     if (!leave) {
-      return res.status(404).json({ error: 'Leave request not found' });
+      return res.status(404).json({ error: '找不到該請假申請' });
     }
     
     // Check permission: owner can cancel their own leaves, BOSS/MANAGER can cancel any leaves
@@ -273,7 +273,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     const isBossOrManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
     
     if (!isOwner && !isBossOrManager) {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({ error: '權限不足' });
     }
     
     const now = new Date().toISOString();
@@ -294,7 +294,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Delete leave error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -318,7 +318,7 @@ router.get('/rules/:departmentId', authenticateToken, async (req, res) => {
     res.json(rules);
   } catch (error) {
     console.error('Get rules error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -338,7 +338,7 @@ router.put('/rules/:departmentId', authenticateToken, async (req, res) => {
       (currentUser.permissions && currentUser.permissions.includes('MANAGE_LEAVE_RULES') && currentUser.department === departmentId);
     
     if (!canManageRules) {
-      return res.status(403).json({ error: 'Permission denied' });
+      return res.status(403).json({ error: '權限不足' });
     }
     
     const existing = await db.get('SELECT * FROM department_leave_rules WHERE department_id = ?', [departmentId]);
@@ -371,7 +371,7 @@ router.put('/rules/:departmentId', authenticateToken, async (req, res) => {
     res.json(updatedRules);
   } catch (error) {
     console.error('Update rules error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 

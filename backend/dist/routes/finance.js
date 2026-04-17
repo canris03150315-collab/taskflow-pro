@@ -162,7 +162,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Delete finance error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 

@@ -36,7 +36,7 @@ function schedulesRoutes(db, wsServer) {
       res.json(schedules);
     } catch (error) {
       console.error('Get schedules error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: '伺服器內部錯誤' });
     }
   });
 
@@ -47,7 +47,7 @@ function schedulesRoutes(db, wsServer) {
       const { year, month, selectedDays } = req.body;
 
       if (!year || !month || !selectedDays || !Array.isArray(selectedDays)) {
-        return res.status(400).json({ error: 'Invalid input' });
+        return res.status(400).json({ error: '輸入資料無效' });
       }
 
       const id = `schedule-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -72,7 +72,7 @@ function schedulesRoutes(db, wsServer) {
       res.json({ success: true, schedule });
     } catch (error) {
       console.error('Submit schedule error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: '伺服器內部錯誤' });
     }
   });
 
@@ -94,12 +94,12 @@ function schedulesRoutes(db, wsServer) {
         hasApproveLeaves;
 
       if (!canApprove) {
-        return res.status(403).json({ error: 'Permission denied' });
+        return res.status(403).json({ error: '權限不足' });
       }
 
       const schedule = await db.get('SELECT * FROM schedules WHERE id = ?', [id]);
       if (!schedule) {
-        return res.status(404).json({ error: 'Schedule not found' });
+        return res.status(404).json({ error: '找不到該排班' });
       }
 
       const now = new Date().toISOString();
@@ -124,7 +124,7 @@ function schedulesRoutes(db, wsServer) {
       res.json({ success: true, schedule: updatedSchedule });
     } catch (error) {
       console.error('Approve schedule error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: '伺服器內部錯誤' });
     }
   });
 
@@ -146,12 +146,12 @@ function schedulesRoutes(db, wsServer) {
         hasApproveLeavesReject;
 
       if (!canReject) {
-        return res.status(403).json({ error: 'Permission denied' });
+        return res.status(403).json({ error: '權限不足' });
       }
 
       const schedule = await db.get('SELECT * FROM schedules WHERE id = ?', [id]);
       if (!schedule) {
-        return res.status(404).json({ error: 'Schedule not found' });
+        return res.status(404).json({ error: '找不到該排班' });
       }
 
       const now = new Date().toISOString();
@@ -176,7 +176,7 @@ function schedulesRoutes(db, wsServer) {
       res.json({ success: true, schedule: updatedSchedule });
     } catch (error) {
       console.error('Reject schedule error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: '伺服器內部錯誤' });
     }
   });
 
@@ -195,12 +195,12 @@ function schedulesRoutes(db, wsServer) {
       
       const canManage = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER' || currentUser.role === 'SUPERVISOR' || hasApproveLeavesUpdate;
       if (!canManage) {
-        return res.status(403).json({ error: 'Permission denied' });
+        return res.status(403).json({ error: '權限不足' });
       }
 
       const schedule = await db.get('SELECT * FROM schedules WHERE id = ?', [id]);
       if (!schedule) {
-        return res.status(404).json({ error: 'Schedule not found' });
+        return res.status(404).json({ error: '找不到該排班' });
       }
 
       const now = new Date().toISOString();
@@ -248,7 +248,7 @@ function schedulesRoutes(db, wsServer) {
       res.json({ success: true, schedule: updatedSchedule });
     } catch (error) {
       console.error('Update schedule error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: '伺服器內部錯誤' });
     }
   });
 router.get('/rules/:departmentId', authenticateToken, async (req, res) => {
@@ -278,7 +278,7 @@ router.get('/rules/:departmentId', authenticateToken, async (req, res) => {
       res.json(rules);
     } catch (error) {
       console.error('Get rules error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: '伺服器內部錯誤' });
     }
   });
 
@@ -300,7 +300,7 @@ router.get('/rules/:departmentId', authenticateToken, async (req, res) => {
         (currentUser.role === 'SUPERVISOR' && currentUser.department === departmentId);
 
       if (!canManage) {
-        return res.status(403).json({ error: 'Permission denied' });
+        return res.status(403).json({ error: '權限不足' });
       }
 
       const now = new Date().toISOString();
@@ -337,7 +337,7 @@ router.get('/rules/:departmentId', authenticateToken, async (req, res) => {
       res.json({ success: true, rules });
     } catch (error) {
       console.error('Update rules error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+      res.status(500).json({ error: '伺服器內部錯誤' });
     }
   });
 

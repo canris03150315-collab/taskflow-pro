@@ -29,7 +29,7 @@ function logOperation(db, operationType, targetType, targetId, userId, userName,
 function checkKOLPermission(req, res, next) {
   const currentUser = req.user;
   if (!currentUser) {
-    return res.status(403).json({ error: 'Access denied' });
+    return res.status(403).json({ error: '權限不足' });
   }
   next();
 }
@@ -62,7 +62,7 @@ router.get('/profiles', authenticateToken, checkKOLPermission, async (req, res) 
     res.json({ profiles });
   } catch (error) {
     console.error('Get KOL profiles error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -86,7 +86,7 @@ router.get('/stats', authenticateToken, checkKOLPermission, async (req, res) => 
     });
   } catch (error) {
     console.error('Get stats error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -99,7 +99,7 @@ router.post('/profiles', authenticateToken, checkKOLPermission, async (req, res)
     
     const actualPlatformId = platformId || facebookId;
     if (!actualPlatformId || !platformAccount) {
-      return res.status(400).json({ error: 'Required fields missing' });
+      return res.status(400).json({ error: '缺少必要欄位' });
     }
     
     const id = uuidv4();
@@ -116,7 +116,7 @@ router.post('/profiles', authenticateToken, checkKOLPermission, async (req, res)
     res.json({ profile });
   } catch (error) {
     console.error('Create profile error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -128,13 +128,13 @@ router.get('/profiles/:id', authenticateToken, checkKOLPermission, async (req, r
     
     const profile = dbCall(db, 'prepare', 'SELECT * FROM kol_profiles WHERE id = ?').get(id);
     if (!profile) {
-      return res.status(404).json({ error: 'Profile not found' });
+      return res.status(404).json({ error: '找不到該資料' });
     }
     
     res.json({ profile });
   } catch (error) {
     console.error('Get profile details error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -149,7 +149,7 @@ router.put('/profiles/:id', authenticateToken, checkKOLPermission, async (req, r
     
     const profile = dbCall(db, 'prepare', 'SELECT * FROM kol_profiles WHERE id = ?').get(id);
     if (!profile) {
-      return res.status(404).json({ error: 'Profile not found' });
+      return res.status(404).json({ error: '找不到該資料' });
     }
     
     const now = new Date().toISOString();
@@ -172,7 +172,7 @@ router.put('/profiles/:id', authenticateToken, checkKOLPermission, async (req, r
     res.json({ profile: updated });
   } catch (error) {
     console.error('Update profile error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -185,7 +185,7 @@ router.delete('/profiles/:id', authenticateToken, checkKOLPermission, async (req
     
     const profile = dbCall(db, 'prepare', 'SELECT * FROM kol_profiles WHERE id = ?').get(id);
     if (!profile) {
-      return res.status(404).json({ error: 'Profile not found' });
+      return res.status(404).json({ error: '找不到該資料' });
     }
     
     dbCall(db, 'prepare', 'DELETE FROM kol_operation_logs WHERE target_id = ?').run(id);
@@ -193,10 +193,10 @@ router.delete('/profiles/:id', authenticateToken, checkKOLPermission, async (req
     
     logOperation(db, 'DELETE', 'KOL_PROFILE', id, currentUser.id, currentUser.name, { platformId: profile.platform_id });
     
-    res.json({ success: true, message: 'Profile deleted successfully' });
+    res.json({ success: true, message: '資料已刪除' });
   } catch (error) {
     console.error('Delete profile error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -208,7 +208,7 @@ router.post('/import-excel', authenticateToken, checkKOLPermission, async (req, 
     const { data } = req.body;
     
     if (!Array.isArray(data) || data.length === 0) {
-      return res.status(400).json({ error: 'No data provided' });
+      return res.status(400).json({ error: '未提供資料' });
     }
     
     const results = { success: 0, failed: 0, errors: [] };
@@ -219,7 +219,7 @@ router.post('/import-excel', authenticateToken, checkKOLPermission, async (req, 
       try {
         if (!row.platformId && !row.platformAccount) {
           results.failed++;
-          results.errors.push({ row: i + 1, error: 'Missing required fields' });
+          results.errors.push({ row: i + 1, error: '缺少必要欄位' });
           continue;
         }
         
@@ -249,7 +249,7 @@ router.post('/import-excel', authenticateToken, checkKOLPermission, async (req, 
     res.json({ success: true, results, message: `Imported ${results.success} records, ${results.failed} failed` });
   } catch (error) {
     console.error('Excel import error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -262,7 +262,7 @@ router.get('/export-excel', authenticateToken, checkKOLPermission, async (req, r
     res.json({ profiles });
   } catch (error) {
     console.error('Excel export error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -277,12 +277,12 @@ router.post('/payments', authenticateToken, checkKOLPermission, async (req, res)
     const { kolId, amount, paymentDate, notes } = req.body;
     
     if (!kolId || !amount || !paymentDate) {
-      return res.status(400).json({ error: 'Required fields missing' });
+      return res.status(400).json({ error: '缺少必要欄位' });
     }
     
     const kol = dbCall(db, 'prepare', 'SELECT * FROM kol_profiles WHERE id = ?').get(kolId);
     if (!kol) {
-      return res.status(404).json({ error: 'KOL not found' });
+      return res.status(404).json({ error: '找不到該 KOL' });
     }
     
     const id = uuidv4();
@@ -299,7 +299,7 @@ router.post('/payments', authenticateToken, checkKOLPermission, async (req, res)
     res.json({ payment });
   } catch (error) {
     console.error('Create payment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -312,7 +312,7 @@ router.get('/profiles/:kolId/payments', authenticateToken, checkKOLPermission, a
     
     const kol = dbCall(db, 'prepare', 'SELECT * FROM kol_profiles WHERE id = ?').get(kolId);
     if (!kol) {
-      return res.status(404).json({ error: 'KOL not found' });
+      return res.status(404).json({ error: '找不到該 KOL' });
     }
     
     let query = 'SELECT * FROM kol_weekly_payments WHERE kol_id = ?';
@@ -337,7 +337,7 @@ router.get('/profiles/:kolId/payments', authenticateToken, checkKOLPermission, a
     res.json({ payments, total });
   } catch (error) {
     console.error('Get payments error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -406,7 +406,7 @@ router.get('/payment-stats', authenticateToken, checkKOLPermission, async (req, 
     });
   } catch (error) {
     console.error('Get payment stats error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 })
 
@@ -420,14 +420,14 @@ router.put('/payments/:id', authenticateToken, checkKOLPermission, async (req, r
     
     const payment = dbCall(db, 'prepare', 'SELECT * FROM kol_weekly_payments WHERE id = ?').get(id);
     if (!payment) {
-      return res.status(404).json({ error: 'Payment record not found' });
+      return res.status(404).json({ error: '找不到該付款紀錄' });
     }
     
     const isBossOrManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
     const isCreator = payment.created_by === currentUser.id;
     
     if (!isBossOrManager && !isCreator) {
-      return res.status(403).json({ error: 'Permission denied. Only creator or manager can edit.' });
+      return res.status(403).json({ error: '權限不足，僅建立者或主管可編輯' });
     }
     
     const now = new Date().toISOString();
@@ -443,7 +443,7 @@ router.put('/payments/:id', authenticateToken, checkKOLPermission, async (req, r
     res.json({ payment: updated });
   } catch (error) {
     console.error('Update payment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -456,24 +456,24 @@ router.delete('/payments/:id', authenticateToken, checkKOLPermission, async (req
     
     const payment = dbCall(db, 'prepare', 'SELECT * FROM kol_weekly_payments WHERE id = ?').get(id);
     if (!payment) {
-      return res.status(404).json({ error: 'Payment record not found' });
+      return res.status(404).json({ error: '找不到該付款紀錄' });
     }
     
     const isBossOrManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
     const isCreator = payment.created_by === currentUser.id;
     
     if (!isBossOrManager && !isCreator) {
-      return res.status(403).json({ error: 'Permission denied. Only creator or manager can delete.' });
+      return res.status(403).json({ error: '權限不足，僅建立者或主管可刪除' });
     }
     
     dbCall(db, 'prepare', 'DELETE FROM kol_weekly_payments WHERE id = ?').run(id);
     
     logOperation(db, 'DELETE', 'KOL_PAYMENT', id, currentUser.id, currentUser.name, { amount: payment.amount });
     
-    res.json({ success: true, message: 'Payment record deleted successfully' });
+    res.json({ success: true, message: '付款紀錄已刪除' });
   } catch (error) {
     console.error('Delete payment error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 

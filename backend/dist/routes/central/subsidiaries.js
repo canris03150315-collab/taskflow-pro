@@ -71,7 +71,7 @@ router.get('/', (req, res) => {
     res.json({ subsidiaries });
   } catch (error) {
     console.error('[Central - Subsidiaries] List error:', error);
-    res.status(500).json({ error: 'Failed to list subsidiaries', message: error.message });
+    res.status(500).json({ error: '取得子公司列表失敗', message: error.message });
   }
 });
 
@@ -106,7 +106,7 @@ router.post('/', (req, res) => {
     });
   } catch (error) {
     console.error('[Central - Subsidiaries] Register error:', error);
-    res.status(500).json({ error: 'Failed to register subsidiary', message: error.message });
+    res.status(500).json({ error: '註冊子公司失敗', message: error.message });
   }
 });
 
@@ -147,7 +147,7 @@ router.put('/:id', (req, res) => {
     });
   } catch (error) {
     console.error('[Central - Subsidiaries] Update error:', error);
-    res.status(500).json({ error: 'Failed to update subsidiary', message: error.message });
+    res.status(500).json({ error: '更新子公司失敗', message: error.message });
   }
 });
 
@@ -175,7 +175,7 @@ router.delete('/:id', (req, res) => {
     res.json({ message: `子公司「${existing.name}」已停用` });
   } catch (error) {
     console.error('[Central - Subsidiaries] Delete error:', error);
-    res.status(500).json({ error: 'Failed to delete subsidiary', message: error.message });
+    res.status(500).json({ error: '刪除子公司失敗', message: error.message });
   }
 });
 
@@ -209,7 +209,7 @@ router.post('/:id/health-check', async (req, res) => {
     });
   } catch (error) {
     console.error('[Central - Subsidiaries] Health check error:', error);
-    res.status(500).json({ error: 'Health check failed', message: error.message });
+    res.status(500).json({ error: '健康檢查失敗', message: error.message });
   }
 });
 
@@ -256,7 +256,7 @@ router.post('/health-check-all', async (req, res) => {
     });
   } catch (error) {
     console.error('[Central - Subsidiaries] Health check all error:', error);
-    res.status(500).json({ error: 'Health check all failed', message: error.message });
+    res.status(500).json({ error: '批量健康檢查失敗', message: error.message });
   }
 });
 

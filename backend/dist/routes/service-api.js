@@ -46,18 +46,18 @@ function authenticateServiceToken(req, res, next) {
     const serviceToken = process.env.SERVICE_TOKEN;
     if (!serviceToken) {
       console.error('[Service API] SERVICE_TOKEN env var not configured');
-      return res.status(503).json({ error: 'Service API not configured' });
+      return res.status(503).json({ error: '服務 API 未設定' });
     }
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('ServiceToken ')) {
-      return res.status(401).json({ error: 'Missing or invalid ServiceToken' });
+      return res.status(401).json({ error: '缺少或無效的 ServiceToken' });
     }
 
     const token = authHeader.substring('ServiceToken '.length);
     if (token !== serviceToken) {
       console.error('[Service API] Invalid service token attempt');
-      return res.status(401).json({ error: 'Invalid service token' });
+      return res.status(401).json({ error: 'ServiceToken 驗證失敗' });
     }
 
     // Create virtual BOSS user
@@ -73,7 +73,7 @@ function authenticateServiceToken(req, res, next) {
     next();
   } catch (error) {
     console.error('[Service API] Auth error:', error);
-    res.status(500).json({ error: 'Authentication error' });
+    res.status(500).json({ error: '認證失敗' });
   }
 }
 
@@ -190,7 +190,7 @@ router.get('/context', (req, res) => {
     });
   } catch (error) {
     console.error('[Service API] Context error:', error);
-    res.status(500).json({ error: 'Failed to fetch context', message: error.message });
+    res.status(500).json({ error: '取得系統資料失敗', message: error.message });
   }
 });
 
@@ -202,7 +202,7 @@ router.post('/execute', (req, res) => {
     const { action, params } = req.body;
 
     if (!action) {
-      return res.status(400).json({ success: false, message: 'Missing action parameter' });
+      return res.status(400).json({ success: false, message: '缺少 action 參數' });
     }
 
     console.log(`[Service API] Executing action: ${action}`, JSON.stringify(params || {}).substring(0, 200));
@@ -442,7 +442,7 @@ router.get('/alerts', (req, res) => {
     });
   } catch (error) {
     console.error('[Service API] Alerts error:', error);
-    res.status(500).json({ error: 'Failed to fetch alerts', message: error.message });
+    res.status(500).json({ error: '取得提醒失敗', message: error.message });
   }
 });
 

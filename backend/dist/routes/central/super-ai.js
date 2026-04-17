@@ -825,7 +825,7 @@ router.post('/query', async (req, res) => {
     const userId = req.user.id;
 
     if (!message || message.trim() === '') {
-      return res.status(400).json({ error: 'Message is required' });
+      return res.status(400).json({ error: '請輸入訊息內容' });
     }
 
     console.log(`[Super AI] Query from ${req.user.name}: ${message.substring(0, 100)}`);
@@ -910,7 +910,7 @@ router.post('/query', async (req, res) => {
     });
   } catch (error) {
     console.error('[Super AI] Query error:', error);
-    res.status(500).json({ error: 'Failed to process super AI query' });
+    res.status(500).json({ error: '處理 AI 查詢失敗' });
   }
 });
 
@@ -956,7 +956,7 @@ router.post('/confirm', async (req, res) => {
     res.json({ results });
   } catch (error) {
     console.error('[Super AI] Confirm error:', error);
-    res.status(500).json({ error: 'Failed to confirm actions' });
+    res.status(500).json({ error: '確認操作失敗' });
   }
 });
 
@@ -973,7 +973,7 @@ router.post('/cancel', (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('[Super AI] Cancel error:', error);
-    res.status(500).json({ error: 'Failed to cancel actions' });
+    res.status(500).json({ error: '取消操作失敗' });
   }
 });
 
@@ -1132,7 +1132,7 @@ router.get('/alerts', async (req, res) => {
     });
   } catch (error) {
     console.error('[Super AI] Alerts error:', error);
-    res.status(500).json({ error: 'Failed to fetch aggregated alerts' });
+    res.status(500).json({ error: '取得聚合提醒失敗' });
   }
 });
 
