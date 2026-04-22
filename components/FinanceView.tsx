@@ -286,9 +286,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   const renderConfirmButton = (record: FinanceRecord) => {
     const canConfirm =
       record.status === 'PENDING' &&
-      ((record.scope === 'DEPARTMENT' &&
-        currentUser.department === record.departmentId &&
-        (isSupervisor || isBoss || hasPermission(currentUser, 'MANAGE_FINANCE'))) ||
+      (isBoss ||
+        (record.scope === 'DEPARTMENT' &&
+          currentUser.department === record.departmentId &&
+          (isSupervisor || hasPermission(currentUser, 'MANAGE_FINANCE'))) ||
         (record.scope === 'PERSONAL' && record.ownerId === currentUser.id));
 
     if (!canConfirm) return null;
