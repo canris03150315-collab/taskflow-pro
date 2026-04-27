@@ -109,17 +109,6 @@ router.post('/clock-in', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, error: '今日已打卡，請先簽退' });
         }
 
-        // B8 fix: Prevent multiple clock-ins on the same day
-        const existingToday = await dbCall(db, 'get',
-            'SELECT id FROM attendance_records WHERE user_id = ? AND date = ? LIMIT 1',
-            [currentUser.id, today]
-        );
-
-        if (existingToday) {
-            console.log(`[Attendance V37.3] Duplicate clock-in attempt for ${currentUser.name}`);
-            return res.status(400).json({ success: false, error: '今日已有打卡紀錄' });
-        }
-
         const id = 'att-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         const clockInTime = client_timestamp ? new Date(client_timestamp) : new Date();
         
