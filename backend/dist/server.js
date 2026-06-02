@@ -34,6 +34,7 @@ const schedules_1 = require("./routes/schedules");
 const platformRevenueRoutes = require("./routes/platform-revenue");
 const workLogsRoutes = require("./routes/work-logs");
 const filesRoutesModule = require('./routes/files');
+const trashCleanup = require('./jobs/trashCleanup');
 class TaskFlowServer {
     constructor(config = {}) {
         this.config = {
@@ -281,6 +282,9 @@ IP.2 = ::1
             console.log('📊 初始化資料庫...');
             await this.db.initialize();
             console.log('✅ 資料庫初始化完成');
+            // Start trash cleanup cron (runs every hour, deletes versions soft-deleted >48h ago)
+            trashCleanup.startCleanupCron(this.db);
+            console.log('[Server] Trash cleanup cron started (runs every hour)');
             // Initialize central hub tables after DB is ready
             if (this._initSubsidiariesTable) {
                 this._initSubsidiariesTable(this.db);
