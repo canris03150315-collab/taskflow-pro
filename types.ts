@@ -628,3 +628,60 @@ export interface KOLOperationLog {
 
 // Build-time injected version
 declare const __APP_VERSION__: string;
+
+// --- File Management Types ---
+export interface FileRecord {
+  id: string;
+  filename: string;
+  owner_id: string;
+  owner_name?: string;
+  created_at: string;
+  latest_uploaded_at: string;
+  is_deleted: number;
+  version_count?: number;
+  latest_version_no?: number;
+  latest_uploader_id?: string;
+  latest_file_size?: number;
+  latest_mime_type?: string;
+}
+
+export interface FileVersion {
+  id: string;
+  file_id: string;
+  version_no: number;
+  uploader_id: string;
+  uploader_name?: string;
+  uploaded_at: string;
+  content_hash: string;
+  blob_path: string;
+  file_size: number;
+  mime_type: string;
+  note?: string;
+  is_deleted: number;
+  deleted_at?: string;
+  deleted_by?: string;
+}
+
+export interface FileOperation {
+  id: string;
+  action: 'upload' | 'delete' | 'download' | 'restore';
+  actor_id: string;
+  actor_name?: string;
+  file_id: string;
+  filename?: string;
+  version_id?: string;
+  version_no?: number;
+  created_at: string;
+  ip_address?: string;
+}
+
+export interface ConflictCheckResult {
+  same_user_match: { file_id: string; version_count: number; latest_version_no: number } | null;
+  cross_user_matches: Array<{
+    file_id: string;
+    owner_id: string;
+    owner_name: string;
+    version_count: number;
+    hash_matches_latest: boolean;
+  }>;
+}
