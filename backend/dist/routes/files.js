@@ -88,4 +88,65 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
   }
 });
 
+// GET /
+router.get('/', authenticateToken, (req, res) => {
+  try {
+    const { scope, q, uploader_id, from_date, to_date, file_type } = req.query;
+    const rows = fileService.listFiles(req.db, req.user, {
+      scope: scope || 'mine',
+      q,
+      uploaderId: uploader_id,
+      fromDate: from_date,
+      toDate: to_date,
+      fileType: file_type,
+    });
+    res.json({ files: rows });
+  } catch (err) {
+    console.error('[files] list error:', err.message);
+    res.status(500).json({ error: '取得檔案列表失敗' });
+  }
+});
+
+// GET /:id
+router.get('/:id', authenticateToken, (req, res) => {
+  try {
+    const detail = fileService.getFileDetail(req.db, req.params.id);
+    if (!detail || detail.is_deleted) return res.status(404).json({ error: '檔案不存在' });
+    if (!perms.canViewFile(req.user, detail)) return res.status(403).json({ error: '無權限查看此檔案' });
+    res.json(detail);
+  } catch (err) {
+    console.error('[files] detail error:', err.message);
+    res.status(500).json({ error: '取得檔案詳情失敗' });
+  }
+});
+
+// GET /:id/v/:n — download
+router.get('/:id/v/:n', authenticateToken, (req, res) => {
+  try {
+    const file = req.db.prepare('SELECT * FROM files WHERE id = ? AND is_deleted = 0').get(req.params.id);
+    if (!file) return res.status(404).json({ error: '檔案不存在' });
+    if (!perms.canViewFile(req.user, file)) return res.status(403).json({ error: '無權限下載' });
+
+    const version = fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
+    if (!version) return res.status(404).json({ error: '版本不存在' });
+
+    const buffer = storage.readBlob(version.blob_path);
+
+    opsLog.logOperation(req.db, {
+      action: 'download',
+      actorId: req.user.id,
+      fileId: file.id,
+      versionId: version.id,
+      ipAddress: req.ip,
+    });
+
+    res.set('Content-Type', version.mime_type);
+    res.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+    res.send(buffer);
+  } catch (err) {
+    console.error('[files] download error:', err.message);
+    res.status(500).json({ error: '下載失敗' });
+  }
+});
+
 exports.filesRoutes = router;
