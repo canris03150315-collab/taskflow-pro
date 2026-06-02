@@ -102,4 +102,168 @@ function uploadFile(db, currentUser, { filename, buffer, mimeType, note, targetF
   return { file_id: fileId, version_id: versionId, version_no: versionNo, uploaded_at: now };
 }
 
-module.exports = { checkConflict, uploadFile, genId };
+/**
+ * List files visible to user, filtered by scope.
+ *
+ * scope = 'mine'    → files where owner_id = currentUser.id
+ * scope = 'company' → all files (BOSS/MANAGER) or 48h-window files (EMPLOYEE)
+ */
+function listFiles(db, currentUser, { scope = 'mine', q, uploaderId, fromDate, toDate, fileType } = {}) {
+  const params = [];
+  const whereClauses = ['f.is_deleted = 0'];
+
+  if (scope === 'mine') {
+    whereClauses.push('f.owner_id = ?');
+    params.push(currentUser.id);
+  } else if (scope === 'company') {
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
+      const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+      whereClauses.push('f.latest_uploaded_at >= ?');
+      params.push(fortyEightHoursAgo);
+    }
+  }
+
+  if (q) {
+    whereClauses.push('f.filename LIKE ?');
+    params.push(`%${q}%`);
+  }
+
+  if (uploaderId) {
+    whereClauses.push(
+      `EXISTS (SELECT 1 FROM file_versions v WHERE v.file_id = f.id AND v.uploader_id = ? AND v.is_deleted = 0)`
+    );
+    params.push(uploaderId);
+  }
+
+  if (fromDate) {
+    whereClauses.push('f.latest_uploaded_at >= ?');
+    params.push(fromDate);
+  }
+
+  if (toDate) {
+    whereClauses.push('f.latest_uploaded_at <= ?');
+    params.push(toDate);
+  }
+
+  const sql = `
+    SELECT f.*, u.name AS owner_name,
+      (SELECT COUNT(*) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS version_count,
+      (SELECT MAX(version_no) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS latest_version_no,
+      (SELECT uploader_id FROM file_versions WHERE file_id = f.id AND is_deleted = 0 ORDER BY version_no DESC LIMIT 1) AS latest_uploader_id,
+      (SELECT file_size FROM file_versions WHERE file_id = f.id AND is_deleted = 0 ORDER BY version_no DESC LIMIT 1) AS latest_file_size,
+      (SELECT mime_type FROM file_versions WHERE file_id = f.id AND is_deleted = 0 ORDER BY version_no DESC LIMIT 1) AS latest_mime_type
+    FROM files f
+    LEFT JOIN users u ON u.id = f.owner_id
+    WHERE ${whereClauses.join(' AND ')}
+    ORDER BY f.latest_uploaded_at DESC
+  `;
+
+  const rows = db.prepare(sql).all(...params);
+
+  if (fileType) {
+    return rows.filter((r) => matchesFileType(r.latest_mime_type, fileType));
+  }
+  return rows;
+}
+
+function matchesFileType(mime, type) {
+  const map = {
+    excel: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'],
+    word: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'],
+    pdf: ['application/pdf'],
+    image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+    powerpoint: [
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-powerpoint',
+    ],
+    csv: ['text/csv'],
+    text: ['text/plain'],
+  };
+  return (map[type] || []).includes(mime);
+}
+
+function getFileDetail(db, fileId) {
+  const file = db
+    .prepare('SELECT f.*, u.name AS owner_name FROM files f LEFT JOIN users u ON u.id = f.owner_id WHERE f.id = ?')
+    .get(fileId);
+  if (!file) return null;
+  const versions = db
+    .prepare(
+      `SELECT v.*, u.name AS uploader_name
+         FROM file_versions v
+         LEFT JOIN users u ON u.id = v.uploader_id
+         WHERE v.file_id = ? AND v.is_deleted = 0
+         ORDER BY v.version_no DESC`
+    )
+    .all(fileId);
+  return { ...file, versions };
+}
+
+function getVersion(db, fileId, versionNo) {
+  return db
+    .prepare('SELECT * FROM file_versions WHERE file_id = ? AND version_no = ? AND is_deleted = 0')
+    .get(fileId, versionNo);
+}
+
+function softDeleteVersion(db, currentUser, versionId) {
+  const now = new Date().toISOString();
+  db.prepare(
+    'UPDATE file_versions SET is_deleted = 1, deleted_at = ?, deleted_by = ? WHERE id = ?'
+  ).run(now, currentUser.id, versionId);
+
+  // If all versions of this file are deleted, mark file as deleted too
+  const v = db.prepare('SELECT file_id FROM file_versions WHERE id = ?').get(versionId);
+  if (v) {
+    const remaining = db
+      .prepare('SELECT COUNT(*) AS n FROM file_versions WHERE file_id = ? AND is_deleted = 0')
+      .get(v.file_id);
+    if (remaining.n === 0) {
+      db.prepare('UPDATE files SET is_deleted = 1 WHERE id = ?').run(v.file_id);
+    }
+  }
+}
+
+function restoreVersion(db, versionId) {
+  const v = db.prepare('SELECT file_id FROM file_versions WHERE id = ?').get(versionId);
+  if (!v) return;
+  db.prepare(
+    'UPDATE file_versions SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE id = ?'
+  ).run(versionId);
+  // Un-delete the parent file if it was marked deleted
+  db.prepare('UPDATE files SET is_deleted = 0 WHERE id = ?').run(v.file_id);
+}
+
+function listTrash(db, currentUser) {
+  const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+
+  const sql = isManager
+    ? `SELECT v.*, f.filename, u.name AS deleter_name
+         FROM file_versions v
+         JOIN files f ON f.id = v.file_id
+         LEFT JOIN users u ON u.id = v.deleted_by
+         WHERE v.is_deleted = 1 AND v.deleted_at >= ?
+         ORDER BY v.deleted_at DESC`
+    : `SELECT v.*, f.filename, u.name AS deleter_name
+         FROM file_versions v
+         JOIN files f ON f.id = v.file_id
+         LEFT JOIN users u ON u.id = v.deleted_by
+         WHERE v.is_deleted = 1 AND v.deleted_at >= ? AND v.deleted_by = ?
+         ORDER BY v.deleted_at DESC`;
+
+  return isManager
+    ? db.prepare(sql).all(fortyEightHoursAgo)
+    : db.prepare(sql).all(fortyEightHoursAgo, currentUser.id);
+}
+
+module.exports = {
+  checkConflict,
+  uploadFile,
+  listFiles,
+  getFileDetail,
+  getVersion,
+  softDeleteVersion,
+  restoreVersion,
+  listTrash,
+  genId,
+};
