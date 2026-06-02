@@ -191,4 +191,83 @@ router.get('/:id/v/:n/preview', authenticateToken, (req, res) => {
   }
 });
 
+// DELETE /:id/v/:n — soft delete version
+router.delete('/:id/v/:n', authenticateToken, (req, res) => {
+  try {
+    const version = fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
+    if (!version) return res.status(404).json({ error: '版本不存在' });
+    if (!perms.canDeleteVersion(req.user, version)) {
+      return res.status(403).json({ error: '無權限刪除此版本' });
+    }
+    fileService.softDeleteVersion(req.db, req.user, version.id);
+    opsLog.logOperation(req.db, {
+      action: 'delete',
+      actorId: req.user.id,
+      fileId: req.params.id,
+      versionId: version.id,
+      ipAddress: req.ip,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[files] delete error:', err.message);
+    res.status(500).json({ error: '刪除失敗' });
+  }
+});
+
+// POST /:id/v/:n/restore
+router.post('/:id/v/:n/restore', authenticateToken, (req, res) => {
+  try {
+    const version = req.db
+      .prepare('SELECT * FROM file_versions WHERE file_id = ? AND version_no = ?')
+      .get(req.params.id, parseInt(req.params.n, 10));
+    if (!version) return res.status(404).json({ error: '版本不存在' });
+    if (!perms.canDeleteVersion(req.user, version)) {
+      return res.status(403).json({ error: '無權限救回此版本' });
+    }
+    fileService.restoreVersion(req.db, version.id);
+    opsLog.logOperation(req.db, {
+      action: 'restore',
+      actorId: req.user.id,
+      fileId: req.params.id,
+      versionId: version.id,
+      ipAddress: req.ip,
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[files] restore error:', err.message);
+    res.status(500).json({ error: '救回失敗' });
+  }
+});
+
+// GET /trash
+router.get('/trash/list', authenticateToken, (req, res) => {
+  try {
+    const items = fileService.listTrash(req.db, req.user);
+    res.json({ items });
+  } catch (err) {
+    console.error('[files] trash error:', err.message);
+    res.status(500).json({ error: '取得垃圾桶失敗' });
+  }
+});
+
+// GET /operations
+router.get('/operations/list', authenticateToken, (req, res) => {
+  try {
+    if (!perms.canViewOperationsLog(req.user)) {
+      return res.status(403).json({ error: '無權限查看操作紀錄' });
+    }
+    const { action, actor_id, from_date, to_date } = req.query;
+    const items = opsLog.listOperations(req.db, {
+      action,
+      actorId: actor_id,
+      fromDate: from_date,
+      toDate: to_date,
+    });
+    res.json({ items });
+  } catch (err) {
+    console.error('[files] operations error:', err.message);
+    res.status(500).json({ error: '取得操作紀錄失敗' });
+  }
+});
+
 exports.filesRoutes = router;
