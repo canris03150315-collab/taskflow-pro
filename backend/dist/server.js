@@ -33,6 +33,7 @@ const leaves_1 = require("./routes/leaves");
 const schedules_1 = require("./routes/schedules");
 const platformRevenueRoutes = require("./routes/platform-revenue");
 const workLogsRoutes = require("./routes/work-logs");
+const filesRoutesModule = require('./routes/files');
 class TaskFlowServer {
     constructor(config = {}) {
         this.config = {
@@ -135,6 +136,7 @@ class TaskFlowServer {
         this.app.use('/api/ai-assistant', require('./routes/ai-assistant'));
         this.app.use('/api/platform-accounts', require('./routes/platform-accounts'));
         this.app.use('/api/backup', require('./routes/backup'));
+        this.app.use('/api/files', filesRoutesModule.filesRoutes);
         // this.app.use('/api/platform-revenue', platformRevenueRoutes); // replaced by platform-accounts
         // system route (optional)
         // this.app.use('/api/system', systemRoutes);
