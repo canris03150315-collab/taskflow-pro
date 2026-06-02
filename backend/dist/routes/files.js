@@ -7,6 +7,7 @@ const fileService = require('../services/fileService');
 const storage = require('../services/fileStorage');
 const perms = require('../services/filePermissions');
 const opsLog = require('../services/fileOperationsLog');
+const xlsx = require('xlsx');
 
 const router = express.Router();
 
@@ -146,6 +147,47 @@ router.get('/:id/v/:n', authenticateToken, (req, res) => {
   } catch (err) {
     console.error('[files] download error:', err.message);
     res.status(500).json({ error: '下載失敗' });
+  }
+});
+
+// GET /:id/v/:n/preview
+router.get('/:id/v/:n/preview', authenticateToken, (req, res) => {
+  try {
+    const file = req.db.prepare('SELECT * FROM files WHERE id = ? AND is_deleted = 0').get(req.params.id);
+    if (!file) return res.status(404).json({ error: '檔案不存在' });
+    if (!perms.canViewFile(req.user, file)) return res.status(403).json({ error: '無權限預覽' });
+
+    const version = fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
+    if (!version) return res.status(404).json({ error: '版本不存在' });
+
+    const isExcel =
+      version.mime_type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      version.mime_type === 'application/vnd.ms-excel';
+
+    if (isExcel) {
+      if (version.file_size > 5 * 1024 * 1024) {
+        return res.json({ type: 'oversized', message: '檔案過大，請下載查看' });
+      }
+      const buffer = storage.readBlob(version.blob_path);
+      const wb = xlsx.read(buffer, { type: 'buffer' });
+      const sheets = wb.SheetNames.map((name) => ({
+        name,
+        data: xlsx.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }),
+      }));
+      return res.json({ type: 'excel', sheets });
+    }
+
+    if (version.mime_type === 'application/pdf') {
+      const buffer = storage.readBlob(version.blob_path);
+      res.set('Content-Type', 'application/pdf');
+      res.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+      return res.send(buffer);
+    }
+
+    res.json({ type: 'unsupported', message: '此檔案類型不支援預覽，請下載查看' });
+  } catch (err) {
+    console.error('[files] preview error:', err.message);
+    res.status(500).json({ error: '預覽失敗' });
   }
 });
 
