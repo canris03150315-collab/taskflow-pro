@@ -9,8 +9,6 @@ import {
   Announcement,
   UNASSIGNED_DEPT_ID,
   Report,
-  ReportType,
-  DailyReportContent,
   TaskTimelineEntry,
   FinanceRecord,
   Suggestion,
@@ -55,9 +53,6 @@ const BulletinView = lazy(() =>
 );
 const ReportView = lazy(() =>
   import('./components/ReportView').then((m) => ({ default: m.ReportView }))
-);
-const CreateReportView = lazy(() =>
-  import('./components/CreateReportView').then((m) => ({ default: m.CreateReportView }))
 );
 const FinanceView = lazy(() =>
   import('./components/FinanceView').then((m) => ({ default: m.FinanceView }))
@@ -139,8 +134,6 @@ function AppContent() {
   // UI States
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isUserModalOpen, setUserModalOpen] = useState(false);
-  const [isCreatingReport, setIsCreatingReport] = useState(false);
-  const [isReportProcessing, setReportProcessing] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -235,7 +228,6 @@ function AppContent() {
         api.departments.getAll(),
         api.tasks.getAll(),
         api.announcements.getAll(),
-        api.reports.getAll(),
         api.finance.getAll(),
         api.forum.getAll(),
         api.leaves.getAll(),
@@ -253,18 +245,16 @@ function AppContent() {
       if (results[3].status === 'fulfilled')
         setAnnouncements(Array.isArray(results[3].value) ? results[3].value : []);
       if (results[4].status === 'fulfilled')
-        setReports(Array.isArray(results[4].value) ? results[4].value : []);
+        setFinanceRecords(Array.isArray(results[4].value) ? results[4].value : []);
       if (results[5].status === 'fulfilled')
-        setFinanceRecords(Array.isArray(results[5].value) ? results[5].value : []);
+        setSuggestions(Array.isArray(results[5].value) ? results[5].value : []);
       if (results[6].status === 'fulfilled')
-        setSuggestions(Array.isArray(results[6].value) ? results[6].value : []);
-      if (results[7].status === 'fulfilled')
-        setLeaves(Array.isArray(results[7].value) ? results[7].value : []);
-      if (results[8].status === 'fulfilled' && results[8].value.menuGroups) {
-        setMenuGroups(results[8].value.menuGroups);
+        setLeaves(Array.isArray(results[6].value) ? results[6].value : []);
+      if (results[7].status === 'fulfilled' && results[7].value.menuGroups) {
+        setMenuGroups(results[7].value.menuGroups);
       }
-      if (results[9].status === 'fulfilled') {
-        setBackendVersion(results[9].value.version || '未知');
+      if (results[8].status === 'fulfilled') {
+        setBackendVersion(results[8].value.version || '未知');
       }
     } catch (err) {
       console.error('Failed to load initial data', err);
@@ -550,7 +540,6 @@ function AppContent() {
         api.departments.getAll(),
         api.tasks.getAll(),
         api.announcements.getAll(),
-        api.reports.getAll(),
         api.finance.getAll(),
         api.forum.getAll(),
         api.system.getSettings(),
@@ -560,11 +549,10 @@ function AppContent() {
       if (results[1].status === 'fulfilled') setDepartments(results[1].value);
       if (results[2].status === 'fulfilled') setTasks(results[2].value);
       if (results[3].status === 'fulfilled') setAnnouncements(results[3].value);
-      if (results[4].status === 'fulfilled') setReports(results[4].value);
-      if (results[5].status === 'fulfilled') setFinanceRecords(results[5].value);
-      if (results[6].status === 'fulfilled') setSuggestions(results[6].value);
-      if (results[7].status === 'fulfilled' && results[7].value.menuGroups) {
-        setMenuGroups(results[7].value.menuGroups);
+      if (results[4].status === 'fulfilled') setFinanceRecords(results[4].value);
+      if (results[5].status === 'fulfilled') setSuggestions(results[5].value);
+      if (results[6].status === 'fulfilled' && results[6].value.menuGroups) {
+        setMenuGroups(results[6].value.menuGroups);
       }
     } catch (err) {
       console.error('Failed to load data after login', err);
@@ -945,27 +933,6 @@ function AppContent() {
     }
   };
 
-  const handleCreateReport = async (
-    content: DailyReportContent,
-    type: ReportType,
-    reportDate?: string
-  ) => {
-    if (!currentUser) return;
-    setReportProcessing(true);
-    const newReport: Report = {
-      id: `rep-${Date.now()}`,
-      type,
-      userId: currentUser.id,
-      createdAt: reportDate || new Date().toISOString().split('T')[0],
-      content,
-    };
-    const savedReport = await api.reports.create(newReport);
-    // 使用後端返回的完整報表對象（已在 api.ts 中處理）
-    setReports([savedReport, ...reports]);
-    setReportProcessing(false);
-    setIsCreatingReport(false);
-  };
-
   const handleAddFinanceRecord = async (record: Omit<FinanceRecord, 'id'>) => {
     const result = await api.finance.create(record as FinanceRecord);
     // 使用後端返回的記錄（包含正確的 ID）
@@ -1290,7 +1257,6 @@ function AppContent() {
           key={id}
           onClick={() => {
             setCurrentPage(id);
-            setIsCreatingReport(false);
             setIsMobileMenuOpen(false);
           }}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
@@ -1309,7 +1275,6 @@ function AppContent() {
         key={id}
         onClick={() => {
           setCurrentPage(id);
-          setIsCreatingReport(false);
           setIsMobileMenuOpen(false);
         }}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition font-bold ${isSidebarCollapsed ? 'justify-center' : ''} ${currentPage === id ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'}`}
@@ -1842,23 +1807,9 @@ function AppContent() {
                   )}
                 </div>
               )}
-              {currentPage === 'reports' &&
-                (isCreatingReport ? (
-                  <CreateReportView
-                    onCancel={() => setIsCreatingReport(false)}
-                    onSubmit={handleCreateReport}
-                    isProcessing={isReportProcessing}
-                  />
-                ) : (
-                  <ReportView
-                    currentUser={currentUser}
-                    users={users}
-                    reports={reports}
-                    departments={departments}
-                    onCreateClick={() => setIsCreatingReport(true)}
-                    onOpenReportModal={() => setIsCreatingReport(true)}
-                  />
-                ))}
+              {currentPage === 'reports' && (
+                <ReportView currentUser={currentUser} users={users} departments={departments} />
+              )}
               {currentPage === 'finance' && (
                 <FinanceView
                   currentUser={currentUser}
