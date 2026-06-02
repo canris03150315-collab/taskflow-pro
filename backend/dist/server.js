@@ -19,7 +19,6 @@ const tasks_1 = require("./routes/tasks");
 const departments_1 = require("./routes/departments");
 const attendance_1 = require("./routes/attendance");
 const sync_1 = require("./routes/sync");
-const reports_1 = require("./routes/reports");
 const finance_1 = require("./routes/finance");
 const forum_1 = require("./routes/forum");
 const memos_1 = require("./routes/memos");
@@ -120,7 +119,6 @@ class TaskFlowServer {
         this.app.use('/api/sync', sync_1.syncRoutes);
         // announcements route (optional)
         this.app.use('/api/announcements', announcements_1.announcementsRoutes);
-        this.app.use('/api/reports', reports_1.reportRoutes);
         this.app.use('/api/work-logs', workLogsRoutes);
         this.app.use('/api/finance', finance_1.financeRoutes);
         this.app.use('/api/forum', forum_1.forumRoutes);
