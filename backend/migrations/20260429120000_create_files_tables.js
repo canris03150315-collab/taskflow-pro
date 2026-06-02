@@ -1,6 +1,6 @@
 // backend/migrations/20260429120000_create_files_tables.js
 exports.up = async function (knex) {
-  await knex.schema.createTable('files', (t) => {
+  await knex.schema.createTableIfNotExists('files', (t) => {
     t.text('id').primary();
     t.text('filename').notNullable();
     t.text('owner_id').notNullable();
@@ -9,11 +9,13 @@ exports.up = async function (knex) {
     t.integer('is_deleted').defaultTo(0);
     t.foreign('owner_id').references('users.id');
   });
-  await knex.schema.raw('CREATE INDEX idx_files_owner ON files(owner_id)');
-  await knex.schema.raw('CREATE INDEX idx_files_filename_owner ON files(filename, owner_id)');
-  await knex.schema.raw('CREATE INDEX idx_files_latest ON files(latest_uploaded_at)');
+  await knex.schema.raw('CREATE INDEX IF NOT EXISTS idx_files_owner ON files(owner_id)');
+  await knex.schema.raw(
+    'CREATE INDEX IF NOT EXISTS idx_files_filename_owner ON files(filename, owner_id)'
+  );
+  await knex.schema.raw('CREATE INDEX IF NOT EXISTS idx_files_latest ON files(latest_uploaded_at)');
 
-  await knex.schema.createTable('file_versions', (t) => {
+  await knex.schema.createTableIfNotExists('file_versions', (t) => {
     t.text('id').primary();
     t.text('file_id').notNullable();
     t.integer('version_no').notNullable();
@@ -31,12 +33,18 @@ exports.up = async function (knex) {
     t.foreign('uploader_id').references('users.id');
     t.unique(['file_id', 'version_no']);
   });
-  await knex.schema.raw('CREATE INDEX idx_versions_file ON file_versions(file_id)');
-  await knex.schema.raw('CREATE INDEX idx_versions_uploader ON file_versions(uploader_id)');
-  await knex.schema.raw('CREATE INDEX idx_versions_hash ON file_versions(content_hash)');
-  await knex.schema.raw('CREATE INDEX idx_versions_deleted_at ON file_versions(deleted_at)');
+  await knex.schema.raw('CREATE INDEX IF NOT EXISTS idx_versions_file ON file_versions(file_id)');
+  await knex.schema.raw(
+    'CREATE INDEX IF NOT EXISTS idx_versions_uploader ON file_versions(uploader_id)'
+  );
+  await knex.schema.raw(
+    'CREATE INDEX IF NOT EXISTS idx_versions_hash ON file_versions(content_hash)'
+  );
+  await knex.schema.raw(
+    'CREATE INDEX IF NOT EXISTS idx_versions_deleted_at ON file_versions(deleted_at)'
+  );
 
-  await knex.schema.createTable('file_operations', (t) => {
+  await knex.schema.createTableIfNotExists('file_operations', (t) => {
     t.text('id').primary();
     t.text('action').notNullable();
     t.text('actor_id').notNullable();
@@ -47,8 +55,10 @@ exports.up = async function (knex) {
     t.foreign('actor_id').references('users.id');
     t.foreign('file_id').references('files.id');
   });
-  await knex.schema.raw('CREATE INDEX idx_ops_created ON file_operations(created_at)');
-  await knex.schema.raw('CREATE INDEX idx_ops_actor ON file_operations(actor_id)');
+  await knex.schema.raw(
+    'CREATE INDEX IF NOT EXISTS idx_ops_created ON file_operations(created_at)'
+  );
+  await knex.schema.raw('CREATE INDEX IF NOT EXISTS idx_ops_actor ON file_operations(actor_id)');
 };
 
 exports.down = async function (knex) {
