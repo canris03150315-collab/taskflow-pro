@@ -2,22 +2,24 @@
 'use strict';
 const { genId } = require('./fileService');
 
-function logOperation(db, { action, actorId, fileId, versionId, ipAddress }) {
+async function logOperation(db, { action, actorId, fileId, versionId, ipAddress }) {
   const id = genId('op');
   const createdAt = new Date().toISOString();
-  db.prepare(
+  await db.run(
     `INSERT INTO file_operations (id, action, actor_id, file_id, version_id, created_at, ip_address)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, action, actorId, fileId, versionId || null, createdAt, ipAddress || null);
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, action, actorId, fileId, versionId || null, createdAt, ipAddress || null]
+  );
 }
 
-function listOperations(db, { action, actorId, fromDate, toDate, limit = 200 } = {}) {
+async function listOperations(db, { action, actorId, fromDate, toDate, limit = 200 } = {}) {
   const where = [];
   const params = [];
   if (action) { where.push('o.action = ?'); params.push(action); }
   if (actorId) { where.push('o.actor_id = ?'); params.push(actorId); }
   if (fromDate) { where.push('o.created_at >= ?'); params.push(fromDate); }
   if (toDate) { where.push('o.created_at <= ?'); params.push(toDate); }
+  params.push(limit);
 
   const sql = `
     SELECT o.*, u.name AS actor_name, f.filename, v.version_no
@@ -29,7 +31,7 @@ function listOperations(db, { action, actorId, fromDate, toDate, limit = 200 } =
       ORDER BY o.created_at DESC
       LIMIT ?
   `;
-  return db.prepare(sql).all(...params, limit);
+  return db.all(sql, params);
 }
 
 module.exports = { logOperation, listOperations };

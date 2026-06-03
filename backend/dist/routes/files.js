@@ -33,13 +33,13 @@ const ALLOWED_MIME = new Set([
 ]);
 
 // POST /check-conflict
-router.post('/check-conflict', authenticateToken, (req, res) => {
+router.post('/check-conflict', authenticateToken, async (req, res) => {
   try {
     const { filename, content_hash } = req.body;
     if (!filename || !content_hash) {
       return res.status(400).json({ error: '缺少 filename 或 content_hash' });
     }
-    const result = fileService.checkConflict(req.db, req.user, filename, content_hash);
+    const result = await fileService.checkConflict(req.db, req.user, filename, content_hash);
     res.json(result);
   } catch (err) {
     console.error('[files] check-conflict error:', err.message);
@@ -48,7 +48,7 @@ router.post('/check-conflict', authenticateToken, (req, res) => {
 });
 
 // POST /upload
-router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
+router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: '請選擇檔案' });
     if (!ALLOWED_MIME.has(req.file.mimetype)) {
@@ -59,14 +59,14 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
 
     // Permission: if target_file_id given, ensure user can add version to that file
     if (target_file_id) {
-      const file = req.db.prepare('SELECT * FROM files WHERE id = ? AND is_deleted = 0').get(target_file_id);
+      const file = await req.db.get('SELECT * FROM files WHERE id = ? AND is_deleted = 0', [target_file_id]);
       if (!file) return res.status(404).json({ error: '目標檔案不存在' });
       if (!perms.canViewFile(req.user, file)) {
         return res.status(403).json({ error: '無權限新增版本到此檔案' });
       }
     }
 
-    const result = fileService.uploadFile(req.db, req.user, {
+    const result = await fileService.uploadFile(req.db, req.user, {
       filename: req.file.originalname,
       buffer: req.file.buffer,
       mimeType: req.file.mimetype,
@@ -74,7 +74,7 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
       targetFileId: target_file_id,
     });
 
-    opsLog.logOperation(req.db, {
+    await opsLog.logOperation(req.db, {
       action: 'upload',
       actorId: req.user.id,
       fileId: result.file_id,
@@ -90,10 +90,10 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
 });
 
 // GET /
-router.get('/', authenticateToken, (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { scope, q, uploader_id, from_date, to_date, file_type } = req.query;
-    const rows = fileService.listFiles(req.db, req.user, {
+    const rows = await fileService.listFiles(req.db, req.user, {
       scope: scope || 'mine',
       q,
       uploaderId: uploader_id,
@@ -109,9 +109,9 @@ router.get('/', authenticateToken, (req, res) => {
 });
 
 // GET /:id
-router.get('/:id', authenticateToken, (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const detail = fileService.getFileDetail(req.db, req.params.id);
+    const detail = await fileService.getFileDetail(req.db, req.params.id);
     if (!detail || detail.is_deleted) return res.status(404).json({ error: '檔案不存在' });
     if (!perms.canViewFile(req.user, detail)) return res.status(403).json({ error: '無權限查看此檔案' });
     res.json(detail);
@@ -122,18 +122,18 @@ router.get('/:id', authenticateToken, (req, res) => {
 });
 
 // GET /:id/v/:n — download
-router.get('/:id/v/:n', authenticateToken, (req, res) => {
+router.get('/:id/v/:n', authenticateToken, async (req, res) => {
   try {
-    const file = req.db.prepare('SELECT * FROM files WHERE id = ? AND is_deleted = 0').get(req.params.id);
+    const file = await req.db.get('SELECT * FROM files WHERE id = ? AND is_deleted = 0', [req.params.id]);
     if (!file) return res.status(404).json({ error: '檔案不存在' });
     if (!perms.canViewFile(req.user, file)) return res.status(403).json({ error: '無權限下載' });
 
-    const version = fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
+    const version = await fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
     if (!version) return res.status(404).json({ error: '版本不存在' });
 
     const buffer = storage.readBlob(version.blob_path);
 
-    opsLog.logOperation(req.db, {
+    await opsLog.logOperation(req.db, {
       action: 'download',
       actorId: req.user.id,
       fileId: file.id,
@@ -151,13 +151,13 @@ router.get('/:id/v/:n', authenticateToken, (req, res) => {
 });
 
 // GET /:id/v/:n/preview
-router.get('/:id/v/:n/preview', authenticateToken, (req, res) => {
+router.get('/:id/v/:n/preview', authenticateToken, async (req, res) => {
   try {
-    const file = req.db.prepare('SELECT * FROM files WHERE id = ? AND is_deleted = 0').get(req.params.id);
+    const file = await req.db.get('SELECT * FROM files WHERE id = ? AND is_deleted = 0', [req.params.id]);
     if (!file) return res.status(404).json({ error: '檔案不存在' });
     if (!perms.canViewFile(req.user, file)) return res.status(403).json({ error: '無權限預覽' });
 
-    const version = fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
+    const version = await fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
     if (!version) return res.status(404).json({ error: '版本不存在' });
 
     const isExcel =
@@ -192,15 +192,15 @@ router.get('/:id/v/:n/preview', authenticateToken, (req, res) => {
 });
 
 // DELETE /:id/v/:n — soft delete version
-router.delete('/:id/v/:n', authenticateToken, (req, res) => {
+router.delete('/:id/v/:n', authenticateToken, async (req, res) => {
   try {
-    const version = fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
+    const version = await fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
     if (!version) return res.status(404).json({ error: '版本不存在' });
     if (!perms.canDeleteVersion(req.user, version)) {
       return res.status(403).json({ error: '無權限刪除此版本' });
     }
-    fileService.softDeleteVersion(req.db, req.user, version.id);
-    opsLog.logOperation(req.db, {
+    await fileService.softDeleteVersion(req.db, req.user, version.id);
+    await opsLog.logOperation(req.db, {
       action: 'delete',
       actorId: req.user.id,
       fileId: req.params.id,
@@ -215,17 +215,18 @@ router.delete('/:id/v/:n', authenticateToken, (req, res) => {
 });
 
 // POST /:id/v/:n/restore
-router.post('/:id/v/:n/restore', authenticateToken, (req, res) => {
+router.post('/:id/v/:n/restore', authenticateToken, async (req, res) => {
   try {
-    const version = req.db
-      .prepare('SELECT * FROM file_versions WHERE file_id = ? AND version_no = ?')
-      .get(req.params.id, parseInt(req.params.n, 10));
+    const version = await req.db.get(
+      'SELECT * FROM file_versions WHERE file_id = ? AND version_no = ?',
+      [req.params.id, parseInt(req.params.n, 10)]
+    );
     if (!version) return res.status(404).json({ error: '版本不存在' });
     if (!perms.canDeleteVersion(req.user, version)) {
       return res.status(403).json({ error: '無權限救回此版本' });
     }
-    fileService.restoreVersion(req.db, version.id);
-    opsLog.logOperation(req.db, {
+    await fileService.restoreVersion(req.db, version.id);
+    await opsLog.logOperation(req.db, {
       action: 'restore',
       actorId: req.user.id,
       fileId: req.params.id,
@@ -240,9 +241,9 @@ router.post('/:id/v/:n/restore', authenticateToken, (req, res) => {
 });
 
 // GET /trash
-router.get('/trash/list', authenticateToken, (req, res) => {
+router.get('/trash/list', authenticateToken, async (req, res) => {
   try {
-    const items = fileService.listTrash(req.db, req.user);
+    const items = await fileService.listTrash(req.db, req.user);
     res.json({ items });
   } catch (err) {
     console.error('[files] trash error:', err.message);
@@ -251,13 +252,13 @@ router.get('/trash/list', authenticateToken, (req, res) => {
 });
 
 // GET /operations
-router.get('/operations/list', authenticateToken, (req, res) => {
+router.get('/operations/list', authenticateToken, async (req, res) => {
   try {
     if (!perms.canViewOperationsLog(req.user)) {
       return res.status(403).json({ error: '無權限查看操作紀錄' });
     }
     const { action, actor_id, from_date, to_date } = req.query;
-    const items = opsLog.listOperations(req.db, {
+    const items = await opsLog.listOperations(req.db, {
       action,
       actorId: actor_id,
       fromDate: from_date,

@@ -15,30 +15,28 @@ function getExt(filename) {
  * Check conflict before upload.
  * Returns: { same_user_match, cross_user_matches }
  */
-function checkConflict(db, currentUser, filename, contentHash) {
-  const sameUser = db
-    .prepare(
-      `SELECT f.id AS file_id,
-              (SELECT COUNT(*) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS version_count,
-              (SELECT MAX(version_no) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS latest_version_no
-         FROM files f
-         WHERE f.owner_id = ? AND f.filename = ? AND f.is_deleted = 0
-         LIMIT 1`
-    )
-    .get(currentUser.id, filename);
+async function checkConflict(db, currentUser, filename, contentHash) {
+  const sameUser = await db.get(
+    `SELECT f.id AS file_id,
+            (SELECT COUNT(*) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS version_count,
+            (SELECT MAX(version_no) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS latest_version_no
+       FROM files f
+       WHERE f.owner_id = ? AND f.filename = ? AND f.is_deleted = 0
+       LIMIT 1`,
+    [currentUser.id, filename]
+  );
 
-  const crossUsers = db
-    .prepare(
-      `SELECT f.id AS file_id, f.owner_id,
-              u.name AS owner_name,
-              (SELECT COUNT(*) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS version_count,
-              (SELECT content_hash FROM file_versions WHERE file_id = f.id AND is_deleted = 0
-                 ORDER BY version_no DESC LIMIT 1) AS latest_hash
-         FROM files f
-         JOIN users u ON u.id = f.owner_id
-         WHERE f.owner_id != ? AND f.filename = ? AND f.is_deleted = 0`
-    )
-    .all(currentUser.id, filename);
+  const crossUsers = await db.all(
+    `SELECT f.id AS file_id, f.owner_id,
+            u.name AS owner_name,
+            (SELECT COUNT(*) FROM file_versions WHERE file_id = f.id AND is_deleted = 0) AS version_count,
+            (SELECT content_hash FROM file_versions WHERE file_id = f.id AND is_deleted = 0
+               ORDER BY version_no DESC LIMIT 1) AS latest_hash
+       FROM files f
+       JOIN users u ON u.id = f.owner_id
+       WHERE f.owner_id != ? AND f.filename = ? AND f.is_deleted = 0`,
+    [currentUser.id, filename]
+  );
 
   return {
     same_user_match: sameUser || null,
@@ -59,7 +57,7 @@ function checkConflict(db, currentUser, filename, contentHash) {
  *   - undefined → create new file record (uploader is owner)
  *   - given     → add as new version to existing file (caller must have permission)
  */
-function uploadFile(db, currentUser, { filename, buffer, mimeType, note, targetFileId }) {
+async function uploadFile(db, currentUser, { filename, buffer, mimeType, note, targetFileId }) {
   const contentHash = storage.computeHash(buffer);
   const ext = getExt(filename);
   const blobPath = storage.writeBlob(contentHash, ext, buffer);
@@ -69,34 +67,34 @@ function uploadFile(db, currentUser, { filename, buffer, mimeType, note, targetF
 
   if (targetFileId) {
     // Add new version to existing file
-    const file = db.prepare('SELECT * FROM files WHERE id = ? AND is_deleted = 0').get(targetFileId);
+    const file = await db.get('SELECT * FROM files WHERE id = ? AND is_deleted = 0', [targetFileId]);
     if (!file) throw new Error('Target file not found');
     fileId = targetFileId;
 
-    const maxVer = db
-      .prepare('SELECT MAX(version_no) AS max_no FROM file_versions WHERE file_id = ?')
-      .get(targetFileId);
+    const maxVer = await db.get(
+      'SELECT MAX(version_no) AS max_no FROM file_versions WHERE file_id = ?',
+      [targetFileId]
+    );
     versionNo = (maxVer.max_no || 0) + 1;
 
-    db.prepare('UPDATE files SET latest_uploaded_at = ? WHERE id = ?').run(now, fileId);
+    await db.run('UPDATE files SET latest_uploaded_at = ? WHERE id = ?', [now, fileId]);
   } else {
     // Create new file
     fileId = genId('file');
     versionNo = 1;
-    db.prepare(
+    await db.run(
       `INSERT INTO files (id, filename, owner_id, created_at, latest_uploaded_at, is_deleted)
-       VALUES (?, ?, ?, ?, ?, 0)`
-    ).run(fileId, filename, currentUser.id, now, now);
+       VALUES (?, ?, ?, ?, ?, 0)`,
+      [fileId, filename, currentUser.id, now, now]
+    );
   }
 
   const versionId = genId('ver');
-  db.prepare(
+  await db.run(
     `INSERT INTO file_versions
      (id, file_id, version_no, uploader_id, uploaded_at, content_hash, blob_path, file_size, mime_type, note, is_deleted)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
-  ).run(
-    versionId, fileId, versionNo, currentUser.id, now,
-    contentHash, blobPath, buffer.length, mimeType, note || null
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    [versionId, fileId, versionNo, currentUser.id, now, contentHash, blobPath, buffer.length, mimeType, note || null]
   );
 
   return { file_id: fileId, version_id: versionId, version_no: versionNo, uploaded_at: now };
@@ -108,7 +106,7 @@ function uploadFile(db, currentUser, { filename, buffer, mimeType, note, targetF
  * scope = 'mine'    → files where owner_id = currentUser.id
  * scope = 'company' → all files (BOSS/MANAGER) or 48h-window files (EMPLOYEE)
  */
-function listFiles(db, currentUser, { scope = 'mine', q, uploaderId, fromDate, toDate, fileType } = {}) {
+async function listFiles(db, currentUser, { scope = 'mine', q, uploaderId, fromDate, toDate, fileType } = {}) {
   const params = [];
   const whereClauses = ['f.is_deleted = 0'];
 
@@ -158,7 +156,7 @@ function listFiles(db, currentUser, { scope = 'mine', q, uploaderId, fromDate, t
     ORDER BY f.latest_uploaded_at DESC
   `;
 
-  const rows = db.prepare(sql).all(...params);
+  const rows = await db.all(sql, params);
 
   if (fileType) {
     return rows.filter((r) => matchesFileType(r.latest_mime_type, fileType));
@@ -182,58 +180,62 @@ function matchesFileType(mime, type) {
   return (map[type] || []).includes(mime);
 }
 
-function getFileDetail(db, fileId) {
-  const file = db
-    .prepare('SELECT f.*, u.name AS owner_name FROM files f LEFT JOIN users u ON u.id = f.owner_id WHERE f.id = ?')
-    .get(fileId);
+async function getFileDetail(db, fileId) {
+  const file = await db.get(
+    'SELECT f.*, u.name AS owner_name FROM files f LEFT JOIN users u ON u.id = f.owner_id WHERE f.id = ?',
+    [fileId]
+  );
   if (!file) return null;
-  const versions = db
-    .prepare(
-      `SELECT v.*, u.name AS uploader_name
-         FROM file_versions v
-         LEFT JOIN users u ON u.id = v.uploader_id
-         WHERE v.file_id = ? AND v.is_deleted = 0
-         ORDER BY v.version_no DESC`
-    )
-    .all(fileId);
+  const versions = await db.all(
+    `SELECT v.*, u.name AS uploader_name
+       FROM file_versions v
+       LEFT JOIN users u ON u.id = v.uploader_id
+       WHERE v.file_id = ? AND v.is_deleted = 0
+       ORDER BY v.version_no DESC`,
+    [fileId]
+  );
   return { ...file, versions };
 }
 
-function getVersion(db, fileId, versionNo) {
-  return db
-    .prepare('SELECT * FROM file_versions WHERE file_id = ? AND version_no = ? AND is_deleted = 0')
-    .get(fileId, versionNo);
+async function getVersion(db, fileId, versionNo) {
+  return db.get(
+    'SELECT * FROM file_versions WHERE file_id = ? AND version_no = ? AND is_deleted = 0',
+    [fileId, versionNo]
+  );
 }
 
-function softDeleteVersion(db, currentUser, versionId) {
+async function softDeleteVersion(db, currentUser, versionId) {
   const now = new Date().toISOString();
-  db.prepare(
-    'UPDATE file_versions SET is_deleted = 1, deleted_at = ?, deleted_by = ? WHERE id = ?'
-  ).run(now, currentUser.id, versionId);
+  await db.run(
+    'UPDATE file_versions SET is_deleted = 1, deleted_at = ?, deleted_by = ? WHERE id = ?',
+    [now, currentUser.id, versionId]
+  );
 
   // If all versions of this file are deleted, mark file as deleted too
-  const v = db.prepare('SELECT file_id FROM file_versions WHERE id = ?').get(versionId);
+  const v = await db.get('SELECT file_id FROM file_versions WHERE id = ?', [versionId]);
   if (v) {
-    const remaining = db
-      .prepare('SELECT COUNT(*) AS n FROM file_versions WHERE file_id = ? AND is_deleted = 0')
-      .get(v.file_id);
+    const remaining = await db.get(
+      'SELECT COUNT(*) AS n FROM file_versions WHERE file_id = ? AND is_deleted = 0',
+      [v.file_id]
+    );
     if (remaining.n === 0) {
-      db.prepare('UPDATE files SET is_deleted = 1 WHERE id = ?').run(v.file_id);
+      await db.run('UPDATE files SET is_deleted = 1 WHERE id = ?', [v.file_id]);
     }
   }
 }
 
-function restoreVersion(db, versionId) {
-  const v = db.prepare('SELECT file_id FROM file_versions WHERE id = ?').get(versionId);
+async function restoreVersion(db, versionId) {
+  const v = await db.get('SELECT file_id FROM file_versions WHERE id = ?', [versionId]);
   if (!v) return;
-  db.prepare(
-    'UPDATE file_versions SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE id = ?'
-  ).run(versionId);
+  await db.run(
+    'UPDATE file_versions SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE id = ?',
+    [versionId]
+  );
   // Un-delete the parent file if it was marked deleted
-  db.prepare('UPDATE files SET is_deleted = 0 WHERE id = ?').run(v.file_id);
+  await db.run('UPDATE files SET is_deleted = 0 WHERE id = ?', [v.file_id]);
 }
 
-function listTrash(db, currentUser) {
+async function listTrash(db, currentUser) {
   const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
 
@@ -252,8 +254,8 @@ function listTrash(db, currentUser) {
          ORDER BY v.deleted_at DESC`;
 
   return isManager
-    ? db.prepare(sql).all(fortyEightHoursAgo)
-    : db.prepare(sql).all(fortyEightHoursAgo, currentUser.id);
+    ? db.all(sql, [fortyEightHoursAgo])
+    : db.all(sql, [fortyEightHoursAgo, currentUser.id]);
 }
 
 module.exports = {
