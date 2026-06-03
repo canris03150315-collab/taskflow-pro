@@ -64,6 +64,13 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
     tomorrowTasks: '',
     notes: '',
   });
+  // Pending images for NEW log creation (uploaded after the log is created).
+  // Each File is kept alongside a synthetic blob URL for thumbnail preview.
+  const [pendingImages, setPendingImages] = useState<{
+    today: { file: File; localUrl: string; hash: string }[];
+    tomorrow: { file: File; localUrl: string; hash: string }[];
+    notes: { file: File; localUrl: string; hash: string }[];
+  }>({ today: [], tomorrow: [], notes: [] });
   const [yesterdayLog, setYesterdayLog] = useState<WorkLog | null>(null);
 
   const [lightbox, setLightbox] = useState<{ images: WorkLogImage[]; idx: number } | null>(null);
@@ -156,9 +163,19 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
     }
   };
 
+  const clearPendingImages = () => {
+    setPendingImages((p) => {
+      for (const sec of ['today', 'tomorrow', 'notes'] as Section[]) {
+        for (const item of p[sec]) URL.revokeObjectURL(item.localUrl);
+      }
+      return { today: [], tomorrow: [], notes: [] };
+    });
+  };
+
   const handleCreate = () => {
     setEditingLog(null);
     setFormData({ date: selectedDate, todayTasks: '', tomorrowTasks: '', notes: '' });
+    clearPendingImages();
     setFormError('');
     fetchYesterdayLog();
     setIsModalOpen(true);
@@ -193,7 +210,23 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       if (editingLog) {
         await api.workLogs.update(editingLog.id, formData);
       } else {
-        await api.workLogs.create(formData);
+        const result = await api.workLogs.create(formData);
+        const newLogId = result?.log?.id || result?.id;
+        if (newLogId) {
+          // Upload buffered pending images now that we have a log id
+          let failed = 0;
+          for (const sec of ['today', 'tomorrow', 'notes'] as Section[]) {
+            for (const item of pendingImages[sec]) {
+              try {
+                await api.workLogs.images.upload(newLogId, sec, item.file);
+              } catch {
+                failed++;
+              }
+            }
+          }
+          if (failed > 0) showError(`${failed} 張圖片上傳失敗，可在編輯時重試`);
+        }
+        clearPendingImages();
       }
       setIsModalOpen(false);
       showSuccess(editingLog ? '工作日誌已更新' : '工作日誌已建立');
@@ -602,7 +635,7 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
                       placeholder={required ? `請輸入${label}...` : '其他需要注意的事項...'}
                       required={required}
                     />
-                    {editingLog && (
+                    {editingLog ? (
                       <div className="mt-2">
                         <ImageUploader
                           images={imgs}
@@ -614,14 +647,51 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
                           label="附件圖片"
                         />
                       </div>
+                    ) : (
+                      <div className="mt-2">
+                        <ImageUploader
+                          images={pendingImages[section].map((p) => ({
+                            hash: p.hash,
+                            filename: p.file.name,
+                            size: p.file.size,
+                            mime_type: p.file.type,
+                            uploader_id: currentUser.id,
+                            uploaded_at: new Date().toISOString(),
+                          }))}
+                          maxCount={10}
+                          onAdd={async (file) => {
+                            const localUrl = URL.createObjectURL(file);
+                            const hash = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                            setPendingImages((p) => ({
+                              ...p,
+                              [section]: [...p[section], { file, localUrl, hash }],
+                            }));
+                          }}
+                          onRemove={async (hash) => {
+                            const item = pendingImages[section].find((p) => p.hash === hash);
+                            if (item) URL.revokeObjectURL(item.localUrl);
+                            setPendingImages((p) => ({
+                              ...p,
+                              [section]: p[section].filter((x) => x.hash !== hash),
+                            }));
+                          }}
+                          onPreview={(img) => {
+                            const url = pendingImages[section].find(
+                              (p) => p.hash === img.hash
+                            )?.localUrl;
+                            if (url) window.open(url, '_blank', 'noopener');
+                          }}
+                          canRemove={() => true}
+                          label="附件圖片（建立後一併上傳）"
+                          resolveUrl={(img) =>
+                            pendingImages[section].find((p) => p.hash === img.hash)?.localUrl || ''
+                          }
+                        />
+                      </div>
                     )}
                   </div>
                 );
               })}
-
-              {!editingLog && (
-                <p className="text-xs text-slate-500 italic">💡 提示：建立日誌後即可加入圖片附件</p>
-              )}
             </form>
 
             <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">

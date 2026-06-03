@@ -13,6 +13,9 @@ interface ImageUploaderProps {
   canRemove: (image: WorkLogImage) => boolean;
   disabled?: boolean;
   label?: string;
+  // Optional override for thumbnail URL resolution. Used for pending (not-yet-uploaded)
+  // images during a new-log create flow where the URL is a local blob: URL.
+  resolveUrl?: (image: WorkLogImage) => string;
 }
 
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
@@ -25,6 +28,8 @@ const formatSize = (bytes: number) =>
       ? `${(bytes / 1024).toFixed(0)} KB`
       : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
+const defaultResolveUrl = (img: WorkLogImage) => api.workLogs.images.getUrl(img.hash, img.filename);
+
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   images,
   maxCount,
@@ -34,6 +39,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   canRemove,
   disabled,
   label,
+  resolveUrl,
 }) => {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +114,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               aria-label={`預覽 ${img.filename}`}
             >
               <img
-                src={api.workLogs.images.getUrl(img.hash, img.filename)}
+                src={(resolveUrl || defaultResolveUrl)(img)}
                 alt={img.filename}
                 className="w-full h-full object-cover"
                 loading="lazy"
