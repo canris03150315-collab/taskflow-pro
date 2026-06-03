@@ -1,18 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { KOLProfile, KOLWeeklyPayment, User, Role } from '../types';
 import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 
 // 新增支付記錄 Modal
-export const AddPaymentModal: React.FC<{ 
-  profile: KOLProfile; 
-  onClose: () => void; 
-  onSubmit: (data: { amount: number; paymentDate: string; notes?: string }) => void 
+export const AddPaymentModal: React.FC<{
+  profile: KOLProfile;
+  onClose: () => void;
+  onSubmit: (data: { amount: number; paymentDate: string; notes?: string }) => void;
 }> = ({ profile, onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     amount: '',
     paymentDate: new Date().toISOString().split('T')[0],
-    notes: ''
+    notes: '',
   });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,13 +31,17 @@ export const AddPaymentModal: React.FC<{
     onSubmit({
       amount: parseFloat(formData.amount),
       paymentDate: formData.paymentDate,
-      notes: formData.notes || undefined
+      notes: formData.notes || undefined,
     });
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-md">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
         <h2 className="text-2xl font-bold mb-4">記錄支付 - {profile.platformAccount}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -39,7 +51,7 @@ export const AddPaymentModal: React.FC<{
               step="0.01"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
               placeholder="請輸入金額"
               required
             />
@@ -50,7 +62,7 @@ export const AddPaymentModal: React.FC<{
               type="date"
               value={formData.paymentDate}
               onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
               required
             />
           </div>
@@ -94,8 +106,16 @@ export const EditPaymentModal: React.FC<{
   const [formData, setFormData] = useState({
     amount: payment.amount.toString(),
     paymentDate: payment.paymentDate,
-    notes: payment.notes || ''
+    notes: payment.notes || '',
   });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,13 +126,17 @@ export const EditPaymentModal: React.FC<{
     onSubmit({
       amount: parseFloat(formData.amount),
       paymentDate: formData.paymentDate,
-      notes: formData.notes || undefined
+      notes: formData.notes || undefined,
     });
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-      <div className="bg-white rounded-xl p-6 w-full max-w-md">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md">
         <h2 className="text-2xl font-bold mb-4">編輯支付記錄</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -122,7 +146,7 @@ export const EditPaymentModal: React.FC<{
               step="0.01"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
               required
             />
           </div>
@@ -132,7 +156,7 @@ export const EditPaymentModal: React.FC<{
               type="date"
               value={formData.paymentDate}
               onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
               required
             />
           </div>
@@ -177,7 +201,10 @@ export const PaymentHistoryModal: React.FC<{
   total: number;
   currentUser: User;
   onClose: () => void;
-  onEdit: (paymentId: string, data: { amount: number; paymentDate: string; notes?: string }) => void;
+  onEdit: (
+    paymentId: string,
+    data: { amount: number; paymentDate: string; notes?: string }
+  ) => void;
   onDelete: (paymentId: string) => void;
   onRefresh: (startDate?: string, endDate?: string) => void;
 }> = ({ profile, payments, total, currentUser, onClose, onEdit, onDelete, onRefresh }) => {
@@ -185,21 +212,35 @@ export const PaymentHistoryModal: React.FC<{
   const [endDate, setEndDate] = useState('');
   const [editingPayment, setEditingPayment] = useState<KOLWeeklyPayment | null>(null);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const handleSearch = () => {
     onRefresh(startDate || undefined, endDate || undefined);
   };
 
   const canEdit = (payment: KOLWeeklyPayment) => {
-    return currentUser.role === Role.BOSS || 
-           currentUser.role === Role.MANAGER || 
-           payment.createdBy === currentUser.id;
+    return (
+      currentUser.role === Role.BOSS ||
+      currentUser.role === Role.MANAGER ||
+      payment.createdBy === currentUser.id
+    );
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-4">{profile.platformAccount} 的支付記錄</h2>
-        
+
         {/* 日期區間搜尋 */}
         <div className="mb-4 p-4 bg-gray-50 rounded-lg">
           <div className="flex gap-4 items-end">
@@ -209,7 +250,7 @@ export const PaymentHistoryModal: React.FC<{
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
               />
             </div>
             <div className="flex-1">
@@ -218,7 +259,7 @@ export const PaymentHistoryModal: React.FC<{
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
               />
             </div>
             <button
@@ -258,7 +299,9 @@ export const PaymentHistoryModal: React.FC<{
               {payments.map((payment) => (
                 <tr key={payment.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-sm">{payment.paymentDate}</td>
-                  <td className="px-4 py-2 text-sm font-semibold">${payment.amount.toLocaleString()}</td>
+                  <td className="px-4 py-2 text-sm font-semibold">
+                    ${payment.amount.toLocaleString()}
+                  </td>
                   <td className="px-4 py-2 text-sm text-gray-600">{payment.notes || '-'}</td>
                   <td className="px-4 py-2">
                     {canEdit(payment) && (

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from './Toast';
 
@@ -13,7 +13,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   userId,
   userName,
   onClose,
-  onSuccess
+  onSuccess,
 }) => {
   const toast = useToast();
   const [currentPassword, setCurrentPassword] = useState('');
@@ -23,6 +23,14 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,12 +78,26 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* 標題 */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
-            <span className="text-blue-600">🔐</span>
+            <svg className="w-5 h-5 text-slate-700" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z"
+                clipRule="evenodd"
+              />
+            </svg>
             <h2 className="text-lg font-semibold">修改密碼</h2>
           </div>
           <button
@@ -94,9 +116,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
           {/* 目前密碼 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              目前密碼
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">目前密碼</label>
             <div className="relative">
               <input
                 type={showCurrentPassword ? 'text' : 'password'}
@@ -117,9 +137,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
           {/* 新密碼 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              新密碼
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">新密碼</label>
             <div className="relative">
               <input
                 type={showNewPassword ? 'text' : 'password'}
@@ -140,9 +158,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
           {/* 確認新密碼 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              確認新密碼
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">確認新密碼</label>
             <input
               type="password"
               value={confirmPassword}

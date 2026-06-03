@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trash2, AlertTriangle, CheckCircle, Calendar, Database } from 'lucide-react';
 import { showSuccess, showError, showWarning } from '../utils/dialogService';
 
@@ -16,25 +16,85 @@ interface DataCategory {
 
 const dataCategories: DataCategory[] = [
   { id: 'tasks', name: '任務記錄', table: 'tasks', icon: '📋', description: '已完成或取消的任務' },
-  { id: 'leave_requests', name: '請假記錄', table: 'leave_requests', icon: '📅', description: '已處理的請假申請' },
-  { id: 'schedules', name: '排班記錄', table: 'schedules', icon: '📊', description: '過期的排班資料' },
-  { id: 'attendance', name: '打卡記錄', table: 'attendance_records', icon: '⏰', description: '歷史打卡資料' },
-  { id: 'routines', name: '每日任務記錄', table: 'routine_records', icon: '📝', description: '過期的每日任務執行記錄' },
-  { id: 'finance', name: '財務記錄', table: 'finance', icon: '💰', description: '歷史財務交易記錄' },
-  { id: 'announcements', name: '公告記錄', table: 'announcements', icon: '📢', description: '過期的公告' },
-  { id: 'suggestions', name: '提案記錄', table: 'suggestions', icon: '💡', description: '已處理的提案' },
+  {
+    id: 'leave_requests',
+    name: '請假記錄',
+    table: 'leave_requests',
+    icon: '📅',
+    description: '已處理的請假申請',
+  },
+  {
+    id: 'schedules',
+    name: '排班記錄',
+    table: 'schedules',
+    icon: '📊',
+    description: '過期的排班資料',
+  },
+  {
+    id: 'attendance',
+    name: '打卡記錄',
+    table: 'attendance_records',
+    icon: '⏰',
+    description: '歷史打卡資料',
+  },
+  {
+    id: 'routines',
+    name: '每日任務記錄',
+    table: 'routine_records',
+    icon: '📝',
+    description: '過期的每日任務執行記錄',
+  },
+  {
+    id: 'finance',
+    name: '財務記錄',
+    table: 'finance',
+    icon: '💰',
+    description: '歷史財務交易記錄',
+  },
+  {
+    id: 'announcements',
+    name: '公告記錄',
+    table: 'announcements',
+    icon: '📢',
+    description: '過期的公告',
+  },
+  {
+    id: 'suggestions',
+    name: '提案記錄',
+    table: 'suggestions',
+    icon: '💡',
+    description: '已處理的提案',
+  },
   { id: 'reports', name: '報表記錄', table: 'reports', icon: '📈', description: '歷史營運報表' },
   { id: 'memos', name: '備忘錄', table: 'memos', icon: '📝', description: '過期的備忘錄' },
-  { id: 'kol_profiles', name: 'KOL 檔案', table: 'kol_profiles', icon: '👤', description: 'KOL 基本資料' },
-  { id: 'kol_contracts', name: 'KOL 合約', table: 'kol_contracts', icon: '📄', description: 'KOL 合約記錄' },
-  { id: 'kol_payments', name: 'KOL 付款', table: 'kol_payments', icon: '💵', description: 'KOL 付款記錄' }
+  {
+    id: 'kol_profiles',
+    name: 'KOL 檔案',
+    table: 'kol_profiles',
+    icon: '👤',
+    description: 'KOL 基本資料',
+  },
+  {
+    id: 'kol_contracts',
+    name: 'KOL 合約',
+    table: 'kol_contracts',
+    icon: '📄',
+    description: 'KOL 合約記錄',
+  },
+  {
+    id: 'kol_payments',
+    name: 'KOL 付款',
+    table: 'kol_payments',
+    icon: '💵',
+    description: 'KOL 付款記錄',
+  },
 ];
 
 const timeRanges = [
   { value: 1, label: '一個月以前' },
   { value: 2, label: '兩個月以前' },
   { value: 3, label: '三個月以前' },
-  { value: 6, label: '六個月以前' }
+  { value: 6, label: '六個月以前' },
 ];
 
 export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
@@ -46,10 +106,8 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
   const [showPreview, setShowPreview] = useState(false);
 
   const handleCategoryToggle = (categoryId: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(categoryId) 
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
+    setSelectedCategories((prev) =>
+      prev.includes(categoryId) ? prev.filter((id) => id !== categoryId) : [...prev, categoryId]
     );
   };
 
@@ -57,7 +115,7 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
     if (selectedCategories.length === dataCategories.length) {
       setSelectedCategories([]);
     } else {
-      setSelectedCategories(dataCategories.map(c => c.id));
+      setSelectedCategories(dataCategories.map((c) => c.id));
     }
   };
 
@@ -73,12 +131,12 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
         body: JSON.stringify({
           months: selectedTimeRange,
-          categories: selectedCategories
-        })
+          categories: selectedCategories,
+        }),
       });
 
       if (!response.ok) throw new Error('預覽失敗');
@@ -101,12 +159,12 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
         body: JSON.stringify({
           months: selectedTimeRange,
-          categories: selectedCategories
-        })
+          categories: selectedCategories,
+        }),
       });
 
       if (!response.ok) throw new Error('刪除失敗');
@@ -125,13 +183,33 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
     }
   };
 
-  const totalPreviewCount = Object.values(previewCounts).reduce((sum: number, count) => sum + (count as number), 0);
+  const totalPreviewCount = Object.values(previewCounts).reduce(
+    (sum: number, count) => sum + (count as number),
+    0
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showConfirmDialog) {
+        setShowConfirmDialog(false);
+      } else if (showPreview) {
+        setShowPreview(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showConfirmDialog, showPreview]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-red-500 to-orange-500 text-white p-6 rounded-t-lg">
+        <div className="sticky top-0 bg-gradient-to-r from-red-500 to-orange-500 text-white p-6 rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Database className="w-8 h-8" />
@@ -157,7 +235,7 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
               <h3 className="font-bold text-blue-900">步驟 1：選擇時間範圍</h3>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {timeRanges.map(range => (
+              {timeRanges.map((range) => (
                 <button
                   key={range.value}
                   onClick={() => setSelectedTimeRange(range.value)}
@@ -187,9 +265,9 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
                 {selectedCategories.length === dataCategories.length ? '取消全選' : '全選'}
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {dataCategories.map(category => (
+              {dataCategories.map((category) => (
                 <label
                   key={category.id}
                   className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
@@ -233,7 +311,7 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
                   共找到 <span className="text-red-600">{totalPreviewCount}</span> 筆資料將被刪除
                 </p>
                 <p className="text-sm text-gray-600">
-                  時間範圍：{timeRanges.find(r => r.value === selectedTimeRange)?.label}
+                  時間範圍：{timeRanges.find((r) => r.value === selectedTimeRange)?.label}
                 </p>
               </div>
             </div>
@@ -248,7 +326,7 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
             >
               {isLoading ? '處理中...' : '預覽將刪除的資料'}
             </button>
-            
+
             {showPreview && (totalPreviewCount as number) > 0 && (
               <button
                 onClick={() => setShowConfirmDialog(true)}
@@ -265,22 +343,27 @@ export default function DataCleanupView({ onClose }: DataCleanupViewProps) {
 
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full p-6">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-red-100 p-3 rounded-full">
                 <AlertTriangle className="w-8 h-8 text-red-600" />
               </div>
               <h3 className="text-xl font-bold text-gray-900">確認刪除</h3>
             </div>
-            
+
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <p className="text-red-900 font-bold mb-2">⚠️ 警告：此操作無法復原！</p>
               <p className="text-gray-700 mb-2">
-                您即將刪除 <span className="font-bold text-red-600">{totalPreviewCount}</span> 筆資料
+                您即將刪除 <span className="font-bold text-red-600">{totalPreviewCount}</span>{' '}
+                筆資料
               </p>
               <p className="text-sm text-gray-600">
-                時間範圍：{timeRanges.find(r => r.value === selectedTimeRange)?.label}
+                時間範圍：{timeRanges.find((r) => r.value === selectedTimeRange)?.label}
               </p>
             </div>
 
