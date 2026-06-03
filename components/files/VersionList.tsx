@@ -11,7 +11,11 @@ interface VersionListProps {
   filename: string;
   versions: FileVersion[];
   currentUser: User;
-  onPreview: (versionNo: number, mimeType: string) => void;
+  onPreview: (
+    versionNo: number,
+    mimeType: string,
+    meta: { fileSize: number; uploaderName: string; uploadedAt: string }
+  ) => void;
   onChanged: () => void;
 }
 
@@ -81,7 +85,13 @@ export const VersionList: React.FC<VersionListProps> = ({
               <div className="flex items-center gap-1.5">
                 <button
                   className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-blue-50"
-                  onClick={() => onPreview(v.version_no, v.mime_type)}
+                  onClick={() =>
+                    onPreview(v.version_no, v.mime_type, {
+                      fileSize: v.file_size,
+                      uploaderName: v.uploader_name || '?',
+                      uploadedAt: v.uploaded_at,
+                    })
+                  }
                 >
                   預覽
                 </button>
