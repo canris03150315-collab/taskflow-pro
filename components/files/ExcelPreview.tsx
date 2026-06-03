@@ -109,7 +109,106 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
   };
 
   const openInNewTab = () => {
-    if (pdfUrl) window.open(pdfUrl, '_blank', 'noopener');
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank', 'noopener');
+      return;
+    }
+    if (!data) return;
+
+    // For Excel: render all sheets as a standalone HTML page.
+    const escape = (s: any) =>
+      String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const sheetsHtml = data.sheets
+      .map((s: any, i: number) => {
+        const rows = (s.data || [])
+          .map(
+            (row: any[], rowIdx: number) =>
+              `<tr>${row
+                .map(
+                  (cell) =>
+                    `<${rowIdx === 0 ? 'th' : 'td'}>${escape(cell)}</${rowIdx === 0 ? 'th' : 'td'}>`
+                )
+                .join('')}</tr>`
+          )
+          .join('');
+        return `
+          <section${i === 0 ? ' open' : ''} class="sheet">
+            <h2>${escape(s.name)}</h2>
+            <div class="table-wrap"><table><tbody>${rows}</tbody></table></div>
+          </section>`;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>${escape(filename)} · v${versionNo}</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    background: #f8fafc;
+    color: #0f172a;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: white; border-bottom: 1px solid #e2e8f0;
+    padding: 16px 24px;
+    display: flex; align-items: baseline; gap: 12px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  }
+  h1 { margin: 0; font-size: 18px; font-weight: 900; }
+  .meta { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+  .version-badge {
+    font-family: monospace; font-weight: 700;
+    color: #047857; background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    padding: 2px 8px; border-radius: 4px; font-size: 11px;
+  }
+  main { padding: 24px; max-width: 1600px; margin: 0 auto; }
+  .sheet { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .sheet h2 { margin: 0 0 12px; font-size: 14px; font-weight: 700; color: #0f172a; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+  th, td {
+    border: 1px solid #e2e8f0; padding: 8px 12px;
+    min-width: 100px; white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  th { background: #f1f5f9; font-weight: 700; text-align: left; }
+  tr:hover td { background: #f8fafc; }
+  @media print {
+    header { position: static; box-shadow: none; }
+    .sheet { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>${escape(filename)}</h1>
+  <span class="version-badge">v${versionNo}</span>
+  <span class="meta">${
+    fileSize !== undefined ? formatFileSize(fileSize) : ''
+  }${uploaderName ? ' · ' + escape(uploaderName) : ''}${
+    uploadedAt ? ' · ' + escape(new Date(uploadedAt).toLocaleString('zh-TW')) : ''
+  }</span>
+</header>
+<main>${sheetsHtml}</main>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    // Revoke later so the new tab has time to load the document
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
   };
 
   return (
@@ -153,7 +252,7 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {pdfUrl && (
+            {(pdfUrl || data) && (
               <button
                 onClick={openInNewTab}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 h-10 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
