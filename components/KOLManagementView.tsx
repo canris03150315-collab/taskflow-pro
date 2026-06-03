@@ -1,15 +1,33 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, KOLProfile, KOLStats, KOL_PLATFORMS, KOLPlatform, DepartmentDef, Role, KOLWeeklyPayment } from '../types';
+import {
+  User,
+  KOLProfile,
+  KOLStats,
+  KOL_PLATFORMS,
+  KOLPlatform,
+  DepartmentDef,
+  Role,
+  KOLWeeklyPayment,
+} from '../types';
 import { api } from '../services/api';
 import { AddPaymentModal, PaymentHistoryModal } from './PaymentModals';
-import { showSuccess, showError, showWarning, showConfirm, showToast } from '../utils/dialogService';
+import {
+  showSuccess,
+  showError,
+  showWarning,
+  showConfirm,
+  showToast,
+} from '../utils/dialogService';
 
 interface KOLManagementViewProps {
   currentUser: User;
   departments?: DepartmentDef[];
 }
 
-export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUser, departments = [] }) => {
+export const KOLManagementView: React.FC<KOLManagementViewProps> = ({
+  currentUser,
+  departments = [],
+}) => {
   const [profiles, setProfiles] = useState<KOLProfile[]>([]);
   const [stats, setStats] = useState<KOLStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,7 +43,12 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   const [paymentTotal, setPaymentTotal] = useState(0);
   const [profilePayments, setProfilePayments] = useState<Record<string, number>>({});
   const [showPaymentStatsModal, setShowPaymentStatsModal] = useState(false);
-  const [paymentStats, setPaymentStats] = useState<{ total: number; count: number; average: number; byKol: any[] } | null>(null);
+  const [paymentStats, setPaymentStats] = useState<{
+    total: number;
+    count: number;
+    average: number;
+    byKol: any[];
+  } | null>(null);
   const [statsDateRange, setStatsDateRange] = useState({ startDate: '', endDate: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,14 +58,28 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     loadData();
   }, [statusFilter, searchQuery, selectedDept]);
 
+  // ESC closes any open modal
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showPaymentStatsModal) setShowPaymentStatsModal(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showPaymentStatsModal]);
+
   const loadData = async () => {
     try {
       setLoading(true);
       const [profilesRes, statsRes] = await Promise.all([
-        api.kol.getProfiles({ status: statusFilter !== 'ALL' ? statusFilter : undefined, search: searchQuery || undefined, departmentId: isBoss ? selectedDept : currentUser.department }),
-        api.kol.getStats({ departmentId: isBoss ? selectedDept : currentUser.department })
+        api.kol.getProfiles({
+          status: statusFilter !== 'ALL' ? statusFilter : undefined,
+          search: searchQuery || undefined,
+          departmentId: isBoss ? selectedDept : currentUser.department,
+        }),
+        api.kol.getStats({ departmentId: isBoss ? selectedDept : currentUser.department }),
       ]);
-      
+
       const transformedProfiles = profilesRes.profiles.map((p: any) => ({
         id: p.id,
         platform: p.platform || 'FACEBOOK',
@@ -55,11 +92,11 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         notes: p.notes,
         createdAt: p.created_at || p.createdAt,
         updatedAt: p.updated_at || p.updatedAt,
-        createdBy: p.created_by || p.createdBy
+        createdBy: p.created_by || p.createdBy,
       }));
       setProfiles(transformedProfiles);
       setStats(statsRes);
-      
+
       await loadAllPayments(transformedProfiles);
     } catch (error) {
       console.error('Load KOL data error:', error);
@@ -70,11 +107,11 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
 
   const loadAllPayments = async (profilesList: KOLProfile[]) => {
     try {
-      const paymentPromises = profilesList.map(p => 
+      const paymentPromises = profilesList.map((p) =>
         api.kol.getKolPayments(p.id).catch(() => ({ payments: [], total: 0 }))
       );
       const results = await Promise.all(paymentPromises);
-      
+
       const paymentMap: Record<string, number> = {};
       profilesList.forEach((p, i) => {
         paymentMap[p.id] = results[i].total || 0;
@@ -91,7 +128,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
       if (isBoss) params.departmentId = selectedDept;
-      
+
       const result = await api.kol.getPaymentStats(params);
       setPaymentStats(result);
     } catch (error) {
@@ -111,7 +148,11 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     }
   };
 
-  const handleAddPayment = async (data: { amount: number; paymentDate: string; notes?: string }) => {
+  const handleAddPayment = async (data: {
+    amount: number;
+    paymentDate: string;
+    notes?: string;
+  }) => {
     if (!selectedProfile) return;
     try {
       await api.kol.createKolPayment({ kolId: selectedProfile.id, ...data });
@@ -124,7 +165,10 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     }
   };
 
-  const handleEditPayment = async (paymentId: string, data: { amount: number; paymentDate: string; notes?: string }) => {
+  const handleEditPayment = async (
+    paymentId: string,
+    data: { amount: number; paymentDate: string; notes?: string }
+  ) => {
     try {
       await api.kol.updateKolPayment(paymentId, data);
       showSuccess('支付記錄更新成功！');
@@ -161,29 +205,41 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   };
 
   const filteredProfiles = useMemo(() => {
-    return profiles.filter(p => {
+    return profiles.filter((p) => {
       if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
-      if (searchQuery && !p.platformId.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !p.platformAccount.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (
+        searchQuery &&
+        !p.platformId.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !p.platformAccount.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+        return false;
       return true;
     });
   }, [profiles, statusFilter, searchQuery]);
 
   const getStatusColor = (statusColor?: 'green' | 'yellow' | 'red') => {
     switch (statusColor) {
-      case 'green': return 'bg-green-100 text-green-800';
-      case 'yellow': return 'bg-yellow-100 text-yellow-800';
-      case 'red': return 'bg-red-100 text-red-800';
-      default: return 'bg-green-100 text-green-800';
+      case 'green':
+        return 'bg-green-100 text-green-800';
+      case 'yellow':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'red':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-green-100 text-green-800';
     }
   };
 
   const getStatusText = (statusColor?: 'green' | 'yellow' | 'red') => {
     switch (statusColor) {
-      case 'green': return '正常合作';
-      case 'yellow': return '暫停合作';
-      case 'red': return '不再合作';
-      default: return '正常合作';
+      case 'green':
+        return '正常合作';
+      case 'yellow':
+        return '暫停合作';
+      case 'red':
+        return '不再合作';
+      default:
+        return '正常合作';
     }
   };
 
@@ -233,10 +289,10 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         const data = e.target?.result;
         if (!data) return;
 
-        const workbook = await import('xlsx').then(XLSX => XLSX.read(data, { type: 'binary' }));
+        const workbook = await import('xlsx').then((XLSX) => XLSX.read(data, { type: 'binary' }));
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = await import('xlsx').then(XLSX => XLSX.utils.sheet_to_json(worksheet));
+        const jsonData = await import('xlsx').then((XLSX) => XLSX.utils.sheet_to_json(worksheet));
 
         const formattedData = jsonData.map((row: any) => ({
           platformId: row['平台ID'] || row['platformId'] || '',
@@ -246,20 +302,20 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           status: row['狀態'] || row['status'] || 'ACTIVE',
           statusColor: row['狀態顏色'] || row['statusColor'] || 'green',
           weeklyPayNote: row['週薪備註'] || row['weeklyPayNote'] || '',
-          notes: row['特別備註'] || row['notes'] || ''
+          notes: row['特別備註'] || row['notes'] || '',
         }));
 
         const result = await api.kol.importExcel(formattedData);
-        
+
         let message = `導入完成！\n成功: ${result.results.success} 筆\n失敗: ${result.results.failed} 筆`;
-        
+
         if (result.results.errors && result.results.errors.length > 0) {
           message += '\n\n失敗詳情：';
           result.results.errors.forEach((err: any) => {
             message += `\n第 ${err.row} 行: ${err.error}`;
           });
         }
-        
+
         showSuccess(message);
         loadData();
       };
@@ -278,15 +334,15 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
     try {
       const { profiles } = await api.kol.exportExcel();
       const XLSX = await import('xlsx');
-      
+
       const exportData = profiles.map((p: any) => ({
-        '平台': p.platform || 'FACEBOOK',
-        '平台ID': p.platform_id || p.platformId,
-        '平台帳號': p.platform_account || p.platformAccount,
-        '聯絡方式': p.contact_info || '',
-        '狀態顏色': p.status_color || 'green',
-        '週薪備註': p.weekly_pay_note || '',
-        '特別備註': p.notes || ''
+        平台: p.platform || 'FACEBOOK',
+        平台ID: p.platform_id || p.platformId,
+        平台帳號: p.platform_account || p.platformAccount,
+        聯絡方式: p.contact_info || '',
+        狀態顏色: p.status_color || 'green',
+        週薪備註: p.weekly_pay_note || '',
+        特別備註: p.notes || '',
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -300,7 +356,20 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64">載入中...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-2 text-slate-500">
+        <svg className="w-6 h-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+          <path
+            d="M22 12a10 10 0 0 1-10 10"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+        </svg>
+        <p className="text-sm">載入中...</p>
+      </div>
+    );
   }
 
   return (
@@ -323,7 +392,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           <div className="text-sm opacity-90">不再合作</div>
           <div className="text-3xl font-bold mt-2">{stats?.stoppedKOLs || 0}</div>
         </div>
-        <div 
+        <div
           className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow"
           onClick={() => {
             loadPaymentStats();
@@ -333,7 +402,10 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         >
           <div className="text-sm opacity-90">總支付金額</div>
           <div className="text-3xl font-bold mt-2">
-            ${Object.values(profilePayments).reduce((sum: number, val: number) => sum + val, 0).toLocaleString()}
+            $
+            {Object.values(profilePayments)
+              .reduce((sum: number, val: number) => sum + val, 0)
+              .toLocaleString()}
           </div>
         </div>
       </div>
@@ -347,8 +419,10 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
               onChange={(e) => setSelectedDept(e.target.value)}
               className="px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50 font-medium"
             >
-              {departments.map(dept => (
-                <option key={dept.id} value={dept.id}>🏢 {dept.name}</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  🏢 {dept.name}
+                </option>
               ))}
             </select>
           )}
@@ -356,7 +430,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500"
           >
             <option value="ALL">全部狀態</option>
             <option value="ACTIVE">正常合作</option>
@@ -369,7 +443,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             placeholder="搜尋 KOL..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 min-w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            className="flex-1 min-w-[200px] px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500"
           />
 
           <button
@@ -386,7 +460,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             onChange={handleExcelImport}
             className="hidden"
           />
-          
+
           <button
             onClick={() => fileInputRef.current?.click()}
             className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 shadow-md whitespace-nowrap"
@@ -416,31 +490,37 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
       {/* KOL 列表 */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <table className="w-full">
-          <thead className="bg-gray-50">
+          <thead className="bg-stone-50">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">平台</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">平台 ID / 帳號</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">週薪備註</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">累計支付</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">合作狀態</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">特別備註</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">操作</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">平台</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">
+                平台 ID / 帳號
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">週薪備註</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">累計支付</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">合作狀態</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">特別備註</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">操作</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-slate-200">
             {filteredProfiles.map((profile) => (
-              <tr key={profile.id} className="hover:bg-gray-50">
+              <tr key={profile.id} className="hover:bg-stone-50">
                 <td className="px-4 py-3">
-                  <span className="text-xl">{KOL_PLATFORMS.find(p => p.value === profile.platform)?.icon}</span>
-                  <span className="ml-1 text-xs text-gray-500">{KOL_PLATFORMS.find(p => p.value === profile.platform)?.label}</span>
+                  <span className="text-xl">
+                    {KOL_PLATFORMS.find((p) => p.value === profile.platform)?.icon}
+                  </span>
+                  <span className="ml-1 text-xs text-slate-500">
+                    {KOL_PLATFORMS.find((p) => p.value === profile.platform)?.label}
+                  </span>
                 </td>
                 <td className="px-4 py-3">
                   <div className="font-medium">{profile.platformId}</div>
-                  <div className="text-sm text-gray-500">@{profile.platformAccount}</div>
+                  <div className="text-sm text-slate-500">@{profile.platformAccount}</div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="text-sm">
-                    <span className="font-medium text-gray-700">
+                    <span className="font-medium text-slate-700">
                       {profile.weeklyPayNote || '-'}
                     </span>
                   </div>
@@ -459,12 +539,14 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   </button>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.statusColor)}`}>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(profile.statusColor)}`}
+                  >
                     {getStatusText(profile.statusColor)}
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="text-sm text-gray-600 max-w-xs truncate">
+                  <div className="text-sm text-slate-600 max-w-xs truncate">
                     {profile.notes || '-'}
                   </div>
                 </td>
@@ -509,7 +591,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
         </table>
 
         {filteredProfiles.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-slate-500">
             <div className="text-4xl mb-4">🔍</div>
             <p>沒有找到符合條件的 KOL</p>
           </div>
@@ -518,10 +600,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
 
       {/* 新增 Modal */}
       {showAddModal && (
-        <AddKOLModal
-          onClose={() => setShowAddModal(false)}
-          onSubmit={handleAddProfile}
-        />
+        <AddKOLModal onClose={() => setShowAddModal(false)} onSubmit={handleAddProfile} />
       )}
 
       {/* 編輯 Modal */}
@@ -563,33 +642,54 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
           }}
           onEdit={handleEditPayment}
           onDelete={handleDeletePayment}
-          onRefresh={(startDate, endDate) => loadPaymentHistory(selectedProfile.id, startDate, endDate)}
+          onRefresh={(startDate, endDate) =>
+            loadPaymentHistory(selectedProfile.id, startDate, endDate)
+          }
         />
       )}
 
       {/* 支付統計 Modal */}
       {showPaymentStatsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => setShowPaymentStatsModal(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">💰 支付統計</h2>
+              <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <svg className="w-6 h-6 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                支付統計
+              </h2>
               <button
                 onClick={() => setShowPaymentStatsModal(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                className="text-slate-500 hover:text-slate-700 text-2xl"
               >
                 ✕
               </button>
             </div>
 
             {/* 日期範圍選擇 */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <div className="bg-stone-50 rounded-lg p-4 mb-6">
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[200px]">
                   <label className="block text-sm font-medium mb-1">開始日期</label>
                   <input
                     type="date"
                     value={statsDateRange.startDate}
-                    onChange={(e) => setStatsDateRange({ ...statsDateRange, startDate: e.target.value })}
+                    onChange={(e) =>
+                      setStatsDateRange({ ...statsDateRange, startDate: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg"
                   />
                 </div>
@@ -598,7 +698,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   <input
                     type="date"
                     value={statsDateRange.endDate}
-                    onChange={(e) => setStatsDateRange({ ...statsDateRange, endDate: e.target.value })}
+                    onChange={(e) =>
+                      setStatsDateRange({ ...statsDateRange, endDate: e.target.value })
+                    }
                     className="w-full px-3 py-2 border rounded-lg"
                   />
                 </div>
@@ -613,7 +715,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                     setStatsDateRange({ startDate: '', endDate: '' });
                     loadPaymentStats();
                   }}
-                  className="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                  className="px-6 py-2 bg-slate-500 text-white rounded-lg hover:bg-slate-600"
                 >
                   清除
                 </button>
@@ -627,7 +729,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-6 text-white">
                     <div className="text-sm opacity-90">總支付金額</div>
-                    <div className="text-3xl font-bold mt-2">${paymentStats.total.toLocaleString()}</div>
+                    <div className="text-3xl font-bold mt-2">
+                      ${paymentStats.total.toLocaleString()}
+                    </div>
                   </div>
                   <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 text-white">
                     <div className="text-sm opacity-90">支付次數</div>
@@ -635,7 +739,9 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                   </div>
                   <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-6 text-white">
                     <div className="text-sm opacity-90">平均金額</div>
-                    <div className="text-3xl font-bold mt-2">${paymentStats.average.toLocaleString()}</div>
+                    <div className="text-3xl font-bold mt-2">
+                      ${paymentStats.average.toLocaleString()}
+                    </div>
                   </div>
                 </div>
 
@@ -645,22 +751,38 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
                     <h3 className="text-lg font-bold mb-4">📊 支付排行榜（前 10 名）</h3>
                     <div className="bg-white border rounded-lg overflow-hidden">
                       <table className="w-full">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-stone-50">
                           <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">排名</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">KOL ID</th>
-                            <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">累計支付</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">
+                              排名
+                            </th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-slate-700">
+                              KOL ID
+                            </th>
+                            <th className="px-4 py-3 text-right text-sm font-medium text-slate-700">
+                              累計支付
+                            </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody className="divide-y divide-slate-200">
                           {paymentStats.byKol.map((item, index) => (
-                            <tr key={item.kolId} className="hover:bg-gray-50">
+                            <tr key={item.kolId} className="hover:bg-stone-50">
                               <td className="px-4 py-3">
-                                <span className={`font-bold ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-gray-400' : index === 2 ? 'text-orange-400' : 'text-gray-600'}`}>
-                                  {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                                <span
+                                  className={`font-bold ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-slate-400' : index === 2 ? 'text-orange-400' : 'text-slate-600'}`}
+                                >
+                                  {index === 0
+                                    ? '🥇'
+                                    : index === 1
+                                      ? '🥈'
+                                      : index === 2
+                                        ? '🥉'
+                                        : `${index + 1}.`}
                                 </span>
                               </td>
-                              <td className="px-4 py-3 font-medium">{item.platformId || item.kolId}</td>
+                              <td className="px-4 py-3 font-medium">
+                                {item.platformId || item.kolId}
+                              </td>
                               <td className="px-4 py-3 text-right font-bold text-green-600">
                                 ${item.total.toLocaleString()}
                               </td>
@@ -675,7 +797,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
             )}
 
             {!paymentStats && (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 text-slate-500">
                 <div className="text-4xl mb-4">📊</div>
                 <p>請選擇日期範圍後點擊查詢</p>
               </div>
@@ -688,7 +810,17 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({ currentUse
 };
 
 // 新增 KOL Modal
-const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void }> = ({ onClose, onSubmit }) => {
+const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void }> = ({
+  onClose,
+  onSubmit,
+}) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
   const [formData, setFormData] = useState({
     platform: 'FACEBOOK' as KOLPlatform,
     platformId: '',
@@ -697,7 +829,7 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
     status: 'ACTIVE',
     statusColor: 'green' as 'green' | 'yellow' | 'red',
     weeklyPayNote: '',
-    notes: ''
+    notes: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -710,19 +842,31 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-2xl font-bold mb-4">新增 KOL</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">平台</label>
             <select
               value={formData.platform}
-              onChange={(e) => setFormData({ ...formData, platform: e.target.value as KOLPlatform })}
+              onChange={(e) =>
+                setFormData({ ...formData, platform: e.target.value as KOLPlatform })
+              }
               className="w-full px-3 py-2 border rounded-lg"
             >
-              {KOL_PLATFORMS.map(p => (
-                <option key={p.value} value={p.value}>{p.icon} {p.label}</option>
+              {KOL_PLATFORMS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.icon} {p.label}
+                </option>
               ))}
             </select>
           </div>
@@ -759,7 +903,12 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
             <label className="block text-sm font-medium mb-1">合作狀態</label>
             <select
               value={formData.statusColor}
-              onChange={(e) => setFormData({ ...formData, statusColor: e.target.value as 'green' | 'yellow' | 'red' })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  statusColor: e.target.value as 'green' | 'yellow' | 'red',
+                })
+              }
               className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="green">🟢 正常合作</option>
@@ -790,7 +939,7 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 border rounded-lg hover:bg-stone-50"
             >
               取消
             </button>
@@ -808,7 +957,18 @@ const AddKOLModal: React.FC<{ onClose: () => void; onSubmit: (data: any) => void
 };
 
 // 編輯 KOL Modal
-const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmit: (data: any) => void }> = ({ profile, onClose, onSubmit }) => {
+const EditKOLModal: React.FC<{
+  profile: KOLProfile;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+}> = ({ profile, onClose, onSubmit }) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
   const [formData, setFormData] = useState({
     platform: profile.platform,
     platformId: profile.platformId,
@@ -817,7 +977,7 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
     status: profile.status,
     statusColor: profile.statusColor || 'green',
     weeklyPayNote: profile.weeklyPayNote || '',
-    notes: profile.notes || ''
+    notes: profile.notes || '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -830,19 +990,31 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="text-2xl font-bold mb-4">編輯 KOL</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">平台</label>
             <select
               value={formData.platform}
-              onChange={(e) => setFormData({ ...formData, platform: e.target.value as KOLPlatform })}
+              onChange={(e) =>
+                setFormData({ ...formData, platform: e.target.value as KOLPlatform })
+              }
               className="w-full px-3 py-2 border rounded-lg"
             >
-              {KOL_PLATFORMS.map(p => (
-                <option key={p.value} value={p.value}>{p.icon} {p.label}</option>
+              {KOL_PLATFORMS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.icon} {p.label}
+                </option>
               ))}
             </select>
           </div>
@@ -879,7 +1051,12 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
             <label className="block text-sm font-medium mb-1">合作狀態</label>
             <select
               value={formData.statusColor}
-              onChange={(e) => setFormData({ ...formData, statusColor: e.target.value as 'green' | 'yellow' | 'red' })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  statusColor: e.target.value as 'green' | 'yellow' | 'red',
+                })
+              }
               className="w-full px-3 py-2 border rounded-lg"
             >
               <option value="green">🟢 正常合作</option>
@@ -910,7 +1087,7 @@ const EditKOLModal: React.FC<{ profile: KOLProfile; onClose: () => void; onSubmi
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 border rounded-lg hover:bg-stone-50"
             >
               取消
             </button>
