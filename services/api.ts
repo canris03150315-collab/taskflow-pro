@@ -780,7 +780,7 @@ const RealApi = {
     },
     downloadBackup: async (): Promise<void> => {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE_URL}/system/backup/download`, {
+      const response = await fetch(`${API_BASE_URL}/backup/download`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -794,27 +794,15 @@ const RealApi = {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `backup-${new Date().toISOString().slice(0, 10)}.db`;
+      a.download = `taskflow-backup-${new Date().toISOString().slice(0, 10)}.tar.gz`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     },
-    uploadBackup: async (file: File): Promise<void> => {
-      const token = localStorage.getItem('auth_token');
-      const formData = new FormData();
-      formData.append('backup', file);
-      const response = await fetch(`${API_BASE_URL}/system/backup/upload`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || '上傳備份失敗');
-      }
+    uploadBackup: async (_file: File): Promise<void> => {
+      // 還原功能尚未實作（tar.gz 還原需要停機操作，建議手動執行）。
+      throw new Error('還原功能尚未開放，請聯繫系統管理員手動還原備份檔案');
     },
   },
   logs: {

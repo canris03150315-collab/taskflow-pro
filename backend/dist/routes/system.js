@@ -59,40 +59,33 @@ router.post('/reset-factory', auth_1.authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/system/backup - \u5099\u4efd\u8cc7\u6599\u5eab
+// POST /api/system/backup - \u5099\u4efd\u8cc7\u6599\u5eab (tar.gz \u6574\u500b data/ \u76ee\u9304\uff0c\u4fdd\u7559 7 \u5929)
+const backupRoutes = require('./backup');
 router.post('/backup', auth_1.authenticateToken, async (req, res) => {
     try {
         const currentUser = req.user;
-        
+        const db = req.db;
+
         if (currentUser.role !== 'BOSS') {
             return res.status(403).json({ error: '\u53ea\u6709\u7ba1\u7406\u54e1\u53ef\u4ee5\u5099\u4efd\u7cfb\u7d71' });
         }
-        
-        const db = req.db;
-        const fs = require('fs');
-        const path = require('path');
-        
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupDir = path.join(process.cwd(), 'data', 'backups');
-        if (!fs.existsSync(backupDir)) {
-            fs.mkdirSync(backupDir, { recursive: true });
-        }
-        const backupPath = path.join(backupDir, `taskflow-backup-${timestamp}.db`);
-        
-        // \u5099\u4efd\u8cc7\u6599\u5eab
-        await db.backup(backupPath);
-        
-        // \u8a18\u9304\u65e5\u8a8c
+
+        const { backupPath, filename } = await backupRoutes.createBackupArchive();
+        const pruned = backupRoutes.pruneOldBackups();
+
         try {
-            await db.logAction(currentUser.id, currentUser.name, 'BACKUP', '\u7cfb\u7d71\u5099\u4efd', 'INFO');
+            await db.logAction(currentUser.id, currentUser.name, 'BACKUP', `\u7cfb\u7d71\u5099\u4efd (${filename})`, 'INFO');
         } catch (error) {
             console.error('\u8a18\u9304\u65e5\u8a8c\u5931\u6557:', error);
         }
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: '\u5099\u4efd\u5b8c\u6210',
-            backupPath 
+            backupPath,
+            filename,
+            pruned: pruned.length,
+            retentionDays: 7
         });
     } catch (error) {
         console.error('\u5099\u4efd\u932f\u8aa4:', error);

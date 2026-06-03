@@ -77,8 +77,8 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.db')) {
-      toast.error('請選擇 .db 格式的備份檔案');
+    if (!file.name.endsWith('.tar.gz') && !file.name.endsWith('.db')) {
+      toast.error('請選擇 .tar.gz 或 .db 格式的備份檔案');
       return;
     }
 
@@ -326,8 +326,10 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                   <div className="space-y-3">
                     <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-blue-700">下載資料庫備份</div>
-                        <div className="text-xs text-blue-500">下載完整的資料庫備份檔案到本機</div>
+                        <div className="font-bold text-blue-700">下載資料備份</div>
+                        <div className="text-xs text-blue-500">
+                          含資料庫與上傳檔案的完整 .tar.gz 備份（伺服器自動保留 7 天）
+                        </div>
                       </div>
                       <button
                         onClick={handleDownloadBackup}
@@ -349,7 +351,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
                         <input
                           ref={uploadInputRef}
                           type="file"
-                          accept=".db"
+                          accept=".tar.gz,.db"
                           onChange={handleUploadBackup}
                           disabled={isUploadingBackup}
                           className="hidden"

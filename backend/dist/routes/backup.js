@@ -2,101 +2,155 @@ const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const path = require('path');
+const tar = require('tar');
 const { authenticateToken } = require('../middleware/auth');
 
-// GET /download - Download latest backup
+const DATA_DIR = path.join(__dirname, '../../data');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+const RETENTION_DAYS = 7;
+const BACKUP_PREFIX = 'taskflow-backup-';
+const BACKUP_EXT = '.tar.gz';
+
+function ensureBackupDir() {
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  }
+}
+
+async function createBackupArchive() {
+  ensureBackupDir();
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const filename = `${BACKUP_PREFIX}${timestamp}${BACKUP_EXT}`;
+  const backupPath = path.join(BACKUP_DIR, filename);
+
+  const entries = fs.readdirSync(DATA_DIR).filter(name => name !== 'backups');
+  await tar.create(
+    {
+      gzip: true,
+      file: backupPath,
+      cwd: DATA_DIR,
+      portable: true,
+    },
+    entries
+  );
+
+  return { backupPath, filename };
+}
+
+function pruneOldBackups() {
+  ensureBackupDir();
+  const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const removed = [];
+  for (const f of fs.readdirSync(BACKUP_DIR)) {
+    if (!f.startsWith(BACKUP_PREFIX) || !f.endsWith(BACKUP_EXT)) continue;
+    const full = path.join(BACKUP_DIR, f);
+    try {
+      const stats = fs.statSync(full);
+      if (stats.mtime.getTime() < cutoff) {
+        fs.unlinkSync(full);
+        removed.push(f);
+      }
+    } catch (e) {
+      console.error('[Backup] prune stat/unlink failed:', f, e.message);
+    }
+  }
+  if (removed.length > 0) {
+    console.log('[Backup] Pruned', removed.length, 'backup(s) older than', RETENTION_DAYS, 'days');
+  }
+  return removed;
+}
+
+function listBackups() {
+  ensureBackupDir();
+  return fs.readdirSync(BACKUP_DIR)
+    .filter(f => f.startsWith(BACKUP_PREFIX) && f.endsWith(BACKUP_EXT))
+    .map(f => {
+      const filePath = path.join(BACKUP_DIR, f);
+      const stats = fs.statSync(filePath);
+      return {
+        filename: f,
+        path: filePath,
+        size: stats.size,
+        created: stats.mtime.toISOString(),
+        timestamp: stats.mtime.getTime(),
+      };
+    })
+    .sort((a, b) => b.timestamp - a.timestamp);
+}
+
+// GET /download - Create a fresh backup and download it
 router.get('/download', authenticateToken, async (req, res) => {
   try {
     const currentUser = req.user;
-    
-    // Only BOSS can download backups
     if (currentUser.role !== 'BOSS') {
-      return res.status(403).json({ error: '\\u6b0a\\u9650\\u4e0d\\u8db3' });
+      return res.status(403).json({ error: '權限不足' });
     }
-    
-    const backupDir = path.join(__dirname, '../../data/backups');
-    
-    // Create backup directory if it doesn't exist
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-    
-    // Get all backup files
-    const files = fs.readdirSync(backupDir)
-      .filter(f => f.endsWith('.db'))
-      .map(f => ({
-        name: f,
-        path: path.join(backupDir, f),
-        time: fs.statSync(path.join(backupDir, f)).mtime.getTime()
-      }))
-      .sort((a, b) => b.time - a.time);
-    
-    if (files.length === 0) {
-      return res.status(404).json({ error: '\\u6c92\\u6709\\u5099\\u4efd\\u6a94\\u6848' });
-    }
-    
-    // Get the latest backup
-    const latestBackup = files[0];
-    
-    console.log('[Backup] Downloading:', latestBackup.name, 'by:', currentUser.name);
-    
-    // Send file
-    res.download(latestBackup.path, latestBackup.name, (err) => {
+
+    const { backupPath, filename } = await createBackupArchive();
+    pruneOldBackups();
+
+    console.log('[Backup] Downloading (fresh):', filename, 'by:', currentUser.name);
+    res.download(backupPath, filename, (err) => {
       if (err) {
         console.error('[Backup] Download error:', err);
         if (!res.headersSent) {
-          res.status(500).json({ error: '\\u4e0b\\u8f09\\u5931\\u6557' });
+          res.status(500).json({ error: '下載失敗' });
         }
       }
     });
-    
   } catch (error) {
     console.error('[Backup] Download error:', error);
-    res.status(500).json({ error: '\\u4f3a\\u670d\\u5668\\u5167\\u90e8\\u932f\\u8aa4' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
-// POST /create - Create new backup
+// GET /download/latest - Download most recent existing backup (no creation)
+router.get('/download/latest', authenticateToken, async (req, res) => {
+  try {
+    const currentUser = req.user;
+    if (currentUser.role !== 'BOSS') {
+      return res.status(403).json({ error: '權限不足' });
+    }
+    const files = listBackups();
+    if (files.length === 0) {
+      return res.status(404).json({ error: '沒有備份檔案' });
+    }
+    const latest = files[0];
+    res.download(latest.path, latest.filename);
+  } catch (error) {
+    console.error('[Backup] Download latest error:', error);
+    res.status(500).json({ error: '伺服器內部錯誤' });
+  }
+});
+
+// POST /create - Create new backup (tar.gz of data/ excluding data/backups/)
 router.post('/create', authenticateToken, async (req, res) => {
   try {
     const currentUser = req.user;
-    
-    // Only BOSS can create backups
     if (currentUser.role !== 'BOSS') {
-      return res.status(403).json({ error: '\\u6b0a\\u9650\\u4e0d\\u8db3' });
+      return res.status(403).json({ error: '權限不足' });
     }
-    
-    const dbPath = path.join(__dirname, '../../data/taskflow.db');
-    const backupDir = path.join(__dirname, '../../data/backups');
-    
-    // Ensure backup directory exists
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-    
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = path.join(backupDir, `taskflow-backup-${timestamp}.db`);
-    
-    // Copy database file
-    fs.copyFileSync(dbPath, backupPath);
-    
+
+    const { backupPath, filename } = await createBackupArchive();
     const stats = fs.statSync(backupPath);
-    
-    console.log('[Backup] Created:', backupPath, 'by:', currentUser.name);
-    
+    const pruned = pruneOldBackups();
+
+    console.log('[Backup] Created:', filename, 'size:', stats.size, 'by:', currentUser.name);
+
     res.json({
       success: true,
-      message: '\\u5099\\u4efd\\u5df2\\u5275\\u5efa',
+      message: '備份已建立',
       backup: {
-        name: path.basename(backupPath),
+        name: filename,
         size: stats.size,
-        created: stats.mtime
-      }
+        created: stats.mtime,
+      },
+      pruned: pruned.length,
+      retentionDays: RETENTION_DAYS,
     });
-    
   } catch (error) {
     console.error('[Backup] Create error:', error);
-    res.status(500).json({ error: '\\u4f3a\\u670d\\u5668\\u5167\\u90e8\\u932f\\u8aa4' });
+    res.status(500).json({ error: '伺服器內部錯誤' });
   }
 });
 
@@ -105,44 +159,18 @@ router.post('/create', authenticateToken, async (req, res) => {
 router.get('/status', authenticateToken, async (req, res) => {
   try {
     const currentUser = req.user;
-
-    // Only BOSS can view backup status
     if (currentUser.role !== 'BOSS') {
       return res.status(403).json({ error: 'Permission denied' });
     }
 
-    const backupDir = path.join(__dirname, '../../data/backups');
-
-    // Create backup directory if it doesn't exist
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
-    }
-
-    // Get all backup files
-    const files = fs.readdirSync(backupDir)
-      .filter(f => f.endsWith('.db') && (f.startsWith('taskflow_backup_') || f.startsWith('taskflow-')))
-      .map(f => {
-        const filePath = path.join(backupDir, f);
-        const stats = fs.statSync(filePath);
-        return {
-          filename: f,
-          size: stats.size,
-          created: stats.mtime.toISOString(),
-          timestamp: stats.mtime.getTime()
-        };
-      })
-      .sort((a, b) => b.timestamp - a.timestamp);
-
-    // Get latest backup info
+    const files = listBackups();
     const latest = files.length > 0 ? files[0] : null;
-    
-    // Calculate time since last backup
+
     let hoursSinceLastBackup = null;
     if (latest) {
       hoursSinceLastBackup = (Date.now() - latest.timestamp) / (1000 * 60 * 60);
     }
 
-    // Determine backup status
     let status = 'unknown';
     if (!latest) {
       status = 'error';
@@ -154,18 +182,26 @@ router.get('/status', authenticateToken, async (req, res) => {
       status = 'error';
     }
 
-    console.log('[Backup Status] Requested by:', currentUser.name);
-    console.log('[Backup Status] Total backups:', files.length);
-    console.log('[Backup Status] Latest:', latest ? latest.filename : 'None');
+    console.log('[Backup Status] Total backups:', files.length, 'latest:', latest ? latest.filename : 'None');
 
     res.json({
       status,
       totalBackups: files.length,
-      latestBackup: latest,
+      latestBackup: latest ? {
+        filename: latest.filename,
+        size: latest.size,
+        created: latest.created,
+        timestamp: latest.timestamp,
+      } : null,
       hoursSinceLastBackup: hoursSinceLastBackup ? hoursSinceLastBackup.toFixed(2) : null,
-      backups: files.slice(0, 20) // Return latest 20 backups
+      retentionDays: RETENTION_DAYS,
+      backups: files.slice(0, 20).map(f => ({
+        filename: f.filename,
+        size: f.size,
+        created: f.created,
+        timestamp: f.timestamp,
+      })),
     });
-
   } catch (error) {
     console.error('[Backup Status] Error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -173,4 +209,5 @@ router.get('/status', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
-
+module.exports.createBackupArchive = createBackupArchive;
+module.exports.pruneOldBackups = pruneOldBackups;
