@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { User, Role, DepartmentDef, hasPermission } from '../types';
 import { api } from '../services/api';
 import { useToast } from './Toast';
@@ -41,7 +41,7 @@ const LEAVE_TYPES = [
   { value: 'PERSONAL', label: '事假', color: 'bg-blue-100 text-blue-800' },
   { value: 'ANNUAL', label: '特休', color: 'bg-green-100 text-green-800' },
   { value: 'MARRIAGE', label: '婚假', color: 'bg-pink-100 text-pink-800' },
-  { value: 'BEREAVEMENT', label: '喪假', color: 'bg-gray-100 text-gray-800' },
+  { value: 'BEREAVEMENT', label: '喪假', color: 'bg-stone-100 text-slate-800' },
   { value: 'MATERNITY', label: '產假', color: 'bg-purple-100 text-purple-800' },
   { value: 'MENSTRUAL', label: '生理假', color: 'bg-rose-100 text-rose-800' },
 ];
@@ -51,7 +51,7 @@ const STATUS_CONFIG = {
   CONFLICT: { label: '有衝突', color: 'bg-orange-100 text-orange-800' },
   APPROVED: { label: '已批准', color: 'bg-green-100 text-green-800' },
   REJECTED: { label: '已駁回', color: 'bg-red-100 text-red-800' },
-  CANCELLED: { label: '已取消', color: 'bg-gray-100 text-gray-800' },
+  CANCELLED: { label: '已取消', color: 'bg-stone-100 text-slate-800' },
 };
 
 export function LeaveManagementView({
@@ -82,6 +82,19 @@ export function LeaveManagementView({
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const [editSelectedDays, setEditSelectedDays] = useState<number[]>([]);
   const [showFullCalendar, setShowFullCalendar] = useState(false); // 手機版月曆展開狀態
+
+  // ESC key handler — close any open modal
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showApplyModal) setShowApplyModal(false);
+      if (showRulesModal) setShowRulesModal(false);
+      if (showScheduleModal) setShowScheduleModal(false);
+      if (showEditScheduleModal) setShowEditScheduleModal(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showApplyModal, showRulesModal, showScheduleModal, showEditScheduleModal]);
 
   // Apply form state
   const [applyForm, setApplyForm] = useState({
@@ -598,9 +611,12 @@ export function LeaveManagementView({
             {activeTab === 'schedule' && (
               <button
                 onClick={() => setShowScheduleModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold flex items-center gap-1.5"
               >
-                📅 提交排班
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" />
+                </svg>
+                提交排班
               </button>
             )}
             {activeTab === 'leave' && (
@@ -617,9 +633,16 @@ export function LeaveManagementView({
                   setShowRulesModal(true);
                   loadScheduleRules();
                 }}
-                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition font-bold"
+                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition font-bold flex items-center gap-1.5"
               >
-                ⚙️ 規則設定
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M7.84 1.804A1 1 0 018.82 1h2.36a1 1 0 01.98.804l.331 1.652a6.993 6.993 0 011.929 1.115l1.598-.54a1 1 0 011.186.447l1.18 2.044a1 1 0 01-.205 1.251l-1.267 1.113a7.047 7.047 0 010 2.228l1.267 1.113a1 1 0 01.206 1.25l-1.18 2.045a1 1 0 01-1.187.447l-1.598-.54a6.993 6.993 0 01-1.929 1.115l-.33 1.652a1 1 0 01-.98.804H8.82a1 1 0 01-.98-.804l-.331-1.652a6.993 6.993 0 01-1.929-1.115l-1.598.54a1 1 0 01-1.186-.447l-1.18-2.044a1 1 0 01.205-1.251l1.267-1.114a7.05 7.05 0 010-2.227L1.821 7.773a1 1 0 01-.206-1.25l1.18-2.045a1 1 0 011.187-.447l1.598.54A6.993 6.993 0 017.51 3.456l.33-1.652zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                規則設定
               </button>
             )}
           </div>
@@ -629,23 +652,33 @@ export function LeaveManagementView({
         <div className="flex gap-2 mt-4 border-b border-slate-200">
           <button
             onClick={() => setActiveTab('schedule')}
-            className={`px-6 py-3 font-bold transition border-b-2 ${
+            className={`px-6 py-3 font-bold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === 'schedule'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-600 hover:text-slate-800'
             }`}
           >
-            📅 月度排班
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" />
+            </svg>
+            月度排班
           </button>
           <button
             onClick={() => setActiveTab('leave')}
-            className={`px-6 py-3 font-bold transition border-b-2 ${
+            className={`px-6 py-3 font-bold transition border-b-2 flex items-center gap-1.5 ${
               activeTab === 'leave'
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-600 hover:text-slate-800'
             }`}
           >
-            🏖️ 請假管理
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            請假管理
           </button>
         </div>
 
@@ -655,23 +688,33 @@ export function LeaveManagementView({
             <div className="flex gap-2">
               <button
                 onClick={() => setScheduleViewMode('calendar')}
-                className={`px-4 py-2 rounded-lg font-bold transition ${
+                className={`px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 ${
                   scheduleViewMode === 'calendar'
                     ? 'bg-blue-100 text-blue-800'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                📅 月曆查看
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" />
+                </svg>
+                月曆查看
               </button>
               <button
                 onClick={() => setScheduleViewMode('list')}
-                className={`px-4 py-2 rounded-lg font-bold transition ${
+                className={`px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 ${
                   scheduleViewMode === 'list'
                     ? 'bg-blue-100 text-blue-800'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                📋 假表審核
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M5 4a3 3 0 013-3h4a3 3 0 013 3h2a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h2zm3-1.5a1.5 1.5 0 00-1.5 1.5h7A1.5 1.5 0 0012 2.5H8z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                假表審核
               </button>
             </div>
 
@@ -699,23 +742,33 @@ export function LeaveManagementView({
           <div className="flex gap-2 mt-4">
             <button
               onClick={() => setViewMode('list')}
-              className={`px-4 py-2 rounded-lg font-bold transition ${
+              className={`px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 ${
                 viewMode === 'list'
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              📋 列表
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M5 4a3 3 0 013-3h4a3 3 0 013 3h2a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h2zm3-1.5a1.5 1.5 0 00-1.5 1.5h7A1.5 1.5 0 0012 2.5H8z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              列表
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`px-4 py-2 rounded-lg font-bold transition ${
+              className={`px-4 py-2 rounded-lg font-bold transition flex items-center gap-1.5 ${
                 viewMode === 'calendar'
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              📅 行事曆
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" />
+              </svg>
+              行事曆
             </button>
           </div>
         )}
@@ -1463,7 +1516,7 @@ export function LeaveManagementView({
                         {canCancelThis && (
                           <button
                             onClick={() => handleCancel(leave.id)}
-                            className="px-3 py-1 bg-gray-600 text-white rounded text-sm hover:bg-gray-700 transition"
+                            className="px-3 py-1 bg-slate-600 text-white rounded text-sm hover:bg-slate-700 transition"
                           >
                             取消
                           </button>
@@ -1486,8 +1539,16 @@ export function LeaveManagementView({
 
       {/* Apply Modal */}
       {showApplyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowApplyModal(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-6 text-slate-800">申請假期</h2>
 
             <div className="space-y-4">
@@ -1592,8 +1653,16 @@ export function LeaveManagementView({
 
       {/* Rules Modal */}
       {showRulesModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowRulesModal(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-6 text-slate-800">
               {activeTab === 'schedule' ? '部門排班規則設定' : '部門請假規則設定'}
             </h2>
@@ -1763,8 +1832,16 @@ export function LeaveManagementView({
 
       {/* Schedule Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowScheduleModal(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-6 text-slate-800">提交月度排班</h2>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -1899,8 +1976,16 @@ export function LeaveManagementView({
 
       {/* Edit Schedule Modal */}
       {showEditScheduleModal && editingSchedule && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowEditScheduleModal(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold mb-6 text-slate-800">調整排班</h2>
 
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
