@@ -904,6 +904,56 @@ const RealApi = {
       });
     },
     delete: async (id: string) => request<void>('DELETE', `/work-logs/${id}`),
+
+    getSubmissionStats: async (date?: string): Promise<any> => {
+      const query = date ? `?date=${encodeURIComponent(date)}` : '';
+      return request<any>('GET', `/work-logs/submission-stats${query}`);
+    },
+
+    images: {
+      async upload(
+        workLogId: string,
+        section: 'today' | 'tomorrow' | 'notes',
+        file: File
+      ): Promise<any> {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('section', section);
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`/api/work-logs/${workLogId}/images`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `上傳失敗 (${res.status})`);
+        }
+        return res.json();
+      },
+
+      getUrl(hash: string, filename: string): string {
+        return `/api/work-logs/images/${hash}/${encodeURIComponent(filename)}`;
+      },
+
+      async fetchBlobUrl(hash: string, filename: string): Promise<string> {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`/api/work-logs/images/${hash}/${encodeURIComponent(filename)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`載入圖片失敗 (${res.status})`);
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      },
+
+      async delete(
+        workLogId: string,
+        hash: string,
+        section: 'today' | 'tomorrow' | 'notes'
+      ): Promise<void> {
+        await request<void>('DELETE', `/work-logs/${workLogId}/images/${hash}?section=${section}`);
+      },
+    },
   },
   platformAccounts: {
     uploadPreview: async (file: File, yearMonth: string): Promise<any> => {
