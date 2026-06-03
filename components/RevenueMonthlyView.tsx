@@ -38,9 +38,10 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
   const [editValue, setEditValue] = useState<string>('');
 
   // Check if user has edit permission (SUPERVISOR, MANAGER, or BOSS)
-  const canEdit = currentUser.role === Role.SUPERVISOR || 
-                  currentUser.role === Role.MANAGER || 
-                  currentUser.role === Role.BOSS;
+  const canEdit =
+    currentUser.role === Role.SUPERVISOR ||
+    currentUser.role === Role.MANAGER ||
+    currentUser.role === Role.BOSS;
 
   useEffect(() => {
     loadPlatforms();
@@ -59,7 +60,7 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
   const loadPlatforms = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/platform-revenue/platforms`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` },
       });
       if (response.ok) {
         const data = await response.json();
@@ -83,7 +84,7 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
 
       const response = await fetch(
         `${API_BASE_URL}/platform-revenue?startDate=${startDate}&endDate=${endDate}&platform=${selectedPlatform}`,
-        { headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } }
+        { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } }
       );
 
       if (response.ok) {
@@ -100,12 +101,12 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
   const getDayData = (day: number): DailyRecord | null => {
     const [year, month] = selectedMonth.split('-');
     const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
-    return monthlyData.find(r => r.date === dateStr) || null;
+    return monthlyData.find((r) => r.date === dateStr) || null;
   };
 
   const handleCellClick = (day: number, field: string) => {
     if (!canEdit) return;
-    
+
     const data = getDayData(day);
     const value = data ? data[field as keyof DailyRecord] : 0;
     setEditingCell({ day, field });
@@ -117,20 +118,20 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
 
     const [year, month] = selectedMonth.split('-');
     const dateStr = `${year}-${month}-${String(editingCell.day).padStart(2, '0')}`;
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/platform-revenue/update-cell`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
         },
         body: JSON.stringify({
           platform: selectedPlatform,
           date: dateStr,
           field: editingCell.field,
-          value: parseFloat(editValue) || 0
-        })
+          value: parseFloat(editValue) || 0,
+        }),
       });
 
       if (response.ok) {
@@ -143,7 +144,10 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
   };
 
   const calculateTotal = (field: string): number => {
-    return monthlyData.reduce((sum, record) => sum + (record[field as keyof DailyRecord] as number || 0), 0);
+    return monthlyData.reduce(
+      (sum, record) => sum + ((record[field as keyof DailyRecord] as number) || 0),
+      0
+    );
   };
 
   const getDaysInMonth = (): number => {
@@ -168,7 +172,7 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
     { key: 'withdrawal_amount', label: '提款' },
     { key: 'loan_amount', label: '借款' },
     { key: 'profit', label: '營利' },
-    { key: 'balance', label: '餘額' }
+    { key: 'balance', label: '餘額' },
   ];
 
   return (
@@ -176,24 +180,26 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
       {/* Header Controls */}
       <div className="flex items-center gap-4 bg-white p-4 rounded-lg shadow">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">平台</label>
+          <label className="block text-sm font-medium text-slate-700 mb-2">平台</label>
           <select
             value={selectedPlatform}
             onChange={(e) => setSelectedPlatform(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            {platforms.map(platform => (
-              <option key={platform} value={platform}>{platform}</option>
+            {platforms.map((platform) => (
+              <option key={platform} value={platform}>
+                {platform}
+              </option>
             ))}
           </select>
         </div>
         <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 mb-2">月份</label>
+          <label className="block text-sm font-medium text-slate-700 mb-2">月份</label>
           <input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
         <div className="flex gap-2 items-end">
@@ -217,35 +223,50 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
 
       {/* Monthly Table */}
       {loading ? (
-        <div className="text-center py-8 text-gray-500">載入中...</div>
+        <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-500">
+          <svg className="w-6 h-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+            <path
+              d="M22 12a10 10 0 0 1-10 10"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+          <p className="text-sm">載入中...</p>
+        </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-stone-50 sticky top-0">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50 z-10">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase sticky left-0 bg-stone-50 z-10">
                     日期
                   </th>
-                  {columns.map(col => (
-                    <th key={col.key} className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                  {columns.map((col) => (
+                    <th
+                      key={col.key}
+                      className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase whitespace-nowrap"
+                    >
                       {col.label}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {Array.from({ length: getDaysInMonth() }, (_, i) => i + 1).map(day => {
+              <tbody className="bg-white divide-y divide-slate-200">
+                {Array.from({ length: getDaysInMonth() }, (_, i) => i + 1).map((day) => {
                   const data = getDayData(day);
                   return (
-                    <tr key={day} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900 sticky left-0 bg-white">
+                    <tr key={day} className="hover:bg-stone-50">
+                      <td className="px-4 py-2 whitespace-nowrap font-medium text-slate-900 sticky left-0 bg-white">
                         {day}
                       </td>
-                      {columns.map(col => {
+                      {columns.map((col) => {
                         const value = data ? data[col.key as keyof DailyRecord] : 0;
-                        const isEditing = editingCell?.day === day && editingCell?.field === col.key;
-                        
+                        const isEditing =
+                          editingCell?.day === day && editingCell?.field === col.key;
+
                         return (
                           <td
                             key={col.key}
@@ -266,20 +287,26 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
                                   }}
                                 />
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); handleCellSave(); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCellSave();
+                                  }}
                                   className="p-1 text-green-600 hover:bg-green-50 rounded"
                                 >
                                   <Save className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); setEditingCell(null); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCell(null);
+                                  }}
                                   className="p-1 text-red-600 hover:bg-red-50 rounded"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
                               </div>
                             ) : (
-                              <span className={value === 0 ? 'text-gray-400' : ''}>
+                              <span className={value === 0 ? 'text-slate-400' : ''}>
                                 {typeof value === 'number' ? value.toLocaleString() : value}
                               </span>
                             )}
@@ -291,11 +318,12 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
                 })}
                 {/* Total Row */}
                 <tr className="bg-blue-50 font-bold">
-                  <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-blue-50">
-                    合計
-                  </td>
-                  {columns.map(col => (
-                    <td key={col.key} className="px-4 py-3 text-right whitespace-nowrap text-blue-900">
+                  <td className="px-4 py-3 whitespace-nowrap sticky left-0 bg-blue-50">合計</td>
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className="px-4 py-3 text-right whitespace-nowrap text-blue-900"
+                    >
                       {calculateTotal(col.key).toLocaleString()}
                     </td>
                   ))}

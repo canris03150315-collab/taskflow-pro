@@ -43,8 +43,8 @@ export const RevenueDateStatsTab: React.FC<RevenueDateStatsTabProps> = ({ curren
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/stats/date?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -69,21 +69,21 @@ export const RevenueDateStatsTab: React.FC<RevenueDateStatsTabProps> = ({ curren
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">開始日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">開始日期</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">結束日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">結束日期</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             />
           </div>
         </div>
@@ -95,7 +95,9 @@ export const RevenueDateStatsTab: React.FC<RevenueDateStatsTabProps> = ({ curren
           </div>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="text-sm text-red-600 font-medium mb-1">總提款</div>
-            <div className="text-2xl font-bold text-red-700">{totalWithdrawal.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-red-700">
+              {totalWithdrawal.toLocaleString()}
+            </div>
           </div>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="text-sm text-green-600 font-medium mb-1">總營利</div>
@@ -104,27 +106,47 @@ export const RevenueDateStatsTab: React.FC<RevenueDateStatsTabProps> = ({ curren
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">載入中...</p>
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-500">
+            <svg className="w-6 h-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path
+                d="M22 12a10 10 0 0 1-10 10"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <p className="text-sm">載入中...</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-stone-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">平台數</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">充值</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">提款</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">營利</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    日期
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    平台數
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    充值
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    提款
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    營利
+                  </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-slate-200">
                 {stats.map((stat, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
+                  <tr key={idx} className="hover:bg-stone-50">
                     <td className="px-6 py-4 whitespace-nowrap font-medium">{stat.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">{stat.platform_count}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      {stat.platform_count}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-blue-600">
                       {stat.total_deposit.toLocaleString()}
                     </td>

@@ -53,8 +53,8 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/history?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -75,8 +75,8 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
       const response = await fetch(`${API_BASE_URL}/platform-revenue/restore/${historyId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -95,17 +95,17 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
   const canRestore = ['SUPERVISOR', 'MANAGER', 'BOSS'].includes(currentUser.role);
 
   const actionTypeLabels: Record<string, string> = {
-    'CREATE': '新增',
-    'UPDATE': '修改',
-    'DELETE': '刪除',
-    'RESTORE': '還原'
+    CREATE: '新增',
+    UPDATE: '修改',
+    DELETE: '刪除',
+    RESTORE: '還原',
   };
 
   const actionTypeColors: Record<string, string> = {
-    'CREATE': 'bg-green-100 text-green-800',
-    'UPDATE': 'bg-blue-100 text-blue-800',
-    'DELETE': 'bg-red-100 text-red-800',
-    'RESTORE': 'bg-purple-100 text-purple-800'
+    CREATE: 'bg-green-100 text-green-800',
+    UPDATE: 'bg-blue-100 text-blue-800',
+    DELETE: 'bg-red-100 text-red-800',
+    RESTORE: 'bg-purple-100 text-purple-800',
   };
 
   return (
@@ -115,42 +115,44 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">開始日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">開始日期</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">結束日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">結束日期</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">操作者</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">操作者</label>
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             >
               <option value="">全部</option>
-              {users?.map(user => (
-                <option key={user.id} value={user.id}>{user.name}</option>
+              {users?.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">操作類型</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">操作類型</label>
             <select
               value={selectedAction}
               onChange={(e) => setSelectedAction(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             >
               <option value="">全部</option>
               <option value="CREATE">新增</option>
@@ -162,27 +164,45 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">載入中...</p>
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-500">
+            <svg className="w-6 h-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path
+                d="M22 12a10 10 0 0 1-10 10"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <p className="text-sm">載入中...</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-stone-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">時間</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作者</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">類型</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">變更摘要</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    時間
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    操作者
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    類型
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    變更摘要
+                  </th>
                   {canRestore && (
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">操作</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-500 uppercase">
+                      操作
+                    </th>
                   )}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-slate-200">
                 {history.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50">
+                  <tr key={record.id} className="hover:bg-stone-50">
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
                       {new Date(record.action_at).toLocaleString()}
                     </td>
@@ -190,26 +210,27 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
                       {record.action_by_name}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        actionTypeColors[record.action_type] || 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          actionTypeColors[record.action_type] || 'bg-stone-100 text-slate-800'
+                        }`}
+                      >
                         {actionTypeLabels[record.action_type] || record.action_type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {record.changes_summary}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{record.changes_summary}</td>
                     {canRestore && (
                       <td className="px-4 py-3 whitespace-nowrap text-center">
-                        {(record.action_type === 'UPDATE' || record.action_type === 'DELETE') && record.old_data && (
-                          <button
-                            onClick={() => handleRestore(record.id)}
-                            className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
-                            title="還原到此版本"
-                          >
-                            ↩️ 還原
-                          </button>
-                        )}
+                        {(record.action_type === 'UPDATE' || record.action_type === 'DELETE') &&
+                          record.old_data && (
+                            <button
+                              onClick={() => handleRestore(record.id)}
+                              className="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+                              title="還原到此版本"
+                            >
+                              ↩️ 還原
+                            </button>
+                          )}
                       </td>
                     )}
                   </tr>
@@ -218,9 +239,7 @@ export const RevenueHistoryTab: React.FC<RevenueHistoryTabProps> = ({ currentUse
             </table>
 
             {history.length === 0 && (
-              <div className="text-center py-12 text-gray-500">
-                無修改記錄
-              </div>
+              <div className="text-center py-12 text-slate-500">無修改記錄</div>
             )}
           </div>
         )}

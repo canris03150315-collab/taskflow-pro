@@ -65,7 +65,11 @@ interface TransactionRecord {
   external_dividend_send?: number;
 }
 
-export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, users, departments }) => {
+export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({
+  currentUser,
+  users,
+  departments,
+}) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState('');
@@ -98,8 +102,8 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
     try {
       const response = await fetch(`${API_BASE_URL}/platform-revenue/platforms`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
       if (response.ok) {
         const data = await response.json();
@@ -119,8 +123,8 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/stats/platform?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -144,8 +148,8 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -169,8 +173,8 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
       const response = await fetch(`${API_BASE_URL}/platform-revenue/export?${params}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-        }
+          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+        },
       });
 
       if (response.ok) {
@@ -203,7 +207,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
               className={`px-4 py-2 rounded-lg ${
                 viewMode === 'stats'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               統計視圖
@@ -213,7 +217,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
               className={`px-4 py-2 rounded-lg ${
                 viewMode === 'details'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
               詳細資料
@@ -223,33 +227,35 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">開始日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">開始日期</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">結束日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">結束日期</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">平台</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">平台</label>
             <select
               value={selectedPlatform}
               onChange={(e) => setSelectedPlatform(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg"
             >
               <option value="">全部平台</option>
-              {platforms.map(platform => (
-                <option key={platform} value={platform}>{platform}</option>
+              {platforms.map((platform) => (
+                <option key={platform} value={platform}>
+                  {platform}
+                </option>
               ))}
             </select>
           </div>
@@ -264,9 +270,17 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">載入中...</p>
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-500">
+            <svg className="w-6 h-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path
+                d="M22 12a10 10 0 0 1-10 10"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <p className="text-sm">載入中...</p>
           </div>
         ) : viewMode === 'stats' ? (
           <>
@@ -276,7 +290,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
                 className={`px-4 py-2 rounded-lg ${
                   detailView === 'summary'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 簡要視圖
@@ -286,7 +300,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
                 className={`px-4 py-2 rounded-lg ${
                   detailView === 'detailed'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 詳細視圖
@@ -295,28 +309,50 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
 
             {detailView === 'summary' ? (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-stone-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">平台</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">記錄數</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">總充值</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">總提款</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">總營利</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">平均營利</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        平台
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        記錄數
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        總充值
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        總提款
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        總營利
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        平均營利
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-slate-200">
                     {stats.map((stat, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap font-medium">{stat.platform_name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">{stat.record_count}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">{stat.total_deposit.toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">{stat.total_withdrawal.toLocaleString()}</td>
+                      <tr key={idx} className="hover:bg-stone-50">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">
+                          {stat.platform_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {stat.record_count}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {stat.total_deposit.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {stat.total_withdrawal.toLocaleString()}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right font-semibold text-green-600">
                           {stat.total_profit.toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">{stat.avg_profit?.toFixed(2) || 0}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {stat.avg_profit?.toFixed(2) || 0}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -324,38 +360,80 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-stone-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">平台</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">記錄數</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">總充值</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">總提款</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">總營利</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">彩票工資</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">彩票反點</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">真人AG</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">棋牌</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">外接返點</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">真人私返</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                        平台
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        記錄數
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        總充值
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        總提款
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        總營利
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        彩票工資
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        彩票反點
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        真人AG
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        棋牌
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        外接返點
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                        真人私返
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white divide-y divide-slate-200">
                     {stats.map((stat, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 whitespace-nowrap font-medium">{stat.platform_name}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{stat.record_count}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{stat.total_deposit.toLocaleString()}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{stat.total_withdrawal.toLocaleString()}</td>
+                      <tr key={idx} className="hover:bg-stone-50">
+                        <td className="px-4 py-4 whitespace-nowrap font-medium">
+                          {stat.platform_name}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {stat.record_count}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {stat.total_deposit.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {stat.total_withdrawal.toLocaleString()}
+                        </td>
                         <td className="px-4 py-4 whitespace-nowrap text-right font-semibold text-green-600">
                           {stat.total_profit.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_lottery_wage || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_lottery_rebate || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_game_ag || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_game_chess || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_game_rebate || 0).toLocaleString()}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right">{(stat.total_game_private || 0).toLocaleString()}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {(stat.total_lottery_wage || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {(stat.total_lottery_rebate || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {(stat.total_game_ag || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {(stat.total_game_chess || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {(stat.total_game_rebate || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right">
+                          {(stat.total_game_private || 0).toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -365,40 +443,64 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({ currentUser, u
           </>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-stone-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">平台</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">充值</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">提款</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">營利</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">上傳者</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">最後修改</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    平台
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    日期
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                    充值
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                    提款
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">
+                    營利
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    上傳者
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">
+                    最後修改
+                  </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-slate-200">
                 {records.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap font-medium">{record.platform_name}</td>
+                  <tr key={record.id} className="hover:bg-stone-50">
+                    <td className="px-4 py-3 whitespace-nowrap font-medium">
+                      {record.platform_name}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">{record.date}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">{record.deposit_amount.toLocaleString()}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">{record.withdrawal_amount.toLocaleString()}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                      {record.deposit_amount.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                      {record.withdrawal_amount.toLocaleString()}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-green-600">
                       {record.profit.toLocaleString()}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
                       <div>{record.uploaded_by_name}</div>
-                      <div className="text-gray-500 text-xs">{new Date(record.uploaded_at).toLocaleString()}</div>
+                      <div className="text-slate-500 text-xs">
+                        {new Date(record.uploaded_at).toLocaleString()}
+                      </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm">
                       {record.last_modified_by_name ? (
                         <>
                           <div>{record.last_modified_by_name}</div>
-                          <div className="text-gray-500 text-xs">{new Date(record.last_modified_at!).toLocaleString()}</div>
+                          <div className="text-slate-500 text-xs">
+                            {new Date(record.last_modified_at!).toLocaleString()}
+                          </div>
                         </>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-slate-400">-</span>
                       )}
                     </td>
                   </tr>
