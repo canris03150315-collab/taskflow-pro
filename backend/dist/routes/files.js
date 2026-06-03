@@ -67,7 +67,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     }
 
     const result = await fileService.uploadFile(req.db, req.user, {
-      filename: req.file.originalname,
+      filename: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
       buffer: req.file.buffer,
       mimeType: req.file.mimetype,
       note,
