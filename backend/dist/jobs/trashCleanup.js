@@ -21,11 +21,30 @@ async function runCleanup(db) {
     await db.run('DELETE FROM file_versions WHERE id = ?', [v.id]);
 
     // If no remaining refs to this hash, remove blob
-    const refs = await db.get(
+    const fileRefs = await db.get(
       'SELECT COUNT(*) AS n FROM file_versions WHERE content_hash = ?',
       [v.content_hash]
     );
-    if (refs.n === 0) {
+
+    // Also check work_logs.images for hash references
+    const workLogRows = await db.all(
+      "SELECT images FROM work_logs WHERE images IS NOT NULL AND images != ''"
+    );
+    let workLogRefs = 0;
+    for (const row of workLogRows) {
+      try {
+        const imgs = JSON.parse(row.images);
+        for (const section of ['today', 'tomorrow', 'notes']) {
+          if (Array.isArray(imgs[section])) {
+            workLogRefs += imgs[section].filter((i) => i.hash === v.content_hash).length;
+          }
+        }
+      } catch {
+        /* skip malformed JSON */
+      }
+    }
+
+    if (fileRefs.n === 0 && workLogRefs === 0) {
       try {
         storage.deleteBlob(v.blob_path);
         blobsRemoved++;
