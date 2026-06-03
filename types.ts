@@ -506,6 +506,22 @@ export const MENU_LABELS: Record<MenuItemId, { label: string; icon: string }> = 
 };
 
 // Work Log Types
+export interface WorkLogImage {
+  hash: string;
+  filename: string;
+  size: number;
+  mime_type: string;
+  uploader_id: string;
+  uploaded_at: string;
+  blob_path?: string; // server-only, may not be sent to frontend
+}
+
+export interface WorkLogImages {
+  today: WorkLogImage[];
+  tomorrow: WorkLogImage[];
+  notes: WorkLogImage[];
+}
+
 export interface WorkLog {
   id: string;
   userId: string;
@@ -516,8 +532,21 @@ export interface WorkLog {
   todayTasks: string; // 今日工作事項
   tomorrowTasks: string; // 明天工作事項
   notes: string; // 特別備註
+  images?: WorkLogImages;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SubmissionStats {
+  date: string;
+  totalEligible: number;
+  submittedCount: number;
+  notSubmitted: Array<{
+    userId: string;
+    name: string;
+    department: string;
+    departmentName?: string;
+  }>;
 }
 
 // --- KOL Management Types ---
