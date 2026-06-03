@@ -79,14 +79,37 @@ async function uploadFile(db, currentUser, { filename, buffer, mimeType, note, t
 
     await db.run('UPDATE files SET latest_uploaded_at = ? WHERE id = ?', [now, fileId]);
   } else {
-    // Create new file
+    // Try to create new file. If UNIQUE constraint fires (concurrent upload of same
+    // filename), find the existing file and add as new version instead.
     fileId = genId('file');
     versionNo = 1;
-    await db.run(
-      `INSERT INTO files (id, filename, owner_id, created_at, latest_uploaded_at, is_deleted)
-       VALUES (?, ?, ?, ?, ?, 0)`,
-      [fileId, filename, currentUser.id, now, now]
-    );
+    try {
+      await db.run(
+        `INSERT INTO files (id, filename, owner_id, created_at, latest_uploaded_at, is_deleted)
+         VALUES (?, ?, ?, ?, ?, 0)`,
+        [fileId, filename, currentUser.id, now, now]
+      );
+    } catch (err) {
+      const msg = (err && err.message) || '';
+      if (msg.includes('UNIQUE') || msg.includes('idx_files_active_unique')) {
+        // Concurrent upload won — find existing file and switch to add-version path
+        const existing = await db.get(
+          'SELECT id FROM files WHERE owner_id = ? AND filename = ? AND is_deleted = 0 LIMIT 1',
+          [currentUser.id, filename]
+        );
+        if (!existing) throw err; // shouldn't happen
+        fileId = existing.id;
+
+        const maxVer = await db.get(
+          'SELECT MAX(version_no) AS max_no FROM file_versions WHERE file_id = ?',
+          [fileId]
+        );
+        versionNo = (maxVer.max_no || 0) + 1;
+        await db.run('UPDATE files SET latest_uploaded_at = ? WHERE id = ?', [now, fileId]);
+      } else {
+        throw err;
+      }
+    }
   }
 
   const versionId = genId('ver');
