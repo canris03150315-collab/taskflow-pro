@@ -468,55 +468,5 @@ router.delete('/:id/images/:hash', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/work-logs/submission-stats?date=YYYY-MM-DD - Manager-only submission stats
-router.get('/submission-stats', authenticateToken, async (req, res) => {
-  try {
-    const db = req.db;
-    const currentUser = req.user;
-    const date = req.query.date || new Date().toISOString().split('T')[0];
-
-    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
-      return res.status(403).json({ error: '無權限查看提交統計' });
-    }
-
-    const eligibleUsers = await dbCall(
-      db,
-      'all',
-      `SELECT u.id, u.name, u.department, d.name AS department_name
-         FROM users u
-         LEFT JOIN departments d ON d.id = u.department
-         WHERE u.role IN ('EMPLOYEE', 'SUPERVISOR')`,
-      []
-    );
-
-    const submitted = await dbCall(
-      db,
-      'all',
-      'SELECT DISTINCT user_id FROM work_logs WHERE date = ?',
-      [date]
-    );
-    const submittedSet = new Set(submitted.map((r) => r.user_id));
-
-    const notSubmitted = eligibleUsers
-      .filter((u) => !submittedSet.has(u.id))
-      .map((u) => ({
-        userId: u.id,
-        name: u.name,
-        department: u.department,
-        departmentName: u.department_name,
-      }));
-
-    res.json({
-      date,
-      totalEligible: eligibleUsers.length,
-      submittedCount: eligibleUsers.length - notSubmitted.length,
-      notSubmitted,
-    });
-  } catch (err) {
-    console.error('[work-logs] submission-stats error:', err.message);
-    res.status(500).json({ error: '取得提交統計失敗' });
-  }
-});
-
 module.exports = router;
 

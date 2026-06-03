@@ -1,14 +1,6 @@
 // components/WorkLogTab.tsx
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  WorkLog,
-  WorkLogImage,
-  WorkLogImages,
-  User,
-  DepartmentDef,
-  Role,
-  SubmissionStats,
-} from '../types';
+import { WorkLog, WorkLogImage, WorkLogImages, User, DepartmentDef, Role } from '../types';
 import { api } from '../services/api';
 import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 import { EmptyState } from './EmptyState';
@@ -76,8 +68,6 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
   const [lightbox, setLightbox] = useState<{ images: WorkLogImage[]; idx: number } | null>(null);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
-  const [stats, setStats] = useState<SubmissionStats | null>(null);
-
   const availableDepts = useMemo(
     () => (isManager ? departments : departments.filter((d) => d.id === currentUser.department)),
     [departments, isManager, currentUser.department]
@@ -113,30 +103,14 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
     }
   };
 
-  const loadStats = async () => {
-    if (!isManager) return;
-    try {
-      const s = await api.workLogs.getSubmissionStats(todayStr());
-      setStats(s);
-    } catch {
-      // Silent — stats are optional
-    }
-  };
-
   useEffect(() => {
     loadLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDept, selectedUser, selectedDate, dateMode]);
 
   useEffect(() => {
-    loadStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     const handler = () => {
       loadLogs();
-      loadStats();
     };
     window.addEventListener('worklog-updated', handler);
     return () => window.removeEventListener('worklog-updated', handler);
@@ -231,7 +205,6 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
       setIsModalOpen(false);
       showSuccess(editingLog ? '工作日誌已更新' : '工作日誌已建立');
       await loadLogs();
-      await loadStats();
     } catch (error: any) {
       const msg = error.message || '保存失敗';
       const displayMsg =
@@ -248,7 +221,6 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
     try {
       await api.workLogs.delete(id);
       await loadLogs();
-      await loadStats();
     } catch {
       showError('刪除失敗');
     }
@@ -285,45 +257,6 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
 
   return (
     <div>
-      {/* Manager submission stats */}
-      {isManager && stats && stats.totalEligible > 0 && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-4">
-          <div className="flex items-center gap-3 mb-2">
-            <h3 className="font-bold text-slate-900 text-sm">📊 今日提交率</h3>
-            <span
-              className="font-mono font-bold text-emerald-700"
-              style={{ fontVariantNumeric: 'tabular-nums' }}
-            >
-              {stats.submittedCount} / {stats.totalEligible}（
-              {Math.round((stats.submittedCount / stats.totalEligible) * 100)}%）
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-slate-100 overflow-hidden mb-3">
-            <div
-              className="h-full bg-emerald-500 transition-all"
-              style={{ width: `${(stats.submittedCount / stats.totalEligible) * 100}%` }}
-            />
-          </div>
-          {stats.notSubmitted.length > 0 && (
-            <div className="text-xs text-slate-600">
-              <span className="font-bold mr-2">未交：</span>
-              {stats.notSubmitted.map((u) => (
-                <button
-                  key={u.userId}
-                  onClick={() => {
-                    setSelectedDept(u.department);
-                    setSelectedUser(u.userId);
-                  }}
-                  className="inline-block mr-2 mb-1 px-2 py-0.5 bg-slate-100 hover:bg-amber-100 rounded text-slate-700 hover:text-amber-800"
-                >
-                  {u.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Date chips + filters + create button */}
       <div className="flex flex-wrap items-end gap-3 mb-5">
         <div className="flex gap-1">

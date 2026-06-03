@@ -905,11 +905,6 @@ const RealApi = {
     },
     delete: async (id: string) => request<void>('DELETE', `/work-logs/${id}`),
 
-    getSubmissionStats: async (date?: string): Promise<any> => {
-      const query = date ? `?date=${encodeURIComponent(date)}` : '';
-      return request<any>('GET', `/work-logs/submission-stats${query}`);
-    },
-
     images: {
       async upload(
         workLogId: string,

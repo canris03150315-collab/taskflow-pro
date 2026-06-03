@@ -537,18 +537,6 @@ export interface WorkLog {
   updatedAt: string;
 }
 
-export interface SubmissionStats {
-  date: string;
-  totalEligible: number;
-  submittedCount: number;
-  notSubmitted: Array<{
-    userId: string;
-    name: string;
-    department: string;
-    departmentName?: string;
-  }>;
-}
-
 // --- KOL Management Types ---
 
 export type KOLStatus = 'ACTIVE' | 'STOPPED' | 'NEGOTIATING' | 'LOST_CONTACT';
