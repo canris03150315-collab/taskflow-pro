@@ -15,19 +15,21 @@ interface PlatformRevenueViewProps {
 export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
   currentUser,
   users,
-  departments
+  departments,
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'upload' | 'monthly' | 'platform_stats' | 'date_stats' | 'history'>('monthly');
+  const [activeSubTab, setActiveSubTab] = useState<
+    'upload' | 'monthly' | 'platform_stats' | 'date_stats' | 'history'
+  >('monthly');
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
+      <div className="flex gap-2 border-b border-slate-200 pb-2">
         <button
           onClick={() => setActiveSubTab('upload')}
           className={`px-4 py-2 font-semibold rounded-t-lg transition-colors ${
             activeSubTab === 'upload'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           📤 上傳報表
@@ -37,7 +39,7 @@ export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
           className={`px-4 py-2 font-semibold rounded-t-lg transition-colors ${
             activeSubTab === 'monthly'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           📅 月度視圖
@@ -47,7 +49,7 @@ export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
           className={`px-4 py-2 font-semibold rounded-t-lg transition-colors ${
             activeSubTab === 'platform_stats'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           📊 平台統計
@@ -57,7 +59,7 @@ export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
           className={`px-4 py-2 font-semibold rounded-t-lg transition-colors ${
             activeSubTab === 'date_stats'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           📅 日期統計
@@ -67,28 +69,20 @@ export const PlatformRevenueView: React.FC<PlatformRevenueViewProps> = ({
           className={`px-4 py-2 font-semibold rounded-t-lg transition-colors ${
             activeSubTab === 'history'
               ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'bg-stone-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           📜 修改記錄
         </button>
       </div>
 
-      {activeSubTab === 'upload' && (
-        <RevenueUploadTab currentUser={currentUser} />
-      )}
-      {activeSubTab === 'monthly' && (
-        <RevenueMonthlyView currentUser={currentUser} />
-      )}
+      {activeSubTab === 'upload' && <RevenueUploadTab currentUser={currentUser} />}
+      {activeSubTab === 'monthly' && <RevenueMonthlyView currentUser={currentUser} />}
       {activeSubTab === 'platform_stats' && (
         <RevenueStatsTab currentUser={currentUser} users={users} departments={departments} />
       )}
-      {activeSubTab === 'date_stats' && (
-        <RevenueDateStatsTab currentUser={currentUser} />
-      )}
-      {activeSubTab === 'history' && (
-        <RevenueHistoryTab currentUser={currentUser} users={users} />
-      )}
+      {activeSubTab === 'date_stats' && <RevenueDateStatsTab currentUser={currentUser} />}
+      {activeSubTab === 'history' && <RevenueHistoryTab currentUser={currentUser} users={users} />}
     </div>
   );
 };

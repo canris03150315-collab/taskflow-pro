@@ -65,10 +65,10 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       REQUEST: { bg: 'bg-blue-100', text: 'text-blue-800', label: '📤 申請' },
       APPROVE: { bg: 'bg-green-100', text: 'text-green-800', label: '✅ 批准' },
       REJECT: { bg: 'bg-red-100', text: 'text-red-800', label: '❌ 拒絕' },
-      REVOKE: { bg: 'bg-gray-100', text: 'text-gray-800', label: '🔄 撤銷' },
+      REVOKE: { bg: 'bg-stone-100', text: 'text-slate-800', label: '🔄 撤銷' },
     };
 
-    const badge = badges[action] || { bg: 'bg-gray-100', text: 'text-gray-800', label: action };
+    const badge = badges[action] || { bg: 'bg-stone-100', text: 'text-slate-800', label: action };
 
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
@@ -96,24 +96,35 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">📋 審核歷史記錄</h2>
-          <p className="text-sm text-gray-600 mt-1">查看所有報表審核操作記錄 · 共 {total} 條記錄</p>
+          <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <svg className="w-6 h-6 text-slate-700" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M5 4a3 3 0 013-3h4a3 3 0 013 3h2a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h2zm3-1.5a1.5 1.5 0 00-1.5 1.5h7A1.5 1.5 0 0012 2.5H8zm-.061 7.97a.75.75 0 011.06.011L9 11.475l1.97-1.96a.75.75 0 011.06 1.07l-2.5 2.5a.75.75 0 01-1.06 0l-1.5-1.5a.75.75 0 01.029-1.05z"
+                clipRule="evenodd"
+              />
+            </svg>
+            審核歷史記錄
+          </h2>
+          <p className="text-sm text-slate-600 mt-1">
+            查看所有報表審核操作記錄 · 共 {total} 條記錄
+          </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Action Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">操作類型</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">操作類型</label>
             <select
               value={actionFilter}
               onChange={(e) => {
                 setActionFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="ALL">全部</option>
               <option value="REQUEST">📤 申請</option>
@@ -125,7 +136,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
 
           {/* Start Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">開始日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">開始日期</label>
             <input
               type="date"
               value={startDate}
@@ -133,13 +144,13 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
                 setStartDate(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           {/* End Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">結束日期</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">結束日期</label>
             <input
               type="date"
               value={endDate}
@@ -147,7 +158,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
                 setEndDate(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -160,7 +171,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
                 setEndDate('');
                 setCurrentPage(1);
               }}
-              className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+              className="w-full px-4 py-2 bg-stone-100 text-slate-700 rounded-lg hover:bg-slate-200 transition"
             >
               🔄 清除篩選
             </button>
@@ -169,52 +180,63 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
       </div>
 
       {/* Audit Logs Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">載入中...</div>
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-500">
+            <svg className="w-6 h-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path
+                d="M22 12a10 10 0 0 1-10 10"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <p className="text-sm">載入中...</p>
+          </div>
         ) : logs.length === 0 ? (
           <EmptyState icon="🔍" title="沒有找到審核記錄" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-stone-50 border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     時間
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     操作類型
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     操作者
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     目標用戶
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     原因
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-slate-200">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={log.id} className="hover:bg-stone-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
                       {formatDate(log.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">{getActionBadge(log.action)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm">
-                        <div className="font-medium text-gray-900">{log.user_name}</div>
-                        <div className="text-gray-500">
+                        <div className="font-medium text-slate-900">{log.user_name}</div>
+                        <div className="text-slate-500">
                           {log.user_dept} · {log.user_role}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
                       {log.target_user_name || '-'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-md truncate">
+                    <td className="px-6 py-4 text-sm text-slate-900 max-w-md truncate">
                       {log.reason || '-'}
                     </td>
                   </tr>
@@ -227,8 +249,8 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white rounded-lg shadow-sm border border-gray-200 px-6 py-4">
-          <div className="text-sm text-gray-700">
+        <div className="flex items-center justify-between bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-4">
+          <div className="text-sm text-slate-700">
             顯示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, total)}{' '}
             條，共 {total} 條記錄
           </div>
@@ -236,7 +258,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-stone-100 text-slate-700 rounded-lg hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               上一頁
             </button>
@@ -260,7 +282,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
                     className={`px-4 py-2 rounded-lg transition ${
                       currentPage === pageNum
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : 'bg-stone-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     {pageNum}
@@ -271,7 +293,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-stone-100 text-slate-700 rounded-lg hover:bg-slate-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               下一頁
             </button>
