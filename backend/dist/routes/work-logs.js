@@ -4,6 +4,33 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
+const multer = require('multer');
+const fileStorage = require('../services/fileStorage');
+const path = require('path');
+
+const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_IMAGES_PER_SECTION = 10;
+const VALID_SECTIONS = new Set(['today', 'tomorrow', 'notes']);
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMAGE_SIZE },
+});
+
+function parseImages(jsonStr) {
+  if (!jsonStr) return { today: [], tomorrow: [], notes: [] };
+  try {
+    const parsed = JSON.parse(jsonStr);
+    return {
+      today: Array.isArray(parsed.today) ? parsed.today : [],
+      tomorrow: Array.isArray(parsed.tomorrow) ? parsed.tomorrow : [],
+      notes: Array.isArray(parsed.notes) ? parsed.notes : [],
+    };
+  } catch {
+    return { today: [], tomorrow: [], notes: [] };
+  }
+}
 
 // Helper function for database calls
 async function dbCall(db, method, query, params = []) {
@@ -86,7 +113,8 @@ router.get('/', authenticateToken, async (req, res) => {
       tomorrowTasks: log.tomorrow_tasks,
       notes: log.notes || '',
       createdAt: log.created_at,
-      updatedAt: log.updated_at
+      updatedAt: log.updated_at,
+      images: parseImages(log.images),
     }));
 
     res.json({ logs: mappedLogs });
@@ -162,7 +190,8 @@ router.post('/', authenticateToken, async (req, res) => {
       tomorrowTasks: log.tomorrow_tasks,
       notes: log.notes || '',
       createdAt: log.created_at,
-      updatedAt: log.updated_at
+      updatedAt: log.updated_at,
+      images: parseImages(log.images),
     };
 
     // Broadcast WebSocket event
@@ -248,7 +277,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
       tomorrowTasks: log.tomorrow_tasks,
       notes: log.notes || '',
       createdAt: log.created_at,
-      updatedAt: log.updated_at
+      updatedAt: log.updated_at,
+      images: parseImages(log.images),
     };
 
     // Broadcast WebSocket event
@@ -295,6 +325,196 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error deleting work log:', error);
     res.status(500).json({ error: '伺服器內部錯誤' });
+  }
+});
+
+// POST /api/work-logs/:id/images - Upload image to specific section
+router.post('/:id/images', authenticateToken, imageUpload.single('file'), async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    const { id } = req.params;
+    const section = req.body.section;
+
+    if (!req.file) return res.status(400).json({ error: '請選擇圖片檔案' });
+    if (!VALID_SECTIONS.has(section)) {
+      return res.status(400).json({ error: 'section 必須是 today / tomorrow / notes' });
+    }
+    if (!ALLOWED_IMAGE_MIME.has(req.file.mimetype)) {
+      return res.status(400).json({ error: '只接受 JPEG / PNG / WebP / GIF 圖片' });
+    }
+
+    const log = await dbCall(db, 'get', 'SELECT * FROM work_logs WHERE id = ?', [id]);
+    if (!log) return res.status(404).json({ error: '日誌不存在' });
+
+    if (log.user_id !== currentUser.id) {
+      return res.status(403).json({ error: '只有日誌作者可上傳圖片' });
+    }
+
+    const images = parseImages(log.images);
+    if (images[section].length >= MAX_IMAGES_PER_SECTION) {
+      return res.status(400).json({ error: `每段最多 ${MAX_IMAGES_PER_SECTION} 張圖片` });
+    }
+
+    const hash = fileStorage.computeHash(req.file.buffer);
+    const ext = path.extname(req.file.originalname).toLowerCase() || '.png';
+    const blobPath = fileStorage.writeBlob(hash, ext, req.file.buffer);
+
+    const decodedFilename = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    const newImage = {
+      hash,
+      filename: decodedFilename,
+      size: req.file.size,
+      mime_type: req.file.mimetype,
+      uploader_id: currentUser.id,
+      uploaded_at: new Date().toISOString(),
+      blob_path: blobPath,
+    };
+    images[section].push(newImage);
+
+    await dbCall(db, 'run', 'UPDATE work_logs SET images = ?, updated_at = ? WHERE id = ?', [
+      JSON.stringify(images),
+      new Date().toISOString(),
+      id,
+    ]);
+
+    res.json({ image: newImage, section });
+  } catch (err) {
+    console.error('[work-logs] image upload error:', err.message);
+    res.status(500).json({ error: '上傳圖片失敗' });
+  }
+});
+
+// GET /api/work-logs/images/:hash/:filename - Serve image blob (auth required)
+router.get('/images/:hash/:filename', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    const { hash } = req.params;
+
+    const logs = await dbCall(db, 'all', 'SELECT * FROM work_logs WHERE images IS NOT NULL', []);
+    let foundImage = null;
+    let foundLog = null;
+    for (const log of logs) {
+      const imgs = parseImages(log.images);
+      for (const section of ['today', 'tomorrow', 'notes']) {
+        const match = imgs[section].find((i) => i.hash === hash);
+        if (match) {
+          foundImage = match;
+          foundLog = log;
+          break;
+        }
+      }
+      if (foundImage) break;
+    }
+    if (!foundImage) return res.status(404).json({ error: '圖片不存在' });
+
+    const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+    const isAuthor = foundLog.user_id === currentUser.id;
+    const isSameDept = foundLog.department_id === currentUser.department;
+    if (!isAuthor && !isManager && !isSameDept) {
+      return res.status(403).json({ error: '無權限查看此圖片' });
+    }
+
+    const buffer = fileStorage.readBlob(foundImage.blob_path);
+    res.set('Content-Type', foundImage.mime_type);
+    res.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(foundImage.filename)}`);
+    res.set('Cache-Control', 'private, max-age=3600');
+    res.send(buffer);
+  } catch (err) {
+    console.error('[work-logs] image fetch error:', err.message);
+    res.status(500).json({ error: '取得圖片失敗' });
+  }
+});
+
+// DELETE /api/work-logs/:id/images/:hash?section=today - Remove image
+router.delete('/:id/images/:hash', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    const { id, hash } = req.params;
+    const section = req.query.section;
+
+    if (!VALID_SECTIONS.has(section)) {
+      return res.status(400).json({ error: 'section 必須是 today / tomorrow / notes' });
+    }
+
+    const log = await dbCall(db, 'get', 'SELECT * FROM work_logs WHERE id = ?', [id]);
+    if (!log) return res.status(404).json({ error: '日誌不存在' });
+
+    const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+    const isAuthor = log.user_id === currentUser.id;
+    if (!isAuthor && !isManager) {
+      return res.status(403).json({ error: '無權限刪除此圖片' });
+    }
+
+    const images = parseImages(log.images);
+    const before = images[section].length;
+    images[section] = images[section].filter((i) => i.hash !== hash);
+    if (images[section].length === before) {
+      return res.status(404).json({ error: '該段落沒有此圖片' });
+    }
+
+    await dbCall(db, 'run', 'UPDATE work_logs SET images = ?, updated_at = ? WHERE id = ?', [
+      JSON.stringify(images),
+      new Date().toISOString(),
+      id,
+    ]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[work-logs] image delete error:', err.message);
+    res.status(500).json({ error: '刪除圖片失敗' });
+  }
+});
+
+// GET /api/work-logs/submission-stats?date=YYYY-MM-DD - Manager-only submission stats
+router.get('/submission-stats', authenticateToken, async (req, res) => {
+  try {
+    const db = req.db;
+    const currentUser = req.user;
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+
+    if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
+      return res.status(403).json({ error: '無權限查看提交統計' });
+    }
+
+    const eligibleUsers = await dbCall(
+      db,
+      'all',
+      `SELECT u.id, u.name, u.department, d.name AS department_name
+         FROM users u
+         LEFT JOIN departments d ON d.id = u.department
+         WHERE u.role IN ('EMPLOYEE', 'SUPERVISOR')`,
+      []
+    );
+
+    const submitted = await dbCall(
+      db,
+      'all',
+      'SELECT DISTINCT user_id FROM work_logs WHERE date = ?',
+      [date]
+    );
+    const submittedSet = new Set(submitted.map((r) => r.user_id));
+
+    const notSubmitted = eligibleUsers
+      .filter((u) => !submittedSet.has(u.id))
+      .map((u) => ({
+        userId: u.id,
+        name: u.name,
+        department: u.department,
+        departmentName: u.department_name,
+      }));
+
+    res.json({
+      date,
+      totalEligible: eligibleUsers.length,
+      submittedCount: eligibleUsers.length - notSubmitted.length,
+      notSubmitted,
+    });
+  } catch (err) {
+    console.error('[work-logs] submission-stats error:', err.message);
+    res.status(500).json({ error: '取得提交統計失敗' });
   }
 });
 
