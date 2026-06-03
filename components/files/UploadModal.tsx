@@ -1,5 +1,5 @@
 // components/files/UploadModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
 import { ConflictCheckResult } from '../../types';
@@ -18,8 +18,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({ file, onClose, onUploa
   const [uploading, setUploading] = useState(false);
   const [targetFileId, setTargetFileId] = useState<string | undefined>(undefined);
   const [note, setNote] = useState('');
+  // Guard against React StrictMode double-invoke of useEffect in dev,
+  // which would otherwise cause one user-action to upload twice.
+  const didStartRef = useRef(false);
 
   useEffect(() => {
+    if (didStartRef.current) return;
+    didStartRef.current = true;
     (async () => {
       try {
         const hash = await api.files.computeHash(file);
