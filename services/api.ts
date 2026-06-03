@@ -1114,8 +1114,40 @@ const RealApi = {
       return request('GET', `/files/${fileId}/v/${versionNo}/preview`);
     },
 
-    getDownloadUrl(fileId: string, versionNo: number): string {
-      return `/api/files/${fileId}/v/${versionNo}`;
+    // Fetches the binary preview (PDF) with auth and returns a blob URL.
+    // Caller is responsible for revoking the URL when done.
+    async getPreviewBlobUrl(fileId: string, versionNo: number): Promise<string> {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/files/${fileId}/v/${versionNo}/preview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `預覽失敗 (${res.status})`);
+      }
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    },
+
+    // Auth-aware download. Triggers a save dialog with the original filename.
+    async download(fileId: string, versionNo: number, filename: string): Promise<void> {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/files/${fileId}/v/${versionNo}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `下載失敗 (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     },
 
     async deleteVersion(fileId: string, versionNo: number): Promise<void> {

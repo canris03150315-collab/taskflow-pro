@@ -1,35 +1,58 @@
 // components/files/ExcelPreview.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
 
 interface ExcelPreviewProps {
   fileId: string;
   versionNo: number;
   filename: string;
+  mimeType: string;
   onClose: () => void;
 }
+
+const isExcelMime = (m: string) =>
+  m === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+  m === 'application/vnd.ms-excel';
+
+const isPdfMime = (m: string) => m === 'application/pdf';
 
 export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
   fileId,
   versionNo,
   filename,
+  mimeType,
   onClose,
 }) => {
   const [data, setData] = useState<any>(null);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
   const [activeSheet, setActiveSheet] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  // Guard against React StrictMode double-invoke of effects in dev.
+  const didStartRef = useRef(false);
+  const objectUrlRef = useRef<string>('');
 
   useEffect(() => {
+    if (didStartRef.current) return;
+    didStartRef.current = true;
+
     (async () => {
       try {
-        const result = await api.files.getPreview(fileId, versionNo);
-        if (result.type === 'oversized' || result.type === 'unsupported') {
-          setError(result.message);
-        } else if (result.type === 'excel') {
-          setData(result);
+        if (isPdfMime(mimeType)) {
+          const url = await api.files.getPreviewBlobUrl(fileId, versionNo);
+          objectUrlRef.current = url;
+          setPdfUrl(url);
+        } else if (isExcelMime(mimeType)) {
+          const result = await api.files.getPreview(fileId, versionNo);
+          if (result.type === 'oversized' || result.type === 'unsupported') {
+            setError(result.message);
+          } else if (result.type === 'excel') {
+            setData(result);
+          } else {
+            setError('預覽失敗');
+          }
         } else {
-          setError('預覽失敗');
+          setError('此檔案類型不支援預覽，請下載查看');
         }
       } catch (e: any) {
         setError(e.message || '載入預覽失敗');
@@ -37,7 +60,15 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
         setLoading(false);
       }
     })();
-  }, [fileId, versionNo]);
+
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = '';
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-50 p-4">
@@ -53,7 +84,10 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
         <div className="flex-1 overflow-auto p-4">
           {loading && <p className="text-slate-500 text-center py-10">載入中...</p>}
           {error && <p className="text-red-600 text-center py-10">{error}</p>}
-          {data && (
+          {pdfUrl && !error && (
+            <iframe src={pdfUrl} title={filename} className="w-full h-[70vh] border-0" />
+          )}
+          {data && !error && (
             <>
               {data.sheets.length > 1 && (
                 <div className="flex gap-1 mb-3 border-b border-slate-200">

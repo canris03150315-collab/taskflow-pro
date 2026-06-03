@@ -8,14 +8,16 @@ import { showConfirm } from '../../utils/dialogService';
 
 interface VersionListProps {
   fileId: string;
+  filename: string;
   versions: FileVersion[];
   currentUser: User;
-  onPreview: (versionNo: number) => void;
+  onPreview: (versionNo: number, mimeType: string) => void;
   onChanged: () => void;
 }
 
 export const VersionList: React.FC<VersionListProps> = ({
   fileId,
+  filename,
   versions,
   currentUser,
   onPreview,
@@ -36,6 +38,14 @@ export const VersionList: React.FC<VersionListProps> = ({
       onChanged();
     } catch (e: any) {
       toast.error(e.message || '刪除失敗');
+    }
+  };
+
+  const handleDownload = async (versionNo: number) => {
+    try {
+      await api.files.download(fileId, versionNo, filename);
+    } catch (e: any) {
+      toast.error(e.message || '下載失敗');
     }
   };
 
@@ -71,17 +81,16 @@ export const VersionList: React.FC<VersionListProps> = ({
               <div className="flex items-center gap-1.5">
                 <button
                   className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-blue-50"
-                  onClick={() => onPreview(v.version_no)}
+                  onClick={() => onPreview(v.version_no, v.mime_type)}
                 >
                   預覽
                 </button>
-                <a
+                <button
                   className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-blue-50"
-                  href={api.files.getDownloadUrl(fileId, v.version_no)}
-                  download
+                  onClick={() => handleDownload(v.version_no)}
                 >
                   下載
-                </a>
+                </button>
                 {canDelete && (
                   <button
                     className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50"

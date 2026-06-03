@@ -23,6 +23,7 @@ export const MyFilesTab: React.FC<MyFilesTabProps> = ({ currentUser }) => {
     fileId: string;
     versionNo: number;
     filename: string;
+    mimeType: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -106,8 +107,8 @@ export const MyFilesTab: React.FC<MyFilesTabProps> = ({ currentUser }) => {
               key={f.id}
               file={f}
               currentUser={currentUser}
-              onPreview={(fileId, versionNo) =>
-                setPreview({ fileId, versionNo, filename: f.filename })
+              onPreview={(fileId, versionNo, mimeType) =>
+                setPreview({ fileId, versionNo, filename: f.filename, mimeType })
               }
               onChanged={load}
             />
@@ -131,6 +132,7 @@ export const MyFilesTab: React.FC<MyFilesTabProps> = ({ currentUser }) => {
           fileId={preview.fileId}
           versionNo={preview.versionNo}
           filename={preview.filename}
+          mimeType={preview.mimeType}
           onClose={() => setPreview(null)}
         />
       )}

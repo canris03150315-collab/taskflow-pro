@@ -20,6 +20,7 @@ export const CompanyFilesTab: React.FC<CompanyFilesTabProps> = ({ currentUser })
     fileId: string;
     versionNo: number;
     filename: string;
+    mimeType: string;
   } | null>(null);
 
   const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
@@ -69,8 +70,8 @@ export const CompanyFilesTab: React.FC<CompanyFilesTabProps> = ({ currentUser })
               key={f.id}
               file={f}
               currentUser={currentUser}
-              onPreview={(fileId, versionNo) =>
-                setPreview({ fileId, versionNo, filename: f.filename })
+              onPreview={(fileId, versionNo, mimeType) =>
+                setPreview({ fileId, versionNo, filename: f.filename, mimeType })
               }
               onChanged={load}
             />
@@ -83,6 +84,7 @@ export const CompanyFilesTab: React.FC<CompanyFilesTabProps> = ({ currentUser })
           fileId={preview.fileId}
           versionNo={preview.versionNo}
           filename={preview.filename}
+          mimeType={preview.mimeType}
           onClose={() => setPreview(null)}
         />
       )}

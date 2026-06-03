@@ -9,7 +9,7 @@ import { VersionList } from './VersionList';
 interface FileListItemProps {
   file: FileRecord;
   currentUser: User;
-  onPreview: (fileId: string, versionNo: number) => void;
+  onPreview: (fileId: string, versionNo: number, mimeType: string) => void;
   onChanged: () => void;
 }
 
@@ -76,9 +76,10 @@ export const FileListItem: React.FC<FileListItemProps> = ({
       {expanded && detail && (
         <VersionList
           fileId={file.id}
+          filename={file.filename}
           versions={detail.versions || []}
           currentUser={currentUser}
-          onPreview={(n) => onPreview(file.id, n)}
+          onPreview={(n, mime) => onPreview(file.id, n, mime)}
           onChanged={() => {
             api.files
               .getDetail(file.id)
