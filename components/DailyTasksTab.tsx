@@ -11,11 +11,11 @@ interface DailyTasksTabProps {
   onRefresh: () => void;
 }
 
-export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({ 
-  templates, 
-  departments, 
+export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
+  templates,
+  departments,
   currentUser,
-  onRefresh 
+  onRefresh,
 }) => {
   const toast = useToast();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,16 +41,15 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
   };
 
   // 只顯示每日任務
-  const dailyTasks = allTemplates.filter(t => 
-    t.isDaily && 
-    (isBoss || t.departmentId === currentUser.department)
+  const dailyTasks = allTemplates.filter(
+    (t) => t.isDaily && (isBoss || t.departmentId === currentUser.department)
   );
 
-  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
+  const getDeptName = (id: string) => departments.find((d) => d.id === id)?.name || id;
 
   const handleNew = () => {
     setEditingId('NEW');
-    setEditDeptId(isBoss ? (departments[0]?.id || '') : currentUser.department);
+    setEditDeptId(isBoss ? departments[0]?.id || '' : currentUser.department);
     setEditTitle('');
     setEditItems(['']);
   };
@@ -71,7 +70,7 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
   };
 
   const handleSave = async () => {
-    const cleanItems = editItems.filter(i => i.trim() !== '');
+    const cleanItems = editItems.filter((i) => i.trim() !== '');
     if (cleanItems.length === 0) {
       toast.warning('請至少輸入一項任務');
       return;
@@ -82,7 +81,7 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
     }
 
     const id = editingId === 'NEW' ? `daily-${Date.now()}` : editingId!;
-    
+
     const newTemplate: RoutineTemplate = {
       id,
       departmentId: editDeptId,
@@ -121,18 +120,24 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm animate-fade-in">
-      
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <span>✅</span> 每日任務管理
+            <svg className="w-5 h-5 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                clipRule="evenodd"
+              />
+            </svg>{' '}
+            每日任務管理
           </h3>
           <p className="text-sm text-slate-500">設定部門員工每天需要完成的任務項目</p>
         </div>
-        
+
         {!editingId && (
-          <button 
+          <button
             onClick={handleNew}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition shadow-sm flex items-center gap-2"
           >
@@ -147,23 +152,27 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
           <h4 className="font-bold text-emerald-800 mb-4 flex items-center gap-2">
             {editingId === 'NEW' ? '➕ 新增每日任務' : '✏️ 編輯每日任務'}
           </h4>
-          
+
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">適用部門</label>
-                <select 
+                <select
                   value={editDeptId}
                   onChange={(e) => setEditDeptId(e.target.value)}
                   disabled={!isBoss}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 bg-white disabled:bg-slate-100"
                 >
-                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">任務名稱</label>
-                <input 
+                <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
@@ -174,18 +183,20 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-2">任務項目（員工每天需完成）</label>
+              <label className="block text-xs font-bold text-slate-600 mb-2">
+                任務項目（員工每天需完成）
+              </label>
               <div className="space-y-2">
                 {editItems.map((item, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
                     <span className="text-emerald-600 font-bold w-6 text-right">{idx + 1}.</span>
-                    <input 
+                    <input
                       value={item}
                       onChange={(e) => handleItemChange(idx, e.target.value)}
                       className="flex-1 px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
                       placeholder="例如：開晨會、整理報表..."
                     />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => removeItem(idx)}
                       className="text-slate-400 hover:text-red-500 px-2 transition"
@@ -196,7 +207,7 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
                   </div>
                 ))}
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={addItem}
                 className="mt-2 text-emerald-600 hover:text-emerald-700 text-sm font-bold flex items-center gap-1"
@@ -206,13 +217,13 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
             </div>
 
             <div className="flex gap-2 pt-4 border-t border-emerald-200">
-              <button 
+              <button
                 onClick={handleSave}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg font-bold text-sm transition"
               >
                 💾 儲存
               </button>
-              <button 
+              <button
                 onClick={() => setEditingId(null)}
                 className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-2 rounded-lg font-bold text-sm transition"
               >
@@ -228,14 +239,24 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
         <div className="space-y-4">
           {dailyTasks.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
-              <div className="text-5xl mb-4">📋</div>
+              <svg
+                className="w-14 h-14 mx-auto text-slate-300 mb-4"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2h-1.5v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2H13v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z"
+                  clipRule="evenodd"
+                />
+              </svg>
               <p className="font-medium text-lg">尚無每日任務</p>
               <p className="text-sm mt-1">點擊「新增每日任務」開始設定</p>
             </div>
           ) : (
-            dailyTasks.map(task => (
-              <div 
-                key={task.id} 
+            dailyTasks.map((task) => (
+              <div
+                key={task.id}
                 className="p-4 bg-slate-50 border border-slate-200 rounded-xl hover:border-emerald-300 transition"
               >
                 <div className="flex items-start justify-between gap-4">
@@ -258,13 +279,13 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       onClick={() => handleEdit(task)}
                       className="text-blue-600 hover:text-blue-700 text-sm font-bold px-3 py-1.5 bg-blue-50 rounded-lg transition"
                     >
                       編輯
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleDelete(task.id)}
                       className="text-red-600 hover:text-red-700 text-sm font-bold px-3 py-1.5 bg-red-50 rounded-lg transition"
                     >

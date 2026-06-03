@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Task, User, Role, TaskStatus, DepartmentDef } from '../types';
 
@@ -11,16 +10,16 @@ interface CalendarViewProps {
   selectedDate: string | null;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ 
-  tasks, 
-  users, 
+export const CalendarView: React.FC<CalendarViewProps> = ({
+  tasks,
+  users,
   departments,
-  currentUser, 
+  currentUser,
   onDateSelect,
-  selectedDate 
+  selectedDate,
 }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  
+
   // 篩選狀態
   const [filterDept, setFilterDept] = useState<string>('ALL');
   const [filterUser, setFilterUser] = useState<string>('ALL');
@@ -40,7 +39,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   }, [currentUser]);
 
   // 部門名稱中文化映射
-  const getDeptName = (id: string) => departments.find(d => d.id === id)?.name || id;
+  const getDeptName = (id: string) => departments.find((d) => d.id === id)?.name || id;
 
   // --- 日曆邏輯 ---
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -55,15 +54,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
 
   // --- 任務篩選邏輯 (計算日曆上的紅點) ---
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = tasks.filter((task) => {
     // 1. 部門篩選
     if (filterDept !== 'ALL') {
       const targetIsDept = task.targetDepartment === filterDept;
-      
+
       // 也要包含指派給「該部門員工」的任務
-      const assignedUser = users.find(u => u.id === task.assignedToUserId || u.id === task.acceptedByUserId);
+      const assignedUser = users.find(
+        (u) => u.id === task.assignedToUserId || u.id === task.acceptedByUserId
+      );
       const userInDept = assignedUser?.department === filterDept;
-      
+
       // 如果任務既不是指派給該部門，執行者也不在該部門，則過濾掉
       if (!targetIsDept && !userInDept) return false;
     }
@@ -81,22 +82,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // --- 按日期分組任務 (統計數量) ---
   // 定義統計結構
   interface DayStats {
-    open: number;      // 未接取
-    assigned: number;  // 未完成 (已指派但未開始)
-    active: number;    // 進行中
+    open: number; // 未接取
+    assigned: number; // 未完成 (已指派但未開始)
+    active: number; // 進行中
     completed: number; // 已完成
   }
 
   const tasksByDate: Record<string, DayStats> = {};
-  
-  filteredTasks.forEach(task => {
+
+  filteredTasks.forEach((task) => {
     if (!task.deadline) return;
     // 修正：僅取 YYYY-MM-DD 部分，忽略時間
-    const dateKey = task.deadline.split('T')[0]; 
+    const dateKey = task.deadline.split('T')[0];
     if (!tasksByDate[dateKey]) {
       tasksByDate[dateKey] = { open: 0, assigned: 0, active: 0, completed: 0 };
     }
-    
+
     switch (task.status) {
       case TaskStatus.COMPLETED:
         tasksByDate[dateKey].completed++;
@@ -118,7 +119,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const d = new Date(year, month, day);
     // 處理時區偏移，確保轉換為 YYYY-MM-DD 時是當地時間
     const offset = d.getTimezoneOffset();
-    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+    const localDate = new Date(d.getTime() - offset * 60 * 1000);
     return localDate.toISOString().split('T')[0];
   };
 
@@ -130,43 +131,54 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // 計算下拉選單可用的員工 (依據目前篩選的部門)
   const availableUsers = useMemo(() => {
     if (filterDept === 'ALL') return users;
-    return users.filter(u => u.department === filterDept);
+    return users.filter((u) => u.department === filterDept);
   }, [users, filterDept]);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:p-6 select-none">
-      
       {/* --- 控制列 --- */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4">
-        
         {/* 月份切換 */}
         <div className="flex items-center gap-2 md:gap-4 w-full justify-between xl:w-auto">
-          <button onClick={prevMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition">
-             ◀
+          <button
+            onClick={prevMonth}
+            className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition"
+          >
+            ◀
           </button>
           <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-wide flex items-center gap-2">
-            📅 {year}年 {month + 1}月
+            <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" />
+            </svg>{' '}
+            {year}年 {month + 1}月
           </h2>
-          <button onClick={nextMonth} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition">
-             ▶
+          <button
+            onClick={nextMonth}
+            className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition"
+          >
+            ▶
           </button>
         </div>
 
         {/* 篩選器區域 */}
         <div className="flex flex-col md:flex-row flex-wrap gap-3 w-full xl:w-auto">
-          
           {/* 部門篩選 (僅總經理可見) */}
           {currentUser.role === Role.BOSS && (
-             <select 
-               value={filterDept}
-               onChange={(e) => { setFilterDept(e.target.value); setFilterUser('ALL'); }}
-               className="w-full md:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-             >
-               <option value="ALL">🏢 所有部門</option>
-               {departments.map(d => (
-                 <option key={d.id} value={d.id}>{d.name}</option>
-               ))}
-             </select>
+            <select
+              value={filterDept}
+              onChange={(e) => {
+                setFilterDept(e.target.value);
+                setFilterUser('ALL');
+              }}
+              className="w-full md:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            >
+              <option value="ALL">🏢 所有部門</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
           )}
 
           {/* 主管的部門顯示 (唯讀) */}
@@ -178,15 +190,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
           {/* 人員篩選 (總經理與主管可見) */}
           {(currentUser.role === Role.BOSS || currentUser.role === Role.SUPERVISOR) && (
-            <select 
+            <select
               value={filterUser}
               onChange={(e) => setFilterUser(e.target.value)}
               className="w-full md:w-auto px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="ALL">👥 全體員工</option>
-              {availableUsers.map(u => (
+              {availableUsers.map((u) => (
                 <option key={u.id} value={u.id}>
-                   {u.name} {currentUser.role === Role.BOSS ? `(${getDeptName(u.department)})` : ''}
+                  {u.name} {currentUser.role === Role.BOSS ? `(${getDeptName(u.department)})` : ''}
                 </option>
               ))}
             </select>
@@ -196,8 +208,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       {/* --- 日曆網格 --- */}
       <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
-        {['日', '一', '二', '三', '四', '五', '六'].map(d => (
-          <div key={d} className="text-center text-xs md:text-sm font-bold text-slate-400 uppercase py-2">
+        {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
+          <div
+            key={d}
+            className="text-center text-xs md:text-sm font-bold text-slate-400 uppercase py-2"
+          >
             {d}
           </div>
         ))}
@@ -205,85 +220,105 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       <div className="grid grid-cols-7 gap-1 md:gap-2">
         {totalSlots.map((day, index) => {
-          if (!day) return <div key={`blank-${index}`} className="aspect-[3/4] md:aspect-square bg-slate-50/50 rounded-lg"></div>;
+          if (!day)
+            return (
+              <div
+                key={`blank-${index}`}
+                className="aspect-[3/4] md:aspect-square bg-slate-50/50 rounded-lg"
+              ></div>
+            );
 
           const dateStr = getDateStr(day);
           const stats = tasksByDate[dateStr];
           const isSelected = selectedDate === dateStr;
           const isToday = dateStr === new Date().toISOString().split('T')[0];
-          const hasTasks = stats && (stats.open + stats.assigned + stats.active + stats.completed) > 0;
+          const hasTasks =
+            stats && stats.open + stats.assigned + stats.active + stats.completed > 0;
 
           return (
-            <div 
+            <div
               key={dateStr}
               onClick={() => onDateSelect(isSelected ? null : dateStr)}
               className={`
                 aspect-[3/4] md:aspect-square rounded-lg border p-1 md:p-1.5 cursor-pointer transition relative flex flex-col justify-between group overflow-hidden
-                ${isSelected 
-                  ? 'bg-blue-50 border-blue-400 ring-1 md:ring-2 ring-blue-200 shadow-md' 
-                  : 'bg-white border-slate-100 hover:border-blue-300 hover:shadow-md'
+                ${
+                  isSelected
+                    ? 'bg-blue-50 border-blue-400 ring-1 md:ring-2 ring-blue-200 shadow-md'
+                    : 'bg-white border-slate-100 hover:border-blue-300 hover:shadow-md'
                 }
               `}
             >
               {/* 日期數字 */}
               <div className="flex justify-center md:justify-between items-start">
-                 <span className={`
+                <span
+                  className={`
                   text-xs md:text-sm font-bold flex items-center justify-center w-5 h-5 md:w-7 md:h-7 rounded-full
                   ${isToday ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-700'}
-                `}>
+                `}
+                >
                   {day}
                 </span>
               </div>
-              
+
               {/* 任務狀態統計區塊 */}
               {hasTasks ? (
                 <>
                   {/* --- Mobile View: 彩色圓點 --- */}
                   <div className="flex md:hidden flex-wrap gap-1 justify-center content-end pb-1 h-full">
-                    {stats.open > 0 && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="待派"></div>}
-                    {stats.assigned > 0 && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" title="未完"></div>}
-                    {stats.active > 0 && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" title="進行"></div>}
-                    {stats.completed > 0 && <div className="w-1.5 h-1.5 rounded-full bg-slate-400" title="完成"></div>}
+                    {stats.open > 0 && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="待派"></div>
+                    )}
+                    {stats.assigned > 0 && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" title="未完"></div>
+                    )}
+                    {stats.active > 0 && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500" title="進行"></div>
+                    )}
+                    {stats.completed > 0 && (
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-400" title="完成"></div>
+                    )}
                   </div>
 
                   {/* --- Desktop View: 詳細文字 --- */}
                   <div className="hidden md:flex flex-col gap-1 w-full mt-1">
-                     {/* 未接取 (Open) - 綠色 */}
-                     {stats.open > 0 && (
-                       <div className="flex items-center justify-between px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-xs font-bold">
-                         <span>待派</span>
-                         <span>{stats.open}</span>
-                       </div>
-                     )}
-                     
-                     {/* 未完成 (Assigned) - 紫色 */}
-                     {stats.assigned > 0 && (
-                       <div className="flex items-center justify-between px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-xs font-bold">
-                         <span>未完</span>
-                         <span>{stats.assigned}</span>
-                       </div>
-                     )}
+                    {/* 未接取 (Open) - 綠色 */}
+                    {stats.open > 0 && (
+                      <div className="flex items-center justify-between px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-xs font-bold">
+                        <span>待派</span>
+                        <span>{stats.open}</span>
+                      </div>
+                    )}
 
-                     {/* 進行中 (Active) - 藍色 */}
-                     {stats.active > 0 && (
-                       <div className="flex items-center justify-between px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-bold">
-                         <span>進行</span>
-                         <span>{stats.active}</span>
-                       </div>
-                     )}
+                    {/* 未完成 (Assigned) - 紫色 */}
+                    {stats.assigned > 0 && (
+                      <div className="flex items-center justify-between px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-xs font-bold">
+                        <span>未完</span>
+                        <span>{stats.assigned}</span>
+                      </div>
+                    )}
 
-                     {/* 已完成 (Completed) - 灰色 */}
-                     {stats.completed > 0 && (
-                       <div className="flex items-center justify-between px-2 py-0.5 rounded bg-slate-200 text-slate-600 text-xs font-bold opacity-80">
-                         <span>完成</span>
-                         <span>{stats.completed}</span>
-                       </div>
-                     )}
+                    {/* 進行中 (Active) - 藍色 */}
+                    {stats.active > 0 && (
+                      <div className="flex items-center justify-between px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-bold">
+                        <span>進行</span>
+                        <span>{stats.active}</span>
+                      </div>
+                    )}
+
+                    {/* 已完成 (Completed) - 灰色 */}
+                    {stats.completed > 0 && (
+                      <div className="flex items-center justify-between px-2 py-0.5 rounded bg-slate-200 text-slate-600 text-xs font-bold opacity-80">
+                        <span>完成</span>
+                        <span>{stats.completed}</span>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
                 <div className="hidden md:flex flex-1 items-center justify-center opacity-0 group-hover:opacity-20 transition">
-                   <span className="text-xl">📅</span>
+                  <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M5.75 2a.75.75 0 01.75.75V4h7V2.75a.75.75 0 011.5 0V4h.25A2.75 2.75 0 0118 6.75v8.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25v-8.5A2.75 2.75 0 014.75 4H5V2.75A.75.75 0 015.75 2zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75z" />
+                  </svg>
                 </div>
               )}
             </div>
@@ -294,12 +329,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {/* 篩選提示 */}
       {selectedDate && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg flex flex-col md:flex-row justify-between items-center text-sm text-blue-800 animate-fade-in gap-2">
-           <span className="flex items-center gap-2">
-             <span>🎯</span> 已鎖定顯示 <strong>{selectedDate}</strong> 的任務
-           </span>
-           <button onClick={() => onDateSelect(null)} className="text-blue-600 underline hover:text-blue-800 font-bold">
-             顯示全部
-           </button>
+          <span className="flex items-center gap-2">
+            <span>🎯</span> 已鎖定顯示 <strong>{selectedDate}</strong> 的任務
+          </span>
+          <button
+            onClick={() => onDateSelect(null)}
+            className="text-blue-600 underline hover:text-blue-800 font-bold"
+          >
+            顯示全部
+          </button>
         </div>
       )}
     </div>
