@@ -265,6 +265,41 @@ const RealApi = {
       request<void>('PATCH', `/tasks/${id}`, updates),
     accept: (id: string) => request<{ task: any }>('POST', `/tasks/${id}/accept`, {}),
     delete: (id: string) => request<void>('DELETE', `/tasks/${id}`),
+    timelineImages: {
+      async upload(taskId: string, timelineId: string, file: File): Promise<any> {
+        const form = new FormData();
+        form.append('file', file);
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(`/api/tasks/${taskId}/timeline/${timelineId}/images`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `上傳失敗 (${res.status})`);
+        }
+        return res.json();
+      },
+      getUrl(hash: string, filename: string): string {
+        return `/api/tasks/timeline-images/${hash}/${encodeURIComponent(filename)}`;
+      },
+      async fetchBlobUrl(hash: string, filename: string): Promise<string> {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch(
+          `/api/tasks/timeline-images/${hash}/${encodeURIComponent(filename)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (!res.ok) throw new Error(`載入圖片失敗 (${res.status})`);
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      },
+      async delete(taskId: string, timelineId: string, hash: string): Promise<void> {
+        await request<void>('DELETE', `/tasks/${taskId}/timeline/${timelineId}/images/${hash}`);
+      },
+    },
   },
   announcements: {
     getAll: async (): Promise<Announcement[]> => {

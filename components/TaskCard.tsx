@@ -1,9 +1,11 @@
-﻿
-import React, { useState } from 'react';
-import { Task, User, Role, TaskStatus, Urgency, DepartmentDef } from '../types';
+﻿import React, { useState, useEffect } from 'react';
+import { Task, User, Role, TaskStatus, Urgency, DepartmentDef, WorkLogImage } from '../types';
 import { Badge } from './Badge';
 import { translateTaskContent } from '../utils/taskTranslations';
 import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
+import { ImageUploader } from './files/ImageUploader';
+import { api } from '../services/api';
+import { useToast } from './Toast';
 
 interface TaskCardProps {
   task: Task;
@@ -11,7 +13,13 @@ interface TaskCardProps {
   users: User[]; // 用於查找姓名
   departments?: DepartmentDef[]; // 用於查找部門名稱
   onAccept: (taskId: string) => void;
-  onUpdateProgress: (taskId: string, progress: number, note: string, isComplete: boolean) => void;
+  onUpdateProgress: (
+    taskId: string,
+    progress: number,
+    note: string,
+    isComplete: boolean,
+    files?: File[]
+  ) => Promise<void> | void;
   onArchive?: (taskId: string) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
@@ -22,12 +30,12 @@ interface TaskCardProps {
   onToggleExpand: () => void;
 }
 
-export const TaskCard: React.FC<TaskCardProps> = ({ 
-  task, 
-  currentUser, 
+export const TaskCard: React.FC<TaskCardProps> = ({
+  task,
+  currentUser,
   users,
   departments,
-  onAccept, 
+  onAccept,
   onUpdateProgress,
   onArchive,
   onEdit,
@@ -36,32 +44,79 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onReopen,
   isHighlighted,
   isExpanded,
-  onToggleExpand
+  onToggleExpand,
 }) => {
   // 狀態正規化：後端使用中文狀態值，前端 enum 使用英文
   // 建立一個正規化的狀態值以便統一比較
   const STATUS_CN_TO_EN: Record<string, string> = {
-    '待接取': TaskStatus.OPEN,
-    '已指派': TaskStatus.ASSIGNED,
-    '進行中': TaskStatus.IN_PROGRESS,
-    '已完成': TaskStatus.COMPLETED,
-    '已取消': TaskStatus.CANCELLED,
+    待接取: TaskStatus.OPEN,
+    已指派: TaskStatus.ASSIGNED,
+    進行中: TaskStatus.IN_PROGRESS,
+    已完成: TaskStatus.COMPLETED,
+    已取消: TaskStatus.CANCELLED,
   };
   const normalizedStatus = STATUS_CN_TO_EN[task.status] || task.status;
 
+  const toast = useToast();
   const [showProgressPanel, setShowProgressPanel] = useState(false);
   const [progressInput, setProgressInput] = useState(task.progress || 0);
   const [noteInput, setNoteInput] = useState('');
+  const [pendingImages, setPendingImages] = useState<
+    {
+      hash: string;
+      filename: string;
+      size: number;
+      mime_type: string;
+      localUrl: string;
+      file: File;
+    }[]
+  >([]);
+  const [thumbBlobUrls, setThumbBlobUrls] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  // Load auth-protected thumbnails for timeline images (each image fetched once)
+  useEffect(() => {
+    if (!task.timeline) return;
+    const allHashes = new Set<string>();
+    for (const e of task.timeline) {
+      for (const img of e.images || []) allHashes.add(img.hash);
+    }
+    for (const e of task.timeline) {
+      for (const img of e.images || []) {
+        if (thumbBlobUrls[img.hash]) continue;
+        api.tasks.timelineImages
+          .fetchBlobUrl(img.hash, img.filename)
+          .then((url) =>
+            setThumbBlobUrls((prev) => (prev[img.hash] ? prev : { ...prev, [img.hash]: url }))
+          )
+          .catch(() => {
+            /* swallow; thumbnail will just fail */
+          });
+      }
+    }
+    // cleanup blob URLs for images no longer in the task
+    return () => {
+      for (const [hash, url] of Object.entries(thumbBlobUrls)) {
+        if (!allHashes.has(hash) && typeof url === 'string') {
+          URL.revokeObjectURL(url);
+        }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.timeline]);
 
   // 查找關聯使用者名稱
-  const creatorName = users.find(u => u.id === task.createdBy)?.name;
-  const assigneeName = users.find(u => u.id === (task.acceptedByUserId || task.assignedToUserId))?.name;
-  
+  const creatorName = users.find((u) => u.id === task.createdBy)?.name;
+  const assigneeName = users.find(
+    (u) => u.id === (task.acceptedByUserId || task.assignedToUserId)
+  )?.name;
+
   // 判斷是否為「指派給我」的任務 (且尚未完成)
-  const isAssignedToMe = task.assignedToUserId === currentUser.id && normalizedStatus === TaskStatus.ASSIGNED;
+  const isAssignedToMe =
+    task.assignedToUserId === currentUser.id && normalizedStatus === TaskStatus.ASSIGNED;
 
   // 判斷是否過期 (有截止日 && 時間已過 && 未完成)
-  const isExpired = task.deadline 
+  const isExpired = task.deadline
     ? new Date(task.deadline) < new Date() && normalizedStatus !== TaskStatus.COMPLETED
     : false;
 
@@ -81,13 +136,85 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     }
   };
 
-  const getTimelineUserName = (userId: string) => users.find(u => u.id === userId)?.name || '未知';
+  const getTimelineUserName = (userId: string) =>
+    users.find((u) => u.id === userId)?.name || '未知';
 
-  const handleSubmitProgress = (isComplete: boolean) => {
-      // 移除強制備註檢查，允許空值
-      onUpdateProgress(task.id, isComplete ? 100 : progressInput, noteInput, isComplete);
+  const handleSubmitProgress = async (isComplete: boolean) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const files = pendingImages.map((p) => p.file);
+      await onUpdateProgress(
+        task.id,
+        isComplete ? 100 : progressInput,
+        noteInput,
+        isComplete,
+        files
+      );
       setShowProgressPanel(false);
       setNoteInput('');
+      // Revoke local preview URLs and clear buffer
+      for (const p of pendingImages) URL.revokeObjectURL(p.localUrl);
+      setPendingImages([]);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddPendingImage = async (file: File) => {
+    const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (!ALLOWED.has(file.type)) {
+      toast.error('只接受 JPEG / PNG / WebP / GIF 圖片');
+      return;
+    }
+    if (file.size > MAX_SIZE) {
+      toast.error('圖片超過 10 MB');
+      return;
+    }
+    if (pendingImages.length >= 10) {
+      toast.error('每次進度最多 10 張圖片');
+      return;
+    }
+    // Use a temp hash (filename + size) since real SHA-256 is computed server-side
+    const tempHash = `pending-${Date.now()}-${file.name}-${file.size}`;
+    const localUrl = URL.createObjectURL(file);
+    setPendingImages((prev) => [
+      ...prev,
+      {
+        hash: tempHash,
+        filename: file.name,
+        size: file.size,
+        mime_type: file.type,
+        localUrl,
+        file,
+      },
+    ]);
+  };
+
+  const handleRemovePendingImage = async (hash: string) => {
+    setPendingImages((prev) => {
+      const target = prev.find((p) => p.hash === hash);
+      if (target) URL.revokeObjectURL(target.localUrl);
+      return prev.filter((p) => p.hash !== hash);
+    });
+  };
+
+  const handleRemoveExistingImage = async (timelineId: string, hash: string) => {
+    if (!(await showConfirm('確定要刪除這張圖片？'))) return;
+    try {
+      await api.tasks.timelineImages.delete(task.id, timelineId, hash);
+      setThumbBlobUrls((prev) => {
+        if (prev[hash]) URL.revokeObjectURL(prev[hash]);
+        const { [hash]: _, ...rest } = prev;
+        return rest;
+      });
+      toast.success('圖片已刪除');
+      // Parent should refetch; force a soft refresh signal via reload-trigger if available
+      window.dispatchEvent(new CustomEvent('tasks:refresh'));
+    } catch (e: any) {
+      toast.error(e.message || '刪除失敗');
+    }
   };
 
   // 判斷是否有執行權限 (所有角色都可以執行任務)
@@ -102,74 +229,74 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const canAcceptTask =
     normalizedStatus === TaskStatus.OPEN &&
     !task.acceptedByUserId &&
-    (
-      (!task.assignedToUserId && !task.assignedToDepartment) ||
+    ((!task.assignedToUserId && !task.assignedToDepartment) ||
       task.assignedToUserId === currentUser.id ||
       task.assignedToDepartment === currentUser.department ||
       currentUser.role === Role.BOSS ||
-      currentUser.role === Role.MANAGER
-    );
+      currentUser.role === Role.MANAGER);
 
   // 判斷是否有封存權限 (任務已完成 且 (是建立者 或 是執行者 或 是主管/老闆))
-  const canArchive = normalizedStatus === TaskStatus.COMPLETED && !task.isArchived && (
-      task.createdBy === currentUser.id ||
+  const canArchive =
+    normalizedStatus === TaskStatus.COMPLETED &&
+    !task.isArchived &&
+    (task.createdBy === currentUser.id ||
       task.acceptedByUserId === currentUser.id ||
       currentUser.role === Role.BOSS ||
       currentUser.role === Role.MANAGER ||
-      currentUser.role === Role.SUPERVISOR
-  );
+      currentUser.role === Role.SUPERVISOR);
 
   // 判斷是否可以編輯任務 (建立者、BOSS 或 MANAGER)
-  const canEdit = 
+  const canEdit =
     task.createdBy === currentUser.id ||
     currentUser.role === Role.BOSS ||
     currentUser.role === Role.MANAGER;
 
   // 判斷是否可以刪除任務 (建立者、BOSS 或 MANAGER 可刪除任何狀態的任務)
-  const canDelete = 
-    task.createdBy === currentUser.id || currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER;
+  const canDelete =
+    task.createdBy === currentUser.id ||
+    currentUser.role === Role.BOSS ||
+    currentUser.role === Role.MANAGER;
 
   // 判斷是否可以撤銷任務 (建立者，且任務尚未完成或取消)
-  const canCancel = 
+  const canCancel =
     task.createdBy === currentUser.id &&
     normalizedStatus !== TaskStatus.COMPLETED &&
     normalizedStatus !== TaskStatus.CANCELLED;
 
   // 判斷是否可以重新開啟任務 (建立者，且任務已取消)
-  const canReopen =
-    task.createdBy === currentUser.id &&
-    normalizedStatus === TaskStatus.CANCELLED;
+  const canReopen = task.createdBy === currentUser.id && normalizedStatus === TaskStatus.CANCELLED;
 
   return (
-    <div className={`
+    <div
+      className={`
       relative rounded-xl p-0.5 transition-all duration-500 group
-      ${normalizedStatus === TaskStatus.CANCELLED ? 'opacity-50 grayscale' : task.isArchived ? 'opacity-60 grayscale' : (normalizedStatus === TaskStatus.COMPLETED ? 'opacity-90' : 'hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200')}
+      ${normalizedStatus === TaskStatus.CANCELLED ? 'opacity-50 grayscale' : task.isArchived ? 'opacity-60 grayscale' : normalizedStatus === TaskStatus.COMPLETED ? 'opacity-90' : 'hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200'}
       ${isHighlighted ? 'bg-yellow-400 scale-[1.02] shadow-[0_0_20px_rgba(250,204,21,0.6)] ring-4 ring-yellow-300 z-10' : normalizedStatus === TaskStatus.CANCELLED ? 'bg-gradient-to-br from-red-100 via-red-200 to-red-300' : 'bg-gradient-to-br from-slate-100 via-slate-200 to-slate-300'}
-    `}>
+    `}
+    >
       {/* S級緊急任務光暈特效 */}
       {task.urgency === 'urgent' && normalizedStatus !== TaskStatus.COMPLETED && (
         <div className="absolute inset-0 rounded-xl bg-red-400 blur-sm opacity-30 animate-pulse"></div>
       )}
 
       <div className="bg-white rounded-[10px] p-6 relative border border-white flex flex-col min-h-full">
-        
         {/* 指派給您的特別標示 */}
         {isAssignedToMe && normalizedStatus === TaskStatus.ASSIGNED && (
-           <div className="absolute -right-12 top-6 bg-red-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
-             指派給您
-           </div>
+          <div className="absolute -right-12 top-6 bg-red-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
+            指派給您
+          </div>
         )}
         {/* 公開任務標示 */}
         {normalizedStatus === TaskStatus.OPEN && (
-           <div className="absolute -right-12 top-6 bg-emerald-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
-             公開任務
-           </div>
+          <div className="absolute -right-12 top-6 bg-emerald-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
+            公開任務
+          </div>
         )}
         {/* 已取消標示 */}
         {normalizedStatus === TaskStatus.CANCELLED && (
-           <div className="absolute -right-12 top-6 bg-slate-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
-             已取消
-           </div>
+          <div className="absolute -right-12 top-6 bg-slate-500 text-white text-[10px] font-bold px-12 py-1 rotate-45 shadow-sm z-20">
+            已取消
+          </div>
         )}
 
         <div className="flex flex-col h-full relative z-10">
@@ -179,10 +306,23 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <Badge type="status" value={normalizedStatus} />
                 <Badge type="urgency" value={task.urgency} />
-                {task.targetDepartment && <Badge type="department" value={task.targetDepartment} departments={departments} />}
-                {task.isArchived && <span className="bg-slate-200 text-slate-500 px-2 py-1 rounded text-xs font-bold border border-slate-300">🗄️ 已封存</span>}
+                {task.targetDepartment && (
+                  <Badge
+                    type="department"
+                    value={task.targetDepartment}
+                    departments={departments}
+                  />
+                )}
+                {task.isArchived && (
+                  <span className="bg-slate-200 text-slate-500 px-2 py-1 rounded text-xs font-bold border border-slate-300">
+                    🗄️ 已封存
+                  </span>
+                )}
               </div>
-              <h4 className={`text-xl font-bold flex flex-wrap items-center gap-2 ${normalizedStatus === TaskStatus.COMPLETED || normalizedStatus === TaskStatus.CANCELLED ? 'text-slate-400 line-through' : 'text-slate-800'}`} title={task.title}>
+              <h4
+                className={`text-xl font-bold flex flex-wrap items-center gap-2 ${normalizedStatus === TaskStatus.COMPLETED || normalizedStatus === TaskStatus.CANCELLED ? 'text-slate-400 line-through' : 'text-slate-800'}`}
+                title={task.title}
+              >
                 <span className="line-clamp-2 break-all">{task.title}</span>
                 {isExpired && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-600 border border-red-200 shadow-sm animate-pulse whitespace-nowrap no-underline">
@@ -191,18 +331,26 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 )}
               </h4>
             </div>
-            
+
             {/* 編輯和刪除按鈕 */}
             {!task.isArchived && (
               <div className="flex gap-1 ml-2">
                 {canEdit && onEdit && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(task);
+                    }}
                     className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded transition"
                     title="編輯任務"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      />
                     </svg>
                   </button>
                 )}
@@ -218,35 +366,50 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     title="刪除任務"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
                     </svg>
                   </button>
                 )}
                 {canCancel && onCancel && (
                   <button
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onCancel(task.id);
                     }}
                     className="text-orange-500 hover:text-orange-700 p-1.5 hover:bg-orange-50 rounded transition"
                     title="撤銷任務"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                      />
                     </svg>
                   </button>
                 )}
                 {canReopen && onReopen && (
                   <button
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onReopen(task.id);
                     }}
                     className="text-emerald-500 hover:text-emerald-700 p-1.5 hover:bg-emerald-50 rounded transition"
                     title="重新開啟任務"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
                     </svg>
                   </button>
                 )}
@@ -256,280 +419,431 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
           {/* 關鍵資訊區塊 (Metadata) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-100 text-sm">
-             <div className="flex items-center gap-2">
-                 <span className="text-lg">🕐</span>
-                 <span className="text-slate-500 font-bold text-xs uppercase">建立:</span>
-                 <span className="font-mono text-slate-600 text-xs">
-                   {formatCreatedAt(task.createdAt)}
-                 </span>
-             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🕐</span>
+              <span className="text-slate-500 font-bold text-xs uppercase">建立:</span>
+              <span className="font-mono text-slate-600 text-xs">
+                {formatCreatedAt(task.createdAt)}
+              </span>
+            </div>
 
-             <div className="flex items-center gap-2">
-                 <span className="text-lg">📅</span>
-                 <span className="text-slate-500 font-bold text-xs uppercase">截止:</span>
-                 <span className={`font-mono font-bold ${isExpired ? 'text-red-600' : 'text-slate-700'}`}>
-                   {formatDeadline(task.deadline)}
-                 </span>
-             </div>
-             
-             <div className="flex items-center gap-2">
-                 <span className="text-lg">👤</span>
-                 <span className="text-slate-500 font-bold text-xs uppercase">分派:</span>
-                 <span className="text-slate-700 font-bold">{creatorName}</span>
-             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">📅</span>
+              <span className="text-slate-500 font-bold text-xs uppercase">截止:</span>
+              <span
+                className={`font-mono font-bold ${isExpired ? 'text-red-600' : 'text-slate-700'}`}
+              >
+                {formatDeadline(task.deadline)}
+              </span>
+            </div>
 
-             {(task.assignedToUserId || task.acceptedByUserId) && (
-               <div className="flex items-center gap-2">
-                   <span className="text-lg">💼</span>
-                   <span className="text-slate-500 font-bold text-xs uppercase">負責:</span>
-                   <span className="text-blue-600 font-bold">
-                     {assigneeName} {isAssignedToMe && '(您)'}
-                   </span>
-               </div>
-             )}
+            <div className="flex items-center gap-2">
+              <span className="text-lg">👤</span>
+              <span className="text-slate-500 font-bold text-xs uppercase">分派:</span>
+              <span className="text-slate-700 font-bold">{creatorName}</span>
+            </div>
+
+            {(task.assignedToUserId || task.acceptedByUserId) && (
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💼</span>
+                <span className="text-slate-500 font-bold text-xs uppercase">負責:</span>
+                <span className="text-blue-600 font-bold">
+                  {assigneeName} {isAssignedToMe && '(您)'}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* 進度條 (Progress Bar) - 可互動 */}
           {(() => {
-             // 允許直接拖拉更新進度的使用者：接取者、指派者、建立者、BOSS / MANAGER
-             const canUpdateProgress =
-               !task.isArchived &&
-               normalizedStatus !== TaskStatus.COMPLETED &&
-               normalizedStatus !== TaskStatus.CANCELLED &&
-               (
-                 task.acceptedByUserId === currentUser.id ||
-                 task.assignedToUserId === currentUser.id ||
-                 task.createdBy === currentUser.id ||
-                 currentUser.role === Role.BOSS ||
-                 currentUser.role === Role.MANAGER
-               );
+            // 允許直接拖拉更新進度的使用者：接取者、指派者、建立者、BOSS / MANAGER
+            const canUpdateProgress =
+              !task.isArchived &&
+              normalizedStatus !== TaskStatus.COMPLETED &&
+              normalizedStatus !== TaskStatus.CANCELLED &&
+              (task.acceptedByUserId === currentUser.id ||
+                task.assignedToUserId === currentUser.id ||
+                task.createdBy === currentUser.id ||
+                currentUser.role === Role.BOSS ||
+                currentUser.role === Role.MANAGER);
 
-             return (
-               <div className="mb-4">
-                  <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
-                     <span>任務進度{canUpdateProgress && <span className="ml-1 text-[10px] text-blue-500 font-normal">(可拖拉調整)</span>}</span>
-                     <span>{task.progress}%</span>
+            return (
+              <div className="mb-4">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-500 mb-1">
+                  <span>
+                    任務進度
+                    {canUpdateProgress && (
+                      <span className="ml-1 text-[10px] text-blue-500 font-normal">
+                        (可拖拉調整)
+                      </span>
+                    )}
+                  </span>
+                  <span>{task.progress}%</span>
+                </div>
+                {canUpdateProgress ? (
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={5}
+                    value={task.progress || 0}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={async (e) => {
+                      const newValue = Number(e.target.value);
+                      const currentProgress = task.progress || 0;
+                      if (newValue < currentProgress) {
+                        const confirmed = await showConfirm(
+                          `確定要將進度從 ${currentProgress}% 降至 ${newValue}%？`
+                        );
+                        if (!confirmed) return;
+                      }
+                      onUpdateProgress(task.id, newValue, '', newValue === 100);
+                    }}
+                    className={`w-full h-2 rounded-full appearance-none cursor-pointer ${normalizedStatus === TaskStatus.COMPLETED ? 'accent-emerald-500' : 'accent-blue-500'} bg-slate-100`}
+                  />
+                ) : (
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${normalizedStatus === TaskStatus.COMPLETED ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                      style={{ width: `${task.progress}%` }}
+                    ></div>
                   </div>
-                  {canUpdateProgress ? (
-                     <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={task.progress || 0}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={async (e) => {
-                           const newValue = Number(e.target.value);
-                           const currentProgress = task.progress || 0;
-                           if (newValue < currentProgress) {
-                             const confirmed = await showConfirm(`確定要將進度從 ${currentProgress}% 降至 ${newValue}%？`);
-                             if (!confirmed) return;
-                           }
-                           onUpdateProgress(task.id, newValue, '', newValue === 100);
-                        }}
-                        className={`w-full h-2 rounded-full appearance-none cursor-pointer ${normalizedStatus === TaskStatus.COMPLETED ? 'accent-emerald-500' : 'accent-blue-500'} bg-slate-100`}
-                     />
-                  ) : (
-                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${normalizedStatus === TaskStatus.COMPLETED ? 'bg-emerald-500' : 'bg-blue-500'}`}
-                          style={{ width: `${task.progress}%` }}
-                        ></div>
-                     </div>
-                  )}
-               </div>
-             );
+                )}
+              </div>
+            );
           })()}
 
           {/* 卡片內容 (可伸縮區域) */}
           <div className="mb-4 overflow-hidden relative">
             {isExpanded ? (
-               <div className="space-y-4 animate-fade-in">
-                  <div className="p-4 bg-slate-50/50 rounded-lg border border-slate-100">
-                      <div className="text-slate-600 text-sm whitespace-pre-line leading-relaxed font-medium">
-                        {task.description}
-                      </div>
+              <div className="space-y-4 animate-fade-in">
+                <div className="p-4 bg-slate-50/50 rounded-lg border border-slate-100">
+                  <div className="text-slate-600 text-sm whitespace-pre-line leading-relaxed font-medium">
+                    {task.description}
                   </div>
+                </div>
 
-                  {/* Timeline (History) */}
-                  {(() => {
-                      console.log('[TaskCard] Timeline 檢查:', {
-                          taskId: task.id,
-                          hasTimeline: !!task.timeline,
-                          timelineLength: task.timeline?.length || 0,
-                          timeline: task.timeline
-                      });
-                      return task.timeline && task.timeline.length > 0;
-                  })() && (
-                      <div className="border-t border-slate-100 pt-4">
-                          <h5 className="text-xs font-bold text-slate-400 uppercase mb-3">進度歷程</h5>
-                          <div className="space-y-3 pl-2 border-l-2 border-slate-100 ml-1">
-                              {task.timeline.map((entry, idx) => {
-                                  const userName = getTimelineUserName(entry.userId);
-                                  console.log('[TaskCard] 渲染 timeline entry:', {
-                                      idx,
-                                      entry,
-                                      userId: entry.userId,
-                                      userName,
-                                      content: entry.content
-                                  });
+                {/* Timeline (History) */}
+                {(() => {
+                  console.log('[TaskCard] Timeline 檢查:', {
+                    taskId: task.id,
+                    hasTimeline: !!task.timeline,
+                    timelineLength: task.timeline?.length || 0,
+                    timeline: task.timeline,
+                  });
+                  return task.timeline && task.timeline.length > 0;
+                })() && (
+                  <div className="border-t border-slate-100 pt-4">
+                    <h5 className="text-xs font-bold text-slate-400 uppercase mb-3">進度歷程</h5>
+                    <div className="space-y-3 pl-2 border-l-2 border-slate-100 ml-1">
+                      {task.timeline.map((entry, idx) => {
+                        const userName = getTimelineUserName(entry.userId);
+                        console.log('[TaskCard] 渲染 timeline entry:', {
+                          idx,
+                          entry,
+                          userId: entry.userId,
+                          userName,
+                          content: entry.content,
+                        });
+                        return (
+                          <div key={idx} className="relative pl-4">
+                            <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-slate-300"></div>
+                            <div className="flex justify-between items-start text-xs mb-1">
+                              <span className="font-bold text-slate-700">{userName}</span>
+                              <span className="text-slate-400">
+                                {new Date(entry.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
+                              {translateTaskContent(entry.content)}
+                            </p>
+                            <div className="text-[10px] text-blue-500 font-bold mt-1">
+                              進度更新至: {entry.progress}%
+                            </div>
+                            {entry.images && entry.images.length > 0 && (
+                              <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                                {entry.images.map((img) => {
+                                  const canDelete =
+                                    entry.userId === currentUser.id ||
+                                    currentUser.role === Role.BOSS ||
+                                    currentUser.role === Role.MANAGER;
                                   return (
-                                      <div key={idx} className="relative pl-4">
-                                          <div className="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-slate-300"></div>
-                                          <div className="flex justify-between items-start text-xs mb-1">
-                                              <span className="font-bold text-slate-700">{userName}</span>
-                                              <span className="text-slate-400">{new Date(entry.timestamp).toLocaleString()}</span>
-                                          </div>
-                                          <p className="text-sm text-slate-600 bg-slate-50 p-2 rounded">{translateTaskContent(entry.content)}</p>
-                                          <div className="text-[10px] text-blue-500 font-bold mt-1">進度更新至: {entry.progress}%</div>
-                                      </div>
+                                    <div
+                                      key={img.hash}
+                                      className="relative aspect-square rounded-md overflow-hidden border border-slate-200 bg-slate-50 group"
+                                    >
+                                      {thumbBlobUrls[img.hash] ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            window.open(thumbBlobUrls[img.hash], '_blank')
+                                          }
+                                          className="w-full h-full hover:opacity-90 transition"
+                                          aria-label={`預覽 ${img.filename}`}
+                                        >
+                                          <img
+                                            src={thumbBlobUrls[img.hash]}
+                                            alt={img.filename}
+                                            className="w-full h-full object-cover"
+                                            loading="lazy"
+                                          />
+                                        </button>
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">
+                                          載入中…
+                                        </div>
+                                      )}
+                                      {canDelete && entry.id && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleRemoveExistingImage(entry.id!, img.hash)
+                                          }
+                                          className="absolute top-1 right-1 w-6 h-6 bg-white/95 hover:bg-red-50 border border-slate-200 hover:border-red-300 rounded-full text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition shadow-sm"
+                                          aria-label={`移除 ${img.filename}`}
+                                          title="移除"
+                                        >
+                                          <svg
+                                            className="w-3 h-3"
+                                            viewBox="0 0 20 20"
+                                            fill="currentColor"
+                                          >
+                                            <path
+                                              fillRule="evenodd"
+                                              d="M4.28 3.22a.75.75 0 00-1.06 1.06L8.94 10l-5.72 5.72a.75.75 0 101.06 1.06L10 11.06l5.72 5.72a.75.75 0 101.06-1.06L11.06 10l5.72-5.72a.75.75 0 00-1.06-1.06L10 8.94 4.28 3.22z"
+                                              clipRule="evenodd"
+                                            />
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
                                   );
-                              })}
+                                })}
+                              </div>
+                            )}
                           </div>
-                      </div>
-                  )}
-
-                  <div className="flex justify-end">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
-                        className="text-xs font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 hover:bg-slate-100 px-2 py-1 rounded transition"
-                    >
-                        收合內容 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"></path></svg>
-                    </button>
+                        );
+                      })}
+                    </div>
                   </div>
-               </div>
+                )}
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleExpand();
+                    }}
+                    className="text-xs font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 hover:bg-slate-100 px-2 py-1 rounded transition"
+                  >
+                    收合內容{' '}
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M5 15l7-7 7 7"
+                      ></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             ) : (
-               <button 
-                  onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
-                  className="w-full px-4 py-2 flex items-center justify-between text-slate-500 border border-slate-200 rounded-lg hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all group"
-               >
-                  <span className="text-sm font-bold flex items-center gap-2">
-                     📄 查看詳細任務內容 & 歷程
-                  </span>
-                  <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 transition">
-                     展開 ▼
-                  </span>
-               </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand();
+                }}
+                className="w-full px-4 py-2 flex items-center justify-between text-slate-500 border border-slate-200 rounded-lg hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all group"
+              >
+                <span className="text-sm font-bold flex items-center gap-2">
+                  📄 查看詳細任務內容 & 歷程
+                </span>
+                <span className="text-xs bg-white border border-slate-200 px-2 py-1 rounded text-slate-400 group-hover:text-blue-600 group-hover:border-blue-200 transition">
+                  展開 ▼
+                </span>
+              </button>
             )}
           </div>
-          
+
           {/* 完成回報顯示 (Legacy) */}
           {normalizedStatus === TaskStatus.COMPLETED && task.completionNotes && !isExpanded && (
             <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-lg mb-4">
               <p className="text-xs text-emerald-600 font-bold mb-1 uppercase">最新結案報告</p>
-              <p className="text-sm text-emerald-800 line-clamp-2">
-                  {task.completionNotes}
-              </p>
+              <p className="text-sm text-emerald-800 line-clamp-2">{task.completionNotes}</p>
             </div>
           )}
 
           {/* 內嵌式進度回報面板 */}
           {showProgressPanel && (
-              <div className="mb-4 bg-slate-50 border border-blue-200 rounded-xl p-4 shadow-inner animate-fade-in">
-                  <div className="flex justify-between items-center mb-3">
-                      <h5 className="font-bold text-blue-700 text-sm">更新任務進度</h5>
-                      <button onClick={() => setShowProgressPanel(false)} className="text-slate-400 hover:text-slate-600">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                      </button>
-                  </div>
-                  
-                  <div className="mb-4">
-                      <label className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                          <span>完成百分比</span>
-                          <span className="text-blue-600">{progressInput}%</span>
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        step="5"
-                        value={progressInput} 
-                        onChange={(e) => setProgressInput(Number(e.target.value))}
-                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                      />
-                  </div>
-
-                  <div className="mb-4">
-                      <label className="block text-xs font-bold text-slate-500 mb-1">進度說明 / 備註</label>
-                      <textarea 
-                        value={noteInput}
-                        onChange={(e) => setNoteInput(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                        rows={3}
-                        placeholder="請說明目前的執行狀況..."
-                      />
-                  </div>
-
-                  <div className="flex gap-2">
-                      <button 
-                        onClick={() => handleSubmitProgress(false)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-bold transition shadow-sm"
-                      >
-                        更新進度
-                      </button>
-                      <button 
-                        onClick={() => handleSubmitProgress(true)}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-sm font-bold transition shadow-sm flex items-center justify-center gap-1"
-                      >
-                        <span>✔</span> 任務結案
-                      </button>
-                  </div>
+            <div className="mb-4 bg-slate-50 border border-blue-200 rounded-xl p-4 shadow-inner animate-fade-in">
+              <div className="flex justify-between items-center mb-3">
+                <h5 className="font-bold text-blue-700 text-sm">更新任務進度</h5>
+                <button
+                  onClick={() => setShowProgressPanel(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                  </svg>
+                </button>
               </div>
+
+              <div className="mb-4">
+                <label className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                  <span>完成百分比</span>
+                  <span className="text-blue-600">{progressInput}%</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={progressInput}
+                  onChange={(e) => setProgressInput(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-500 mb-1">
+                  進度說明 / 備註
+                </label>
+                <textarea
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  rows={3}
+                  placeholder="請說明目前的執行狀況..."
+                />
+              </div>
+
+              <div className="mb-4">
+                <ImageUploader
+                  label="現場照片 / 證據圖"
+                  maxCount={10}
+                  images={
+                    pendingImages.map((p) => ({
+                      hash: p.hash,
+                      filename: p.filename,
+                      size: p.size,
+                      mime_type: p.mime_type,
+                      uploader_id: currentUser.id,
+                      uploaded_at: new Date().toISOString(),
+                    })) as WorkLogImage[]
+                  }
+                  onAdd={handleAddPendingImage}
+                  onRemove={handleRemovePendingImage}
+                  onPreview={(img) => {
+                    const item = pendingImages.find((p) => p.hash === img.hash);
+                    if (item) window.open(item.localUrl, '_blank');
+                  }}
+                  canRemove={() => true}
+                  resolveUrl={(img) =>
+                    pendingImages.find((p) => p.hash === img.hash)?.localUrl || ''
+                  }
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSubmitProgress(false)}
+                  disabled={submitting}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2 rounded-lg text-sm font-bold transition shadow-sm"
+                >
+                  {submitting ? '送出中…' : '更新進度'}
+                </button>
+                <button
+                  onClick={() => handleSubmitProgress(true)}
+                  disabled={submitting}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-2 rounded-lg text-sm font-bold transition shadow-sm flex items-center justify-center gap-1"
+                >
+                  <span>✔</span> {submitting ? '送出中…' : '任務結案'}
+                </button>
+              </div>
+            </div>
           )}
 
           {/* 卡片底部操作區 */}
           {!showProgressPanel && (
             <div className="mt-auto pt-2 flex justify-end items-center w-full">
-                
-                {/* Archive Button */}
-                {canArchive && onArchive && (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onArchive(task.id); }}
-                        className="mr-auto text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition"
-                    >
-                        <span>🗄️</span> 封存任務
-                    </button>
-                )}
+              {/* Archive Button */}
+              {canArchive && onArchive && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onArchive(task.id);
+                  }}
+                  className="mr-auto text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition"
+                >
+                  <span>🗄️</span> 封存任務
+                </button>
+              )}
 
-                <div className="flex-shrink-0 ml-auto">
+              <div className="flex-shrink-0 ml-auto">
                 {/* 可執行: 接取任務 (公開，包含建立者) */}
                 {canExecuteTask && canAcceptTask && (
-                    <button
+                  <button
                     onClick={() => onAccept(task.id)}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-100 transition-all"
-                    >
+                  >
                     接取任務
-                    </button>
+                  </button>
                 )}
-                
+
                 {/* 可執行: 啟動被指派的任務 */}
-                {normalizedStatus === TaskStatus.ASSIGNED && canExecuteTask && task.assignedToUserId === currentUser.id && (
-                    <button 
-                    onClick={() => onAccept(task.id)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-100 transition-all animate-pulse"
+                {normalizedStatus === TaskStatus.ASSIGNED &&
+                  canExecuteTask &&
+                  task.assignedToUserId === currentUser.id && (
+                    <button
+                      onClick={() => onAccept(task.id)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-indigo-100 transition-all animate-pulse"
                     >
-                    確認並執行
+                      確認並執行
                     </button>
-                )}
-                
+                  )}
+
                 {/* 可執行: 回報成果 (開啟面板) */}
-                {canExecuteTask && normalizedStatus === TaskStatus.IN_PROGRESS && task.acceptedByUserId === currentUser.id && (
-                    <button 
-                    onClick={() => { setShowProgressPanel(true); setNoteInput(''); }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-blue-100 transition-all flex items-center gap-2"
+                {canExecuteTask &&
+                  normalizedStatus === TaskStatus.IN_PROGRESS &&
+                  task.acceptedByUserId === currentUser.id && (
+                    <button
+                      onClick={() => {
+                        setShowProgressPanel(true);
+                        setNoteInput('');
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-bold shadow-md shadow-blue-100 transition-all flex items-center gap-2"
                     >
-                    <span>回報進度</span>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                      <span>回報進度</span>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                        ></path>
+                      </svg>
                     </button>
-                )}
+                  )}
 
                 {/* 完成標記 */}
                 {normalizedStatus === TaskStatus.COMPLETED && (
-                    <span className="text-emerald-600 font-bold text-sm border border-emerald-200 px-3 py-1 rounded bg-emerald-50 select-none flex items-center gap-1">
+                  <span className="text-emerald-600 font-bold text-sm border border-emerald-200 px-3 py-1 rounded bg-emerald-50 select-none flex items-center gap-1">
                     <span>✔</span> {task.isArchived ? '已封存' : '已結案'}
-                    </span>
+                  </span>
                 )}
-                </div>
+              </div>
             </div>
           )}
         </div>

@@ -671,7 +671,8 @@ function AppContent() {
     taskId: string,
     progress: number,
     note: string,
-    isComplete: boolean
+    isComplete: boolean,
+    files?: File[]
   ) => {
     if (!currentUser) return;
     const task = tasks.find((t) => t.id === taskId);
@@ -714,12 +715,27 @@ function AppContent() {
     });
 
     // 發送 snake_case 欄位給後端 PUT API
-    await request('PUT', `/tasks/${taskId}`, {
+    const updateResp = await request<{ timelineId?: string | null }>('PUT', `/tasks/${taskId}`, {
       status: newStatus,
       progress: progress,
       note: note || (isComplete ? '任務結案' : '進度更新'),
       completion_notes: isComplete ? note : undefined,
     });
+
+    // 上傳這次進度回報附帶的圖片到新建立的 timeline entry
+    const newTimelineId = updateResp?.timelineId;
+    if (newTimelineId && files && files.length > 0) {
+      let failed = 0;
+      for (const f of files) {
+        try {
+          await api.tasks.timelineImages.upload(taskId, newTimelineId, f);
+        } catch (e) {
+          console.error('[App] 上傳進度圖片失敗:', e);
+          failed++;
+        }
+      }
+      if (failed > 0) showError(`${failed} 張進度圖片上傳失敗`);
+    }
 
     // 重新獲取所有任務以刷新 UI（包含 timeline）
     try {
@@ -731,6 +747,20 @@ function AppContent() {
       setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)));
     }
   };
+
+  // Listen for soft-refresh events from child components (e.g. timeline image delete)
+  useEffect(() => {
+    const handler = async () => {
+      try {
+        const refreshed = await api.tasks.getAll();
+        setTasks(Array.isArray(refreshed) ? refreshed : []);
+      } catch (e) {
+        console.error('[App] tasks:refresh failed:', e);
+      }
+    };
+    window.addEventListener('tasks:refresh', handler);
+    return () => window.removeEventListener('tasks:refresh', handler);
+  }, []);
 
   const handleArchiveTask = async (taskId: string) => {
     try {

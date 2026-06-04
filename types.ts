@@ -82,10 +82,12 @@ export const hasPermission = (user: User, perm: Permission): boolean => {
 };
 
 export interface TaskTimelineEntry {
+  id?: string;
   timestamp: string;
   userId: string;
   content: string;
   progress: number; // Snapshot of progress
+  images?: WorkLogImage[];
 }
 
 export interface Task {

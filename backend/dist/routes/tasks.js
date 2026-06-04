@@ -9,6 +9,21 @@ const types_1 = require("../types");
 const logger_1 = require("../utils/logger");
 const auth_1 = require("../middleware/auth");
 const router = express_1.default.Router();
+// Helper: hydrate timeline rows by parsing the images JSON column
+function hydrateTimeline(rows) {
+    if (!Array.isArray(rows)) return rows;
+    return rows.map((r) => {
+        if (!r) return r;
+        let parsed = [];
+        if (r.images) {
+            try {
+                const p = JSON.parse(r.images);
+                if (Array.isArray(p)) parsed = p;
+            } catch { /* ignore malformed */ }
+        }
+        return { ...r, images: parsed };
+    });
+}
 // DELETE /:id - \u522a\u9664\u4efb\u52d9
 router.delete('/:id', auth_1.authenticateToken, async (req, res) => {
     try {
@@ -129,7 +144,7 @@ router.get('/', auth_1.authenticateToken, async (req, res) => {
         // 獲取每個任務的 timeline
         for (const task of tasks) {
             const timeline = await db.all('SELECT * FROM task_timeline WHERE task_id = ? ORDER BY timestamp ASC', [task.id]);
-            task.timeline = timeline;
+            task.timeline = hydrateTimeline(timeline);
         }
         
         // 獲取總數
@@ -184,7 +199,7 @@ router.get('/:id', auth_1.authenticateToken, async (req, res) => {
         const timeline = await db.all('SELECT * FROM task_timeline WHERE task_id = ? ORDER BY timestamp ASC', [id]);
         res.json({
             ...task,
-            timeline
+            timeline: hydrateTimeline(timeline)
         });
     }
     catch (error) {
@@ -414,12 +429,14 @@ router.put('/:id', auth_1.authenticateToken, async (req, res) => {
         // Update task
             await db.run(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ?`, params);
             // 添加時間軸記錄
+            let newTimelineId = null;
             if (timelineContent) {
+                newTimelineId = `timeline-${Date.now()}`;
                 await db.run(`
           INSERT INTO task_timeline (id, task_id, user_id, content, progress, is_offline)
           VALUES (?, ?, ?, ?, ?, ?)
         `, [
-                    `timeline-${Date.now()}`,
+                    newTimelineId,
                     id,
                     currentUser.id,
                     timelineContent.trim(),
@@ -437,6 +454,7 @@ router.put('/:id', auth_1.authenticateToken, async (req, res) => {
         const updatedTask = await db.get('SELECT * FROM tasks WHERE id = ?', [id]);
         res.json({
             task: updatedTask,
+            timelineId: newTimelineId,
             message: '任務更新成功'
         });
     }
@@ -500,7 +518,7 @@ router.post('/:id/accept', auth_1.authenticateToken, async (req, res) => {
         
         // 獲取時間軸
         const timeline = await db.all('SELECT * FROM task_timeline WHERE task_id = ? ORDER BY timestamp DESC', [id]);
-        updatedTask.timeline = timeline;
+        updatedTask.timeline = hydrateTimeline(timeline);
         
         res.json({ message: '任務接受成功', task: updatedTask });
     }
@@ -592,6 +610,151 @@ router.get('/:id/timeline', auth_1.authenticateToken, async (req, res) => {
         res.status(500).json({ error: '伺服器內部錯誤' });
     }
 });
+// === Task timeline image attachments ===
+const multer = require('multer');
+const fileStorage = require('../services/fileStorage');
+const path = require('path');
+
+const TIMELINE_IMG_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const TIMELINE_IMG_MAX_SIZE = 10 * 1024 * 1024;
+const TIMELINE_IMG_MAX_PER_ENTRY = 10;
+const timelineImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: TIMELINE_IMG_MAX_SIZE },
+});
+
+function parseTimelineImages(jsonStr) {
+    if (!jsonStr) return [];
+    try {
+        const parsed = JSON.parse(jsonStr);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+async function canAccessTaskTimeline(db, currentUser, task) {
+    if (!task) return false;
+    const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+    if (isManager) return true;
+    if (task.created_by === currentUser.id) return true;
+    if (task.accepted_by_user_id === currentUser.id) return true;
+    if (task.assigned_to_user_id === currentUser.id) return true;
+    if (task.assigned_to_department && task.assigned_to_department === currentUser.department) return true;
+    return false;
+}
+
+// POST /api/tasks/:taskId/timeline/:tid/images - upload image to timeline entry
+router.post('/:taskId/timeline/:tid/images', auth_1.authenticateToken, timelineImageUpload.single('file'), async (req, res) => {
+    try {
+        const db = req.db;
+        const currentUser = req.user;
+        const { taskId, tid } = req.params;
+
+        if (!req.file) return res.status(400).json({ error: '請選擇圖片檔案' });
+        if (!TIMELINE_IMG_ALLOWED_MIME.has(req.file.mimetype)) {
+            return res.status(400).json({ error: '只接受 JPEG / PNG / WebP / GIF 圖片' });
+        }
+
+        const entry = await db.get('SELECT * FROM task_timeline WHERE id = ? AND task_id = ?', [tid, taskId]);
+        if (!entry) return res.status(404).json({ error: '進度記錄不存在' });
+        if (entry.user_id !== currentUser.id) {
+            return res.status(403).json({ error: '只有回報者可以為此進度上傳圖片' });
+        }
+
+        const images = parseTimelineImages(entry.images);
+        if (images.length >= TIMELINE_IMG_MAX_PER_ENTRY) {
+            return res.status(400).json({ error: `每次進度回報最多 ${TIMELINE_IMG_MAX_PER_ENTRY} 張圖片` });
+        }
+
+        const hash = fileStorage.computeHash(req.file.buffer);
+        const ext = path.extname(req.file.originalname).toLowerCase() || '.png';
+        const blobPath = fileStorage.writeBlob(hash, ext, req.file.buffer);
+        const decodedFilename = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+        const newImage = {
+            hash,
+            filename: decodedFilename,
+            size: req.file.size,
+            mime_type: req.file.mimetype,
+            uploader_id: currentUser.id,
+            uploaded_at: new Date().toISOString(),
+            blob_path: blobPath,
+        };
+        images.push(newImage);
+        await db.run('UPDATE task_timeline SET images = ? WHERE id = ?', [JSON.stringify(images), tid]);
+
+        res.json({ image: newImage });
+    } catch (err) {
+        console.error('[tasks] timeline image upload error:', err.message);
+        res.status(500).json({ error: '上傳圖片失敗' });
+    }
+});
+
+// GET /api/tasks/timeline-images/:hash/:filename - serve image blob
+router.get('/timeline-images/:hash/:filename', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const db = req.db;
+        const currentUser = req.user;
+        const { hash } = req.params;
+
+        const entries = await db.all('SELECT * FROM task_timeline WHERE images IS NOT NULL', []);
+        let foundImage = null;
+        let foundEntry = null;
+        for (const e of entries) {
+            const imgs = parseTimelineImages(e.images);
+            const match = imgs.find((i) => i.hash === hash);
+            if (match) {
+                foundImage = match;
+                foundEntry = e;
+                break;
+            }
+        }
+        if (!foundImage) return res.status(404).json({ error: '圖片不存在' });
+
+        const task = await db.get('SELECT * FROM tasks WHERE id = ?', [foundEntry.task_id]);
+        if (!(await canAccessTaskTimeline(db, currentUser, task))) {
+            return res.status(403).json({ error: '無權限查看此圖片' });
+        }
+
+        const buffer = fileStorage.readBlob(foundImage.blob_path);
+        res.set('Content-Type', foundImage.mime_type);
+        res.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(foundImage.filename)}`);
+        res.set('Cache-Control', 'private, max-age=3600');
+        res.send(buffer);
+    } catch (err) {
+        console.error('[tasks] timeline image fetch error:', err.message);
+        res.status(500).json({ error: '取得圖片失敗' });
+    }
+});
+
+// DELETE /api/tasks/:taskId/timeline/:tid/images/:hash - remove image
+router.delete('/:taskId/timeline/:tid/images/:hash', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const db = req.db;
+        const currentUser = req.user;
+        const { taskId, tid, hash } = req.params;
+
+        const entry = await db.get('SELECT * FROM task_timeline WHERE id = ? AND task_id = ?', [tid, taskId]);
+        if (!entry) return res.status(404).json({ error: '進度記錄不存在' });
+
+        const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+        if (entry.user_id !== currentUser.id && !isManager) {
+            return res.status(403).json({ error: '無權限刪除此圖片' });
+        }
+
+        const images = parseTimelineImages(entry.images);
+        const before = images.length;
+        const next = images.filter((i) => i.hash !== hash);
+        if (next.length === before) return res.status(404).json({ error: '此進度沒有此圖片' });
+
+        await db.run('UPDATE task_timeline SET images = ? WHERE id = ?', [JSON.stringify(next), tid]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[tasks] timeline image delete error:', err.message);
+        res.status(500).json({ error: '刪除圖片失敗' });
+    }
+});
+
 // GET /api/tasks/sync/queue - 獲取用戶的同步佇列
 router.get('/sync/queue', auth_1.authenticateToken, async (req, res) => {
     try {
