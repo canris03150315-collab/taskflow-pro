@@ -1549,10 +1549,10 @@ function AppContent() {
             </button>
 
             {/* 通知鈴鐺 */}
-            <div className="relative hidden md:block">
+            <div className="relative">
               <button
                 onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)}
-                className="relative flex items-center justify-center w-9 h-9 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-all active:scale-95"
+                className="relative flex items-center justify-center w-11 h-11 md:w-9 md:h-9 bg-white border-2 border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:border-blue-300 transition-all active:scale-95"
                 title={`${totalNotificationCount} 個待處理通知`}
               >
                 <svg
@@ -1582,7 +1582,7 @@ function AppContent() {
                     className="fixed inset-0 z-40"
                     onClick={() => setIsNotificationMenuOpen(false)}
                   ></div>
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-xs sm:max-w-sm md:w-80 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
                     <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                       <h3 className="font-bold text-slate-800 text-lg">通知中心</h3>
                       <p className="text-xs text-slate-500 mt-0.5">

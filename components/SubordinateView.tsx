@@ -261,15 +261,21 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
                     <div className="text-2xl font-black text-slate-700">{stats.activeCount}</div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase">進行中</div>
+                    <div className="text-xs sm:text-[10px] font-bold text-slate-500 uppercase">
+                      進行中
+                    </div>
                   </div>
                   <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
                     <div className="text-2xl font-black text-slate-700">{stats.pendingCount}</div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase">待處理</div>
+                    <div className="text-xs sm:text-[10px] font-bold text-slate-500 uppercase">
+                      待處理
+                    </div>
                   </div>
                   <div className="bg-white/60 rounded-lg p-2 text-center backdrop-blur-sm">
                     <div className="text-2xl font-black text-slate-700">{stats.completedCount}</div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase">已完成</div>
+                    <div className="text-xs sm:text-[10px] font-bold text-slate-500 uppercase">
+                      已完成
+                    </div>
                   </div>
                 </div>
               </button>

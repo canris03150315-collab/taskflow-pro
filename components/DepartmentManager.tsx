@@ -393,7 +393,7 @@ export const DepartmentManager: React.FC<DepartmentManagerProps> = ({
                   className="absolute z-50 mt-12 p-3 bg-white border border-slate-200 rounded-lg shadow-xl"
                   style={{ minWidth: '280px' }}
                 >
-                  <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
+                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1 max-h-48 overflow-y-auto">
                     {commonIcons.map((icon, index) => (
                       <button
                         key={index}

@@ -91,7 +91,7 @@ export const DocumentLibraryView: React.FC<DocumentLibraryViewProps> = ({
           {/* 返回按鈕 */}
           <button
             onClick={() => setReadingDocId(null)}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-800 font-bold mb-6 transition"
+            className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 active:bg-slate-100 font-bold mb-6 transition min-h-[44px] -ml-2 px-2 rounded-lg"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

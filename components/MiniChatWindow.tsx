@@ -121,7 +121,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            className="w-6 h-6 rounded-full hover:bg-white/20 flex items-center justify-center flex-shrink-0"
+            className="w-9 h-9 sm:w-7 sm:h-7 rounded-full hover:bg-white/20 active:bg-white/30 flex items-center justify-center flex-shrink-0"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -153,7 +153,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
         <div className="flex items-center gap-1">
           <button
             onClick={onMinimize}
-            className="w-6 h-6 rounded-full hover:bg-white/20 flex items-center justify-center"
+            className="w-9 h-9 sm:w-7 sm:h-7 rounded-full hover:bg-white/20 active:bg-white/30 flex items-center justify-center"
             title="最小化"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,7 +167,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
           </button>
           <button
             onClick={onClose}
-            className="w-6 h-6 rounded-full hover:bg-white/20 flex items-center justify-center"
+            className="w-9 h-9 sm:w-7 sm:h-7 rounded-full hover:bg-white/20 active:bg-white/30 flex items-center justify-center"
             title="關閉"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

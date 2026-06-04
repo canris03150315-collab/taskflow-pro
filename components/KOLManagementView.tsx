@@ -578,7 +578,7 @@ export const KOLManagementView: React.FC<KOLManagementViewProps> = ({
                           handleDeleteProfile(profile.id);
                         }
                       }}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded"
+                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-2 sm:p-1 text-red-500 hover:bg-red-50 active:bg-red-100 rounded inline-flex items-center justify-center"
                       title="刪除"
                     >
                       🗑️
