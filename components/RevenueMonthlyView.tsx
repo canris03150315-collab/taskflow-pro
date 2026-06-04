@@ -237,7 +237,7 @@ export default function RevenueMonthlyView({ currentUser }: RevenueMonthlyViewPr
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scroll-hint-x">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-stone-50 sticky top-0">
                 <tr>

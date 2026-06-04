@@ -51,6 +51,33 @@
       .bottom-safe-6  { bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
       .bottom-safe-24 { bottom: calc(6rem + env(safe-area-inset-bottom)); }
       .pb-safe-20    { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
+
+      /* 水平捲動表格的右側 fade，提示使用者可以左右滑 */
+      .scroll-hint-x {
+        position: relative;
+        mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+        -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+      }
+      /* 只在實際 overflow 時顯示 fade。沒 overflow 時不要遮 */
+      .scroll-hint-x:not(:hover):not(.scroll-end)::after {
+        content: '→';
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 14px;
+        color: rgb(148 163 184);
+        pointer-events: none;
+        animation: scrollHint 1.5s ease-in-out infinite;
+      }
+      @keyframes scrollHint {
+        0%, 100% { opacity: 0.4; transform: translate(0, -50%); }
+        50%      { opacity: 1; transform: translate(-3px, -50%); }
+      }
+      @media (min-width: 768px) {
+        .scroll-hint-x { mask-image: none; -webkit-mask-image: none; }
+        .scroll-hint-x::after { display: none; }
+      }
       
       /* 自定義滾動條以配合淺色主題 */
       ::-webkit-scrollbar {

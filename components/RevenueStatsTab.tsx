@@ -308,7 +308,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({
             </div>
 
             {detailView === 'summary' ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scroll-hint-x">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-stone-50">
                     <tr>
@@ -359,7 +359,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({
                 </table>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scroll-hint-x">
                 <table className="min-w-full divide-y divide-slate-200">
                   <thead className="bg-stone-50">
                     <tr>
@@ -466,7 +466,7 @@ export const RevenueStatsTab: React.FC<RevenueStatsTabProps> = ({
             )}
           </>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scroll-hint-x">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-stone-50">
                 <tr>

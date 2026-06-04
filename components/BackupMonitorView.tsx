@@ -25,15 +25,15 @@ export const BackupMonitorView: React.FC = () => {
   const fetchBackupStatus = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const token = localStorage.getItem('auth_token');
       const apiBase = (import.meta as any).env?.VITE_API_URL || '/api';
       const response = await fetch(`${apiBase}/backup/status`, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
@@ -76,7 +76,7 @@ export const BackupMonitorView: React.FC = () => {
 
   useEffect(() => {
     fetchBackupStatus();
-    
+
     // Auto refresh every 5 minutes
     const interval = setInterval(fetchBackupStatus, 5 * 60 * 1000);
     return () => clearInterval(interval);
@@ -87,7 +87,7 @@ export const BackupMonitorView: React.FC = () => {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   const formatDate = (dateString: string): string => {
@@ -98,34 +98,46 @@ export const BackupMonitorView: React.FC = () => {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy': return 'text-green-600 bg-green-50 border-green-200';
-      case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'error': return 'text-red-600 bg-red-50 border-red-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'healthy':
+        return 'text-green-600 bg-green-50 border-green-200';
+      case 'warning':
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'error':
+        return 'text-red-600 bg-red-50 border-red-200';
+      default:
+        return 'text-gray-600 bg-gray-50 border-gray-200';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'healthy': return <CheckCircle className="w-6 h-6" />;
-      case 'warning': return <AlertTriangle className="w-6 h-6" />;
-      case 'error': return <AlertTriangle className="w-6 h-6" />;
-      default: return <Clock className="w-6 h-6" />;
+      case 'healthy':
+        return <CheckCircle className="w-6 h-6" />;
+      case 'warning':
+        return <AlertTriangle className="w-6 h-6" />;
+      case 'error':
+        return <AlertTriangle className="w-6 h-6" />;
+      default:
+        return <Clock className="w-6 h-6" />;
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'healthy': return '正常運行';
-      case 'warning': return '需要注意';
-      case 'error': return '異常狀態';
-      default: return '未知狀態';
+      case 'healthy':
+        return '正常運行';
+      case 'warning':
+        return '需要注意';
+      case 'error':
+        return '異常狀態';
+      default:
+        return '未知狀態';
     }
   };
 
@@ -238,31 +250,40 @@ export const BackupMonitorView: React.FC = () => {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scroll-hint-x">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">檔案名稱</th>
-                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">建立時間</th>
-                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">大小</th>
-                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">狀態</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">
+                  檔案名稱
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">
+                  建立時間
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">
+                  大小
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-slate-700 uppercase">
+                  狀態
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {(backupStatus.backups || []).map((backup, index) => (
-                <tr key={backup.filename} className={index === 0 ? 'bg-blue-50' : 'hover:bg-slate-50'}>
+                <tr
+                  key={backup.filename}
+                  className={index === 0 ? 'bg-blue-50' : 'hover:bg-slate-50'}
+                >
                   <td className="px-6 py-4 text-sm font-mono text-slate-900">
                     {backup.filename}
                     {index === 0 && (
-                      <span className="ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded">最新</span>
+                      <span className="ml-2 px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                        最新
+                      </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {formatDate(backup.created)}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {formatBytes(backup.size)}
-                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatDate(backup.created)}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{formatBytes(backup.size)}</td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
                       ✓ 正常

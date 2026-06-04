@@ -119,7 +119,7 @@ export const RevenueDateStatsTab: React.FC<RevenueDateStatsTabProps> = ({ curren
             <p className="text-sm">載入中...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scroll-hint-x">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-stone-50">
                 <tr>

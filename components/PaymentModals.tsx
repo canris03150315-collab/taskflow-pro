@@ -243,28 +243,28 @@ export const PaymentHistoryModal: React.FC<{
 
         {/* 日期區間搜尋 */}
         <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
+          <div className="grid grid-cols-2 sm:flex sm:gap-4 sm:items-end gap-3">
+            <div className="sm:flex-1">
               <label className="block text-sm font-medium mb-1">開始日期</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none min-h-[44px]"
               />
             </div>
-            <div className="flex-1">
+            <div className="sm:flex-1">
               <label className="block text-sm font-medium mb-1">結束日期</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none min-h-[44px]"
               />
             </div>
             <button
               onClick={handleSearch}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              className="min-h-[44px] px-4 py-2 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-lg font-bold"
             >
               搜尋
             </button>
@@ -274,7 +274,7 @@ export const PaymentHistoryModal: React.FC<{
                 setEndDate('');
                 onRefresh();
               }}
-              className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              className="min-h-[44px] px-4 py-2 border rounded-lg hover:bg-gray-100 active:bg-gray-200"
             >
               清除
             </button>
@@ -284,51 +284,96 @@ export const PaymentHistoryModal: React.FC<{
           </div>
         </div>
 
-        {/* 支付記錄列表 */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">日期</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">金額</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">備註</th>
-                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {payments.map((payment) => (
-                <tr key={payment.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 text-sm">{payment.paymentDate}</td>
-                  <td className="px-4 py-2 text-sm font-semibold">
-                    ${payment.amount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-600">{payment.notes || '-'}</td>
-                  <td className="px-4 py-2">
-                    {canEdit(payment) && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setEditingPayment(payment)}
-                          className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-                        >
-                          ✏️ 編輯
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (await showConfirm('確定要刪除此支付記錄嗎？')) {
-                              onDelete(payment.id);
-                            }
-                          }}
-                          className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                        >
-                          🗑️ 刪除
-                        </button>
-                      </div>
-                    )}
-                  </td>
+        {/* 支付記錄列表 — 桌面 table / 手機 card */}
+        <div>
+          {/* 桌面 table */}
+          <div className="hidden md:block overflow-x-auto scroll-hint-x">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">日期</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">金額</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">備註</th>
+                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">操作</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {payments.map((payment) => (
+                  <tr key={payment.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 text-sm">{payment.paymentDate}</td>
+                    <td className="px-4 py-2 text-sm font-semibold">
+                      ${payment.amount.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-600">{payment.notes || '-'}</td>
+                    <td className="px-4 py-2">
+                      {canEdit(payment) && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingPayment(payment)}
+                            className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                          >
+                            ✏️ 編輯
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (await showConfirm('確定要刪除此支付記錄嗎？')) {
+                                onDelete(payment.id);
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          >
+                            🗑️ 刪除
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 手機 card view */}
+          <div className="md:hidden space-y-3">
+            {payments.map((payment) => (
+              <div
+                key={payment.id}
+                className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">
+                    {payment.paymentDate}
+                  </span>
+                  <span className="text-lg font-black text-blue-600">
+                    ${payment.amount.toLocaleString()}
+                  </span>
+                </div>
+                {payment.notes && (
+                  <p className="text-sm text-slate-600 mb-3 break-words">{payment.notes}</p>
+                )}
+                {canEdit(payment) && (
+                  <div className="flex gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => setEditingPayment(payment)}
+                      className="flex-1 min-h-[44px] bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white rounded-lg font-bold text-sm transition"
+                    >
+                      ✏️ 編輯
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (await showConfirm('確定要刪除此支付記錄嗎？')) {
+                          onDelete(payment.id);
+                        }
+                      }}
+                      className="flex-1 min-h-[44px] bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-lg font-bold text-sm transition"
+                    >
+                      🗑️ 刪除
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
 
           {payments.length === 0 && (
             <div className="text-center py-8 text-gray-500">

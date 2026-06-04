@@ -197,7 +197,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ currentUser }) => {
         ) : logs.length === 0 ? (
           <EmptyState icon="🔍" title="沒有找到審核記錄" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scroll-hint-x">
             <table className="w-full">
               <thead className="bg-stone-50 border-b border-slate-200">
                 <tr>
