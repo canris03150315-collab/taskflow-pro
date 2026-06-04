@@ -9,15 +9,13 @@ interface FloatingChatButtonProps {
 export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
   unreadCount,
   onClick,
-  isOpen
+  isOpen,
 }) => {
   return (
     <button
       onClick={onClick}
-      className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 ${
-        isOpen 
-          ? 'bg-blue-700 rotate-0' 
-          : 'bg-blue-600 hover:bg-blue-700'
+      className={`fixed bottom-safe-6 right-6 z-40 w-14 h-14 rounded-full shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 ${
+        isOpen ? 'bg-blue-700 rotate-0' : 'bg-blue-600 hover:bg-blue-700'
       }`}
       title="企業通訊"
     >
@@ -25,10 +23,10 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
       <div className="relative flex items-center justify-center w-full h-full">
         {isOpen ? (
           // 關閉圖標（X）
-          <svg 
-            className="w-6 h-6 text-white" 
-            fill="none" 
-            stroke="currentColor" 
+          <svg
+            className="w-6 h-6 text-white"
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
             strokeWidth="2.5"
           >
@@ -36,21 +34,21 @@ export const FloatingChatButton: React.FC<FloatingChatButtonProps> = ({
           </svg>
         ) : (
           // 聊天氣泡圖標
-          <svg 
-            className="w-7 h-7 text-white" 
-            fill="none" 
-            stroke="currentColor" 
+          <svg
+            className="w-7 h-7 text-white"
+            fill="none"
+            stroke="currentColor"
             viewBox="0 0 24 24"
             strokeWidth="2"
           >
-            <path 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" 
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
             />
           </svg>
         )}
-        
+
         {/* 未讀訊息徽章 */}
         {!isOpen && unreadCount > 0 && (
           <div className="absolute -top-1 -right-1">

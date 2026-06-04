@@ -206,7 +206,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
           <div className="bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm text-center flex-shrink-0 min-w-[90px] md:min-w-[100px]">
-            <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wide">
+            <div className="text-xs md:text-[10px] font-bold text-slate-400 uppercase tracking-wide">
               我的待辦
             </div>
             <div className="text-xl md:text-2xl font-black text-slate-800 mt-1">
@@ -220,7 +220,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
           <div className="bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm text-center flex-shrink-0 min-w-[90px] md:min-w-[100px]">
-            <div className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wide">
+            <div className="text-xs md:text-[10px] font-bold text-slate-400 uppercase tracking-wide">
               未讀公告
             </div>
             <div
@@ -374,7 +374,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {t.title}
                       </div>
                       <div className="w-16 md:w-20 flex-shrink-0">
-                        <div className="flex justify-between text-[10px] text-blue-600 font-bold mb-1">
+                        <div className="flex justify-between text-xs sm:text-[10px] text-blue-600 font-bold mb-1">
                           <span>進度</span>
                           <span>{t.progress}%</span>
                         </div>
@@ -439,7 +439,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span>📢</span> 最新公告
               </h3>
               {unreadAnnouncements.length > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                <span className="bg-red-500 text-white text-xs sm:text-[10px] font-bold px-2 py-0.5 rounded-full">
                   {unreadAnnouncements.length} 未讀
                 </span>
               )}
@@ -466,7 +466,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           onClick={() => onChangePage('bulletin')}
                         >
                           {ann.priority === 'IMPORTANT' && (
-                            <span className="text-[10px] text-red-500 border border-red-200 px-1 rounded mt-0.5 font-bold">
+                            <span className="text-xs sm:text-[10px] text-red-500 border border-red-200 px-1 rounded mt-0.5 font-bold">
                               重要
                             </span>
                           )}
@@ -551,11 +551,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div>
                     <div className="text-xl font-bold">{latestReport.content.registrations}</div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">註冊人數</div>
+                    <div className="text-xs sm:text-[10px] text-slate-500 font-bold uppercase">
+                      註冊人數
+                    </div>
                   </div>
                   <div>
                     <div className="text-xl font-bold">{latestReport.content.firstDeposits}</div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase">首充人數</div>
+                    <div className="text-xs sm:text-[10px] text-slate-500 font-bold uppercase">
+                      首充人數
+                    </div>
                   </div>
                 </div>
                 <button

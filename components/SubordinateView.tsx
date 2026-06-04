@@ -241,7 +241,7 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({
                       </p>
                     </div>
                   </div>
-                  <div className="p-2 bg-white/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="p-2 bg-white/60 rounded-full opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity">
                     <svg
                       className="w-5 h-5 text-slate-400"
                       fill="none"
@@ -580,7 +580,7 @@ export const SubordinateView: React.FC<SubordinateViewProps> = ({
                 </div>
               </div>
 
-              <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500">
+              <div className="absolute bottom-4 right-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity text-blue-500">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"

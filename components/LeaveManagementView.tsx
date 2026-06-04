@@ -1064,11 +1064,11 @@ export function LeaveManagementView({
                             {day}
                           </span>
                           {isToday && (
-                            <span className="text-[10px] sm:text-xs text-blue-600">今天</span>
+                            <span className="text-xs sm:text-[10px] text-blue-600">今天</span>
                           )}
                         </div>
 
-                        <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs">
+                        <div className="space-y-0.5 sm:space-y-1 text-xs sm:text-[10px]">
                           {(() => {
                             const deptUsers = users.filter(
                               (u) => u.department === selectedDepartment
@@ -1081,20 +1081,20 @@ export function LeaveManagementView({
                               <>
                                 {hasConflict && (
                                   <div className="bg-orange-50 border border-orange-300 rounded px-1 py-0.5">
-                                    <p className="text-orange-700 font-bold text-[10px] sm:text-xs">
+                                    <p className="text-orange-700 font-bold text-xs sm:text-[10px]">
                                       <span className="hidden sm:inline">⚠️ 人力不足</span>
                                       <span className="sm:hidden">
                                         ⚠️ {onDuty.length}/{minOnDuty}
                                       </span>
                                     </p>
-                                    <p className="text-orange-600 text-[9px] sm:text-[10px] hidden sm:block">
+                                    <p className="text-orange-600 text-[10px] sm:text-[9px] hidden sm:block">
                                       需{minOnDuty}人，僅{onDuty.length}人
                                     </p>
                                   </div>
                                 )}
                                 {offDuty.length > 0 && (
                                   <div className="bg-red-50 border border-red-200 rounded px-1 py-0.5">
-                                    <p className="text-red-700 font-bold text-[10px] sm:text-xs mb-1">
+                                    <p className="text-red-700 font-bold text-xs sm:text-[10px] mb-1">
                                       <span className="hidden sm:inline">
                                         休息 {offDuty.length}人
                                       </span>
@@ -1104,7 +1104,7 @@ export function LeaveManagementView({
                                       {offDuty.map((u) => (
                                         <span
                                           key={u.id}
-                                          className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[9px] sm:text-xs font-medium"
+                                          className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-xs sm:text-[9px] font-medium"
                                         >
                                           {u.name}
                                         </span>
@@ -1114,7 +1114,7 @@ export function LeaveManagementView({
                                 )}
                                 {onDuty.length > 0 && !hasConflict && (
                                   <div className="bg-green-50 border border-green-200 rounded px-1 py-0.5">
-                                    <p className="text-green-700 font-bold text-[10px] sm:text-xs mb-1">
+                                    <p className="text-green-700 font-bold text-xs sm:text-[10px] mb-1">
                                       <span className="hidden sm:inline">
                                         上班 {onDuty.length}人
                                       </span>
@@ -1124,7 +1124,7 @@ export function LeaveManagementView({
                                       {onDuty.map((u) => (
                                         <span
                                           key={u.id}
-                                          className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[9px] sm:text-xs font-medium"
+                                          className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs sm:text-[9px] font-medium"
                                         >
                                           {u.name}
                                         </span>

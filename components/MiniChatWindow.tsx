@@ -22,7 +22,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
   position,
   onClose,
   onMinimize,
-  isMinimized
+  isMinimized,
 }) => {
   const toast = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,7 +34,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
   // 計算視窗位置（從右下角開始，每個視窗間隔 20px）
   const windowWidth = 320;
   const windowSpacing = 20;
-  const rightOffset = 96 + (position * (windowWidth + windowSpacing));
+  const rightOffset = 96 + position * (windowWidth + windowSpacing);
 
   useEffect(() => {
     loadMessages();
@@ -51,15 +51,16 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
   const loadMessages = async () => {
     try {
       let cid = activeChannelId;
-      
+
       if (!cid) {
         const channels = await api.chat.getChannels(currentUser.id);
-        const existingChannel = channels.find((ch: any) => 
-          ch.type === 'DIRECT' && 
-          ch.participants.includes(currentUser.id) && 
-          ch.participants.includes(targetUserId)
+        const existingChannel = channels.find(
+          (ch: any) =>
+            ch.type === 'DIRECT' &&
+            ch.participants.includes(currentUser.id) &&
+            ch.participants.includes(targetUserId)
         );
-        
+
         if (existingChannel) {
           cid = existingChannel.id;
           setActiveChannelId(cid);
@@ -69,7 +70,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
           setActiveChannelId(cid);
         }
       }
-      
+
       if (cid) {
         const result = await api.chat.getMessages(cid);
         setMessages(result.messages);
@@ -104,7 +105,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
   if (isMinimized) {
     return (
       <div
-        className="fixed bottom-6 bg-white rounded-t-xl shadow-xl border border-slate-200 overflow-hidden z-30 cursor-pointer hover:shadow-2xl transition"
+        className="fixed bottom-safe-6 bg-white rounded-t-xl shadow-xl border border-slate-200 overflow-hidden z-30 cursor-pointer hover:shadow-2xl transition"
         style={{ right: `${rightOffset}px`, width: `${windowWidth}px` }}
         onClick={onMinimize}
       >
@@ -123,7 +124,12 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
             className="w-6 h-6 rounded-full hover:bg-white/20 flex items-center justify-center flex-shrink-0"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -133,7 +139,7 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
 
   return (
     <div
-      className="fixed bottom-6 bg-white rounded-t-xl shadow-2xl border border-slate-200 overflow-hidden z-30"
+      className="fixed bottom-safe-6 bg-white rounded-t-xl shadow-2xl border border-slate-200 overflow-hidden z-30"
       style={{ right: `${rightOffset}px`, width: `${windowWidth}px`, height: '480px' }}
     >
       {/* 標題列 */}
@@ -151,7 +157,12 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
             title="最小化"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M19 9l-7 7-7-7"
+              />
             </svg>
           </button>
           <button
@@ -160,7 +171,12 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
             title="關閉"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -171,7 +187,12 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.5"
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
             </svg>
             <p className="text-sm">開始對話</p>
           </div>
@@ -181,12 +202,9 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
             const isImage = msg.content.startsWith('[IMG]');
             const isFile = msg.content.startsWith('[FILE]');
             const imageUrl = isImage ? msg.content.replace('[IMG]', '') : '';
-            
+
             return (
-              <div
-                key={msg.id}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-              >
+              <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[75%] ${isMe ? 'order-2' : 'order-1'}`}>
                   <div
                     className={`${isImage || isFile ? 'p-1' : 'px-3 py-2'} rounded-2xl ${
@@ -240,12 +258,28 @@ export const MiniChatWindow: React.FC<MiniChatWindowProps> = ({
           >
             {isSending ? (
               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
             ) : (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                />
               </svg>
             )}
           </button>

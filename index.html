@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -46,6 +46,11 @@
       .safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
       .safe-area-pl { padding-left: env(safe-area-inset-left); }
       .safe-area-pr { padding-right: env(safe-area-inset-right); }
+
+      /* 配合 fixed bottom 元件（home indicator 安全距離） */
+      .bottom-safe-6  { bottom: calc(1.5rem + env(safe-area-inset-bottom)); }
+      .bottom-safe-24 { bottom: calc(6rem + env(safe-area-inset-bottom)); }
+      .pb-safe-20    { padding-bottom: calc(5rem + env(safe-area-inset-bottom)); }
       
       /* 自定義滾動條以配合淺色主題 */
       ::-webkit-scrollbar {

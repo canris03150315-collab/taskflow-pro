@@ -599,7 +599,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                                           onClick={() =>
                                             handleRemoveExistingImage(entry.id!, img.hash)
                                           }
-                                          className="absolute top-1 right-1 w-6 h-6 bg-white/95 hover:bg-red-50 border border-slate-200 hover:border-red-300 rounded-full text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition shadow-sm"
+                                          className="absolute top-1 right-1 w-6 h-6 bg-white/95 hover:bg-red-50 border border-slate-200 hover:border-red-300 rounded-full text-red-600 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 focus:opacity-100 transition shadow-sm"
                                           aria-label={`移除 ${img.filename}`}
                                           title="移除"
                                         >

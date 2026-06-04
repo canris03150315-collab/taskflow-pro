@@ -177,7 +177,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                         {ann.title}
                       </h3>
                       {!isRead && (
-                        <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                        <span className="text-xs sm:text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">
                           NEW
                         </span>
                       )}
@@ -214,7 +214,7 @@ export const BulletinView: React.FC<BulletinViewProps> = ({
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-lg transition flex items-center justify-center pointer-events-none">
                           <svg
-                            className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition"
+                            className="w-8 h-8 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"

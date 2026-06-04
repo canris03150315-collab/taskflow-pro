@@ -473,7 +473,7 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
                           </span>
                           <button
                             onClick={() => handleDeleteMessage(msg.id)}
-                            className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition"
+                            className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 text-slate-300 hover:text-red-400 transition"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -495,7 +495,7 @@ export default function AIAssistantView({ currentUser }: AIAssistantViewProps) {
                           </span>
                           <button
                             onClick={() => handleDeleteMessage(msg.id)}
-                            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 transition"
+                            className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 text-slate-400 hover:text-red-400 transition"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>

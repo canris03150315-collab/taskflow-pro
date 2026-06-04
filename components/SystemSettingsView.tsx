@@ -230,7 +230,9 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({
               >
                 {avatar ? <img src={avatar} className="w-full h-full object-cover" /> : '👤'}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition">
-                  <span className="text-white opacity-0 group-hover:opacity-100 text-sm">更換</span>
+                  <span className="text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 text-sm">
+                    更換
+                  </span>
                 </div>
               </div>
               <div>

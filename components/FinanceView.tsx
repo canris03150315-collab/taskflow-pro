@@ -932,7 +932,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                             alt="Preview"
                             className="h-20 object-contain rounded"
                           />
-                          <div className="absolute inset-0 bg-black/20 flex items-center justify-center text-white font-bold opacity-0 group-hover:opacity-100 transition rounded">
+                          <div className="absolute inset-0 bg-black/20 flex items-center justify-center text-white font-bold opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition rounded">
                             更換
                           </div>
                         </div>

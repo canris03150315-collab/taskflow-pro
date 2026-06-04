@@ -222,7 +222,7 @@ export const UserModal: React.FC<UserModalProps> = ({
                 className="w-full h-full object-cover"
               />
               <div
-                className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold cursor-pointer"
+                className="absolute inset-0 bg-black/20 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold cursor-pointer"
                 onClick={handleUploadClick}
               >
                 更換

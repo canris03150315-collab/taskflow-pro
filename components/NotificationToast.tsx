@@ -40,7 +40,10 @@ interface NotificationToastProps {
   onDismiss: (id: string) => void;
 }
 
-export const NotificationToast: React.FC<NotificationToastProps> = ({ notifications, onDismiss }) => {
+export const NotificationToast: React.FC<NotificationToastProps> = ({
+  notifications,
+  onDismiss,
+}) => {
   if (notifications.length === 0) return null;
 
   const getTypeStyles = (type: Notification['type']) => {
@@ -99,11 +102,16 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ notificati
               className="text-white/70 hover:text-white transition"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
-          <div className="mt-2 text-[10px] opacity-70 text-right">點擊查看</div>
+          <div className="mt-2 text-xs sm:text-[10px] opacity-70 text-right">點擊查看</div>
         </div>
       ))}
     </div>

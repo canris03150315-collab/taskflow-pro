@@ -1740,7 +1740,7 @@ function AppContent() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-8 pb-20 md:pb-8">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-8 pb-safe-20 md:pb-8">
           <ErrorBoundary key={currentPage} fallbackTitle="此頁面載入時發生錯誤">
             <Suspense fallback={<PageSkeleton />}>
               {currentPage === 'dashboard' && (
