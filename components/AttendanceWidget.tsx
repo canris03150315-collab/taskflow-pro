@@ -29,51 +29,99 @@ const captureLocation = (): Promise<{ lat: number; lng: number } | null> =>
     setTimeout(() => finish(null), 8500);
   });
 
-// Build platform-specific instructions for re-enabling geolocation
-function getPermissionInstructions(): { platform: string; steps: string[] } {
+// Build platform-specific instructions for re-enabling geolocation.
+// Verified against official browser vendor docs (Chrome / Apple / Mozilla 2025).
+type PermissionGuide = {
+  platform: string;
+  iconHint: string; // what to visually look for
+  steps: string[];
+  fallbackUrl?: string; // chrome://settings... URL the user can paste in a new tab
+};
+
+function getPermissionInstructions(): PermissionGuide {
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   const isIOS = /iPad|iPhone|iPod/.test(ua);
   const isAndroid = /android/i.test(ua);
   const isMac = /Macintosh/.test(ua) && !isIOS;
+  const isFirefox = /Firefox\//.test(ua);
+  const isChromiumDesktop = !isIOS && !isAndroid && /Chrome\//.test(ua) && !isFirefox;
+
   if (isIOS) {
     return {
-      platform: 'iPhone / iPad',
+      platform: 'iPhone / iPad（Safari）',
+      iconHint: '畫面最底部（或頂部）網址列上的「aA」按鈕',
       steps: [
-        '打開「設定」App',
-        '滾到下方找到「Safari」',
-        '點「位置」→ 選「允許」',
-        '回到此頁、按下方「我已開啟，重試」',
+        '點網址列上的「aA」按鈕（iOS 預設在底部）',
+        '選「網站設定」→ 把「位置」改成「允許」',
+        '若 iOS 18.2 以上：設定 → App → Safari → 網站設定 → 位置',
+        '確認 設定 → 隱私權與安全性 → 定位服務 → Safari 網站 已開啟',
       ],
     };
   }
   if (isAndroid) {
     return {
-      platform: 'Android',
+      platform: 'Android Chrome',
+      iconHint: '網址列最左邊的「查看網站資訊」圖示（兩條橫線帶滑桿的 tune 圖示）',
       steps: [
-        '點瀏覽器右上角 ⋮ → 設定',
-        '網站設定 → 位置',
-        '找到此網站、改為「允許」',
-        '回到此頁、按下方「我已開啟，重試」',
+        '點網址列最左邊的「查看網站資訊」圖示',
+        '點「權限」→ 找到「位置」',
+        '選「造訪這個網站時允許」',
+        '若仍不行：手機設定 → 應用程式 → Chrome → 權限 → 位置 → 使用時允許',
+      ],
+    };
+  }
+  if (isFirefox) {
+    return {
+      platform: 'Firefox',
+      iconHint: '網址列鎖頭右側的「權限」滑桿圖示（不是齒輪、也不是盾牌）',
+      steps: [
+        '點網址列鎖頭右側的「權限」滑桿圖示',
+        '找到「存取你的位置資訊」、改為「允許」',
+        '若無此圖示：按 Ctrl+I（Mac 按 ⌘+I）開「頁面資訊」',
+        '在「權限」分頁、把「存取你的位置」取消「使用預設值」、點「允許」',
       ],
     };
   }
   if (isMac) {
+    // Safari on Mac vs Chrome on Mac
+    const isSafariMac = /Safari\//.test(ua) && !/Chrome\//.test(ua);
+    if (isSafariMac) {
+      return {
+        platform: 'Mac Safari',
+        iconHint: '網址列左側智慧搜尋欄旁的「頁面選單按鈕」（小選單圖示）',
+        steps: [
+          '點網址列的「頁面選單按鈕」→「網站設定」',
+          '把「位置」改成「允許」',
+          '或：上方功能表 Safari → 設定 → 網站 → 位置 → 此網站改「允許」',
+          '確認 系統設定 → 隱私權與安全性 → 定位服務 → Safari 已開啟',
+        ],
+      };
+    }
+    // Mac Chrome — fall through to chromium desktop block below
+  }
+  if (isChromiumDesktop) {
     return {
-      platform: 'Mac',
+      platform: '電腦 Chrome / Edge',
+      iconHint:
+        '網址列最左邊的「查看網站資訊」圖示（兩條橫線帶圓點的滑桿圖示，2023/9 起取代舊鎖頭）',
       steps: [
-        '點網址列左邊的 🔒 圖示',
-        '「網站設定」→ 位置 → 改為「允許」',
-        '若仍不行：系統設定 → 隱私與安全性 → 定位服務 → 開啟瀏覽器',
-        '重新整理此頁',
+        '點網址列最左邊的「查看網站資訊」圖示（看起來像兩條橫線帶圓點）',
+        '在跳出的選單點「網站設定」',
+        '在「權限」區找到「位置」、下拉改成「允許」',
+        '若找不到「位置」、用下方按鈕複製設定頁網址、貼到新分頁開啟',
       ],
+      fallbackUrl: 'chrome://settings/content/location',
     };
   }
+  // Generic fallback
   return {
-    platform: '電腦瀏覽器',
+    platform: '瀏覽器',
+    iconHint: '網址列左邊的小圖示',
     steps: [
-      '點網址列左邊的 🔒 圖示',
-      '找到「位置」→ 改為「允許」',
-      '重新整理此頁、或按下方「我已開啟，重試」',
+      '點網址列左邊那個小圖示（可能是滑桿、鎖頭或 ⓘ）',
+      '找到「位置」或「網站設定」→「位置」',
+      '改成「允許」',
+      '重新整理此頁',
     ],
   };
 }
@@ -250,6 +298,10 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
                 <div className="text-xs font-bold text-slate-500 uppercase mb-1.5">
                   {guide.platform}
                 </div>
+                <div className="text-xs text-slate-600 bg-white border border-amber-200 rounded p-2 mb-2">
+                  <span className="font-bold text-amber-700">要找的圖示：</span>
+                  {guide.iconHint}
+                </div>
                 <ol className="space-y-1 text-xs text-slate-700 mb-2">
                   {guide.steps.map((step, i) => (
                     <li key={i} className="flex gap-1.5">
@@ -258,12 +310,31 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
                     </li>
                   ))}
                 </ol>
+                {guide.fallbackUrl && (
+                  <button
+                    onClick={async () => {
+                      const url = guide.fallbackUrl!;
+                      try {
+                        await navigator.clipboard.writeText(url);
+                        toast.success(`已複製 ${url}，請貼到新分頁網址列`);
+                      } catch {
+                        toast.error(`請手動複製：${url}`);
+                      }
+                    }}
+                    className="w-full min-h-[36px] py-1 mb-1.5 bg-white border border-amber-300 hover:bg-amber-100 active:bg-amber-200 text-amber-700 rounded text-xs font-bold transition"
+                  >
+                    📋 複製設定頁網址（{guide.fallbackUrl}）
+                  </button>
+                )}
                 <button
                   onClick={handleRetryPermission}
                   className="w-full min-h-[40px] py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded text-xs font-bold transition"
                 >
                   我已開啟，重試
                 </button>
+                <div className="text-[10px] text-slate-400 mt-1.5 text-center">
+                  改完權限後通常需要重新整理頁面（F5 / 下拉重整）
+                </div>
               </div>
             </details>
           );
