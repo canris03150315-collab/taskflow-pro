@@ -7,28 +7,61 @@ interface AttendanceWidgetProps {
   currentUser: User;
 }
 
-type GeoStatus = 'idle' | 'fetching' | 'ok' | 'denied' | 'unavailable';
+type GeoErrorReason = 'unsupported' | 'denied' | 'unavailable' | 'timeout';
 
-// Capture current GPS as a promise. Never throws — resolves null if blocked / timeout / unsupported.
-const captureLocation = (): Promise<{ lat: number; lng: number } | null> =>
-  new Promise((resolve) => {
+class GeoError extends Error {
+  reason: GeoErrorReason;
+  constructor(reason: GeoErrorReason, msg: string) {
+    super(msg);
+    this.reason = reason;
+  }
+}
+
+// Capture current GPS — REQUIRED. Throws GeoError if denied/timeout/unavailable.
+const captureLocation = (): Promise<{ lat: number; lng: number }> =>
+  new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      resolve(null);
+      reject(new GeoError('unsupported', '此裝置不支援定位功能'));
       return;
     }
     let settled = false;
-    const finish = (val: { lat: number; lng: number } | null) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (settled) return;
+        settled = true;
+        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        if (err.code === err.PERMISSION_DENIED) {
+          reject(
+            new GeoError(
+              'denied',
+              '請允許瀏覽器使用位置權限後再打卡（網址列旁的鎖頭 → 位置 → 允許）'
+            )
+          );
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          reject(
+            new GeoError(
+              'unavailable',
+              '無法取得目前位置，請確認 GPS 已開啟、或移動到收訊較好的地方'
+            )
+          );
+        } else if (err.code === err.TIMEOUT) {
+          reject(new GeoError('timeout', '取得位置逾時，請至窗邊或戶外再試一次'));
+        } else {
+          reject(new GeoError('unavailable', '位置取得失敗'));
+        }
+      },
+      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+    );
+    // Hard timeout safety net
+    setTimeout(() => {
       if (settled) return;
       settled = true;
-      resolve(val);
-    };
-    navigator.geolocation.getCurrentPosition(
-      (pos) => finish({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => finish(null),
-      { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true }
-    );
-    // Hard timeout safety net in case getCurrentPosition never calls back
-    setTimeout(() => finish(null), 8500);
+      reject(new GeoError('timeout', '取得位置逾時，請至窗邊或戶外再試一次'));
+    }, 11000);
   });
 
 export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser }) => {
@@ -36,7 +69,6 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
   const [record, setRecord] = useState<AttendanceRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [geoStatus, setGeoStatus] = useState<GeoStatus>('idle');
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -70,15 +102,17 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
   const handleClockIn = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    setGeoStatus('fetching');
     try {
       const loc = await captureLocation();
-      setGeoStatus(loc ? 'ok' : 'denied');
       const data = await api.attendance.clockIn(currentUser.id, loc);
       setRecord(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error('打卡失敗，請稍後再試');
+      if (e instanceof GeoError) {
+        toast.error(e.message);
+      } else {
+        toast.error('打卡失敗，請稍後再試');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -87,16 +121,18 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
   const handleClockOut = async () => {
     if (!record || isSubmitting) return;
     setIsSubmitting(true);
-    setGeoStatus('fetching');
     try {
       const loc = await captureLocation();
-      setGeoStatus(loc ? 'ok' : 'denied');
       const data = await api.attendance.clockOut(record.id, loc);
       setRecord(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Clock out failed', e);
-      toast.error('簽退失敗，系統將重新整理狀態');
-      await loadStatus();
+      if (e instanceof GeoError) {
+        toast.error(e.message);
+      } else {
+        toast.error('簽退失敗，系統將重新整理狀態');
+        await loadStatus();
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -166,17 +202,6 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
         >
           {isSubmitting ? '處理中...' : <span>{record ? '☀️ 再次上班' : '☀️ 上班打卡'}</span>}
         </button>
-      )}
-
-      {/* GPS 狀態提示（小字、不擾人） */}
-      {geoStatus !== 'idle' && (
-        <div className="mt-2 text-[11px] text-slate-400 font-bold">
-          {geoStatus === 'fetching' && <span>📍 取得位置中…</span>}
-          {geoStatus === 'ok' && <span className="text-emerald-500">📍 已紀錄打卡位置</span>}
-          {(geoStatus === 'denied' || geoStatus === 'unavailable') && (
-            <span className="text-slate-400">📍 未取得位置（不影響打卡）</span>
-          )}
-        </div>
       )}
 
       {record && (
