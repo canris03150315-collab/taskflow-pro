@@ -177,20 +177,35 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
   }, []);
 
   const handleRetryPermission = async () => {
-    // User claims they re-enabled. Re-query Permissions API.
+    // Permissions API state is unreliable after manual toggle (Chrome bug).
+    // Actually try getCurrentPosition — if it returns coords, permission really works.
+    const loc = await captureLocation();
+    if (loc) {
+      setPermissionDenied(false);
+      toast.success('位置權限已恢復，可以打卡了');
+      return;
+    }
+    // GPS failed. Could be: still denied, or Permissions API + page state out of sync.
+    // Re-check API as a second signal.
+    let apiState: PermissionState | null = null;
     if (navigator.permissions) {
       try {
         const s = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-        if (s.state !== 'denied') {
-          setPermissionDenied(false);
-          toast.success('位置權限已恢復，可以打卡了');
-          return;
-        }
+        apiState = s.state;
       } catch {
         /* ignore */
       }
     }
-    toast.error('仍未取得位置權限，請依步驟重試');
+    if (apiState && apiState !== 'denied') {
+      // Browser says OK but GPS failed — almost always needs a hard reload
+      toast.error('權限看起來已開啟、但頁面狀態還沒更新。請按下方「重新整理頁面」');
+    } else {
+      toast.error('仍未取得位置權限。請再次確認步驟、或重新整理頁面');
+    }
+  };
+
+  const handleReloadPage = () => {
+    window.location.reload();
   };
 
   const loadStatus = async () => {
@@ -289,10 +304,13 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
         (() => {
           const guide = getPermissionInstructions();
           return (
-            <details className="w-full bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-left">
-              <summary className="text-xs font-bold text-amber-700 cursor-pointer list-none flex items-center gap-1">
-                <span>📍</span>
-                <span>未取得位置權限（打卡仍可進行）— 點此查看開啟方式</span>
+            <details
+              className="w-full bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-left"
+              open
+            >
+              <summary className="text-xs font-bold text-amber-700 cursor-pointer list-none flex items-start gap-1">
+                <span className="flex-shrink-0">📍</span>
+                <span>瀏覽器已封鎖位置權限（不會再彈出詢問）— 點此查看手動開啟方式</span>
               </summary>
               <div className="mt-2 pt-2 border-t border-amber-200">
                 <div className="text-xs font-bold text-slate-500 uppercase mb-1.5">
@@ -326,14 +344,26 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
                     📋 複製設定頁網址（{guide.fallbackUrl}）
                   </button>
                 )}
-                <button
-                  onClick={handleRetryPermission}
-                  className="w-full min-h-[40px] py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded text-xs font-bold transition"
-                >
-                  我已開啟，重試
-                </button>
-                <div className="text-[10px] text-slate-400 mt-1.5 text-center">
-                  改完權限後通常需要重新整理頁面（F5 / 下拉重整）
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={handleRetryPermission}
+                    className="min-h-[40px] py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded text-xs font-bold transition"
+                  >
+                    我已開啟，重試
+                  </button>
+                  <button
+                    onClick={handleReloadPage}
+                    className="min-h-[40px] py-1.5 bg-white border border-amber-400 hover:bg-amber-50 active:bg-amber-100 text-amber-700 rounded text-xs font-bold transition"
+                  >
+                    🔄 重新整理頁面
+                  </button>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-1.5 text-center leading-relaxed">
+                  💡 <span className="font-bold">為什麼瀏覽器不會再問我？</span>
+                  <br />
+                  你之前對此網站點過「封鎖」、瀏覽器記住了、永遠不會再彈出詢問。
+                  <br />
+                  必須去網站設定把「位置」改成「允許」才能恢復。
                 </div>
               </div>
             </details>
