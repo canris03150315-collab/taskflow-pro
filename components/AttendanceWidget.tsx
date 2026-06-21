@@ -7,61 +7,26 @@ interface AttendanceWidgetProps {
   currentUser: User;
 }
 
-type GeoErrorReason = 'unsupported' | 'denied' | 'unavailable' | 'timeout';
-
-class GeoError extends Error {
-  reason: GeoErrorReason;
-  constructor(reason: GeoErrorReason, msg: string) {
-    super(msg);
-    this.reason = reason;
-  }
-}
-
-// Capture current GPS — REQUIRED. Throws GeoError if denied/timeout/unavailable.
-const captureLocation = (): Promise<{ lat: number; lng: number }> =>
-  new Promise((resolve, reject) => {
+// Capture current GPS — best-effort. Never throws; resolves null if blocked / timeout / unsupported.
+// (Log-only mode: clock-in always succeeds even without GPS.)
+const captureLocation = (): Promise<{ lat: number; lng: number } | null> =>
+  new Promise((resolve) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      reject(new GeoError('unsupported', '此裝置不支援定位功能'));
+      resolve(null);
       return;
     }
     let settled = false;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (settled) return;
-        settled = true;
-        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      (err) => {
-        if (settled) return;
-        settled = true;
-        if (err.code === err.PERMISSION_DENIED) {
-          reject(
-            new GeoError(
-              'denied',
-              '請允許瀏覽器使用位置權限後再打卡（網址列旁的鎖頭 → 位置 → 允許）'
-            )
-          );
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          reject(
-            new GeoError(
-              'unavailable',
-              '無法取得目前位置，請確認 GPS 已開啟、或移動到收訊較好的地方'
-            )
-          );
-        } else if (err.code === err.TIMEOUT) {
-          reject(new GeoError('timeout', '取得位置逾時，請至窗邊或戶外再試一次'));
-        } else {
-          reject(new GeoError('unavailable', '位置取得失敗'));
-        }
-      },
-      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
-    );
-    // Hard timeout safety net
-    setTimeout(() => {
+    const finish = (val: { lat: number; lng: number } | null) => {
       if (settled) return;
       settled = true;
-      reject(new GeoError('timeout', '取得位置逾時，請至窗邊或戶外再試一次'));
-    }, 11000);
+      resolve(val);
+    };
+    navigator.geolocation.getCurrentPosition(
+      (pos) => finish({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => finish(null),
+      { timeout: 8000, maximumAge: 60000, enableHighAccuracy: true }
+    );
+    setTimeout(() => finish(null), 8500);
   });
 
 // Build platform-specific instructions for re-enabling geolocation
@@ -199,13 +164,9 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
       const loc = await captureLocation();
       const data = await api.attendance.clockIn(currentUser.id, loc);
       setRecord(data);
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
-      if (e instanceof GeoError) {
-        toast.error(e.message);
-      } else {
-        toast.error('打卡失敗，請稍後再試');
-      }
+      toast.error('打卡失敗，請稍後再試');
     } finally {
       setIsSubmitting(false);
     }
@@ -218,14 +179,10 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
       const loc = await captureLocation();
       const data = await api.attendance.clockOut(record.id, loc);
       setRecord(data);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Clock out failed', e);
-      if (e instanceof GeoError) {
-        toast.error(e.message);
-      } else {
-        toast.error('簽退失敗，系統將重新整理狀態');
-        await loadStatus();
-      }
+      toast.error('簽退失敗，系統將重新整理狀態');
+      await loadStatus();
     } finally {
       setIsSubmitting(false);
     }
@@ -279,41 +236,40 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
         )}
       </div>
 
-      {permissionDenied ? (
+      {/* 軟性提醒：位置權限被封鎖時引導開啟（不擋打卡） */}
+      {permissionDenied &&
         (() => {
           const guide = getPermissionInstructions();
           return (
-            <div className="w-full bg-amber-50 border-2 border-amber-300 rounded-xl p-4 text-left">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-2xl">📍</span>
-                <div>
-                  <div className="font-black text-amber-800 text-sm">需要開啟位置權限</div>
-                  <div className="text-xs text-amber-600">瀏覽器已封鎖此網站的位置存取</div>
+            <details className="w-full bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-left">
+              <summary className="text-xs font-bold text-amber-700 cursor-pointer list-none flex items-center gap-1">
+                <span>📍</span>
+                <span>未取得位置權限（打卡仍可進行）— 點此查看開啟方式</span>
+              </summary>
+              <div className="mt-2 pt-2 border-t border-amber-200">
+                <div className="text-xs font-bold text-slate-500 uppercase mb-1.5">
+                  {guide.platform}
                 </div>
-              </div>
-              <div className="bg-white rounded-lg p-3 mb-3 border border-amber-200">
-                <div className="text-xs font-bold text-slate-500 uppercase mb-2">
-                  {guide.platform} 設定步驟
-                </div>
-                <ol className="space-y-1.5 text-sm text-slate-700">
+                <ol className="space-y-1 text-xs text-slate-700 mb-2">
                   {guide.steps.map((step, i) => (
-                    <li key={i} className="flex gap-2">
+                    <li key={i} className="flex gap-1.5">
                       <span className="font-black text-amber-600 flex-shrink-0">{i + 1}.</span>
                       <span>{step}</span>
                     </li>
                   ))}
                 </ol>
+                <button
+                  onClick={handleRetryPermission}
+                  className="w-full min-h-[40px] py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded text-xs font-bold transition"
+                >
+                  我已開啟，重試
+                </button>
               </div>
-              <button
-                onClick={handleRetryPermission}
-                className="w-full min-h-[44px] py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-lg font-bold text-sm transition"
-              >
-                我已開啟，重試
-              </button>
-            </div>
+            </details>
           );
-        })()
-      ) : isOnline ? (
+        })()}
+
+      {isOnline ? (
         <button
           onClick={handleClockOut}
           disabled={isSubmitting}
