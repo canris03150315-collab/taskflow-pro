@@ -513,6 +513,9 @@ const RealApi = {
           clockOut: record.clock_out || null,
           durationMinutes: record.duration_minutes || 0,
           status: record.status,
+          locationLat: record.location_lat ?? null,
+          locationLng: record.location_lng ?? null,
+          locationAddress: record.location_address ?? null,
         };
       } catch (error) {
         console.error('Failed to get attendance status', error);
@@ -533,10 +536,22 @@ const RealApi = {
         manualReason: r.manual_reason || null,
         manualBy: r.manual_by || null,
         manualAt: r.manual_at || null,
+        locationLat: r.location_lat ?? null,
+        locationLng: r.location_lng ?? null,
+        locationAddress: r.location_address ?? null,
       }));
     },
-    clockIn: async (userId: string): Promise<AttendanceRecord> => {
-      const response = await request<{ record: any }>('POST', '/attendance/clock-in', {});
+    clockIn: async (
+      userId: string,
+      location?: { lat: number; lng: number; address?: string } | null
+    ): Promise<AttendanceRecord> => {
+      const body: Record<string, unknown> = {};
+      if (location) {
+        body.location_lat = location.lat;
+        body.location_lng = location.lng;
+        if (location.address) body.location_address = location.address;
+      }
+      const response = await request<{ record: any }>('POST', '/attendance/clock-in', body);
       const record = response.record;
       return {
         id: record.id,
@@ -546,12 +561,22 @@ const RealApi = {
         clockOut: record.clock_out || null,
         durationMinutes: record.duration_minutes || 0,
         status: record.status || 'ONLINE',
+        locationLat: record.location_lat ?? null,
+        locationLng: record.location_lng ?? null,
+        locationAddress: record.location_address ?? null,
       };
     },
-    clockOut: async (recordId: string): Promise<AttendanceRecord> => {
-      const response = await request<{ record: any }>('POST', '/attendance/clock-out', {
-        id: recordId,
-      });
+    clockOut: async (
+      recordId: string,
+      location?: { lat: number; lng: number; address?: string } | null
+    ): Promise<AttendanceRecord> => {
+      const body: Record<string, unknown> = { id: recordId };
+      if (location) {
+        body.location_lat = location.lat;
+        body.location_lng = location.lng;
+        if (location.address) body.location_address = location.address;
+      }
+      const response = await request<{ record: any }>('POST', '/attendance/clock-out', body);
       const record = response.record;
       return {
         id: record.id,
@@ -561,6 +586,9 @@ const RealApi = {
         clockOut: record.clock_out,
         durationMinutes: record.duration_minutes,
         status: record.status || 'OFFLINE',
+        locationLat: record.location_lat ?? null,
+        locationLng: record.location_lng ?? null,
+        locationAddress: record.location_address ?? null,
       };
     },
     manualEntry: async (

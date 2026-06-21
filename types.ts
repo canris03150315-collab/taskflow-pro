@@ -363,6 +363,11 @@ export interface AttendanceRecord {
   clockOut?: string; // ISO Timestamp
   durationMinutes?: number; // Calculated after clock out
   status: 'ONLINE' | 'OFFLINE';
+  // Optional geolocation captured at clock-in / clock-out (log-only, not enforced)
+  locationLat?: number | null;
+  locationLng?: number | null;
+  locationAddress?: string | null;
+  isManual?: boolean;
 }
 
 // --- System Audit Log Types ---

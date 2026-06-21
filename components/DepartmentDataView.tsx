@@ -626,6 +626,7 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                       <th className="p-4">上班</th>
                       <th className="p-4">下班</th>
                       <th className="p-4">工時</th>
+                      <th className="p-4">位置</th>
                       <th className="p-4">狀態</th>
                       <th className="p-4">備註</th>
                     </tr>
@@ -699,6 +700,21 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                           {r.durationMinutes
                             ? `${Math.floor(r.durationMinutes / 60)}h ${r.durationMinutes % 60}m`
                             : '0h'}
+                        </td>
+                        <td className="p-4">
+                          {r.locationLat != null && r.locationLng != null ? (
+                            <a
+                              href={`https://www.google.com/maps?q=${r.locationLat},${r.locationLng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded"
+                              title={`${r.locationLat.toFixed(5)}, ${r.locationLng.toFixed(5)}`}
+                            >
+                              📍 查看
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-300">—</span>
+                          )}
                         </td>
                         <td className="p-4">
                           <span
@@ -858,6 +874,16 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                           : '-'}
                       </div>
                     </div>
+                    {r.locationLat != null && r.locationLng != null && (
+                      <a
+                        href={`https://www.google.com/maps?q=${r.locationLat},${r.locationLng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:bg-blue-50 active:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-100"
+                      >
+                        📍 查看打卡地點
+                      </a>
+                    )}
                   </div>
                 ))}
 
