@@ -786,6 +786,10 @@ const RealApi = {
     leaveChannel: async (channelId: string): Promise<void> => {
       await request('POST', `/chat/channels/${channelId}/leave`, {});
     },
+    // Permanently delete a channel + all its messages (creator/manager only — backend enforces)
+    deleteChannel: async (channelId: string): Promise<void> => {
+      await request('DELETE', `/chat/channels/${channelId}`);
+    },
     editChannel: async (
       channelId: string,
       name: string,
@@ -902,6 +906,9 @@ const RealApi = {
       request<any>('POST', `/leaves/${id}/approve`, data || {}),
     reject: async (id: string, data?: any) =>
       request<any>('POST', `/leaves/${id}/reject`, data || {}),
+    // Department leave rules (max concurrent / min on-duty / min advance days)
+    updateRules: async (departmentId: string, rules: any): Promise<void> =>
+      request<void>('PUT', `/leaves/rules/${departmentId}`, rules),
   },
   schedules: {
     getAll: async (): Promise<any[]> => {

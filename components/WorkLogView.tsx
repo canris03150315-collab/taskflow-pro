@@ -87,9 +87,9 @@ export const WorkLogView: React.FC<WorkLogViewProps> = ({ currentUser, users, de
   const handleEdit = (log: WorkLog) => {
     setEditingLog(log);
     setDate(log.date);
-    setTodayTasks(log.today_tasks);
-    setTomorrowTasks(log.tomorrow_tasks);
-    setSpecialNotes(log.special_notes || '');
+    setTodayTasks(log.todayTasks || '');
+    setTomorrowTasks(log.tomorrowTasks || '');
+    setSpecialNotes(log.notes || '');
     setShowForm(true);
   };
 
@@ -390,22 +390,22 @@ export const WorkLogView: React.FC<WorkLogViewProps> = ({ currentUser, users, de
                 <div>
                   <div className="text-xs font-bold text-slate-500 mb-2">今日工作事項</div>
                   <div className="text-sm text-slate-700 bg-blue-50 p-3 rounded-lg border border-blue-100 whitespace-pre-wrap">
-                    {log.today_tasks}
+                    {log.todayTasks}
                   </div>
                 </div>
 
                 <div>
                   <div className="text-xs font-bold text-slate-500 mb-2">明天工作事項</div>
                   <div className="text-sm text-slate-700 bg-green-50 p-3 rounded-lg border border-green-100 whitespace-pre-wrap">
-                    {log.tomorrow_tasks}
+                    {log.tomorrowTasks}
                   </div>
                 </div>
 
-                {log.special_notes && (
+                {log.notes && (
                   <div>
                     <div className="text-xs font-bold text-slate-500 mb-2">特別備註</div>
                     <div className="text-sm text-slate-700 bg-orange-50 p-3 rounded-lg border border-orange-100 whitespace-pre-wrap">
-                      {log.special_notes}
+                      {log.notes}
                     </div>
                   </div>
                 )}
