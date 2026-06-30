@@ -604,6 +604,7 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
                       onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
                       className="w-full px-3 py-2 bg-stone-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none"
                       rows={4}
+                      maxLength={2000}
                       placeholder={required ? `請輸入${label}...` : '其他需要注意的事項...'}
                       required={required}
                     />

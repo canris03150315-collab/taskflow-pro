@@ -2,6 +2,7 @@
 'use strict';
 const express = require('express');
 const multer = require('multer');
+const FileType = require('file-type');
 const { authenticateToken } = require('../middleware/auth');
 const fileService = require('../services/fileService');
 const storage = require('../services/fileStorage');
@@ -31,6 +32,17 @@ const ALLOWED_MIME = new Set([
   'image/gif',
   'image/webp',
 ]);
+// MIME types whose content can't be detected by magic bytes (file-type
+// returns undefined for plain UTF-8 text). For these we trust the declared
+// mime — they're low-risk inert formats anyway.
+const TEXT_MIME = new Set(['text/csv', 'text/plain']);
+// Office formats are ZIPs internally, so file-type sees them all as
+// application/zip. We accept any declared Office MIME when content is zip.
+const OFFICE_MIME = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
 
 // POST /check-conflict
 router.post('/check-conflict', authenticateToken, async (req, res) => {
@@ -55,6 +67,35 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
       return res.status(400).json({ error: '不支援的檔案類型' });
     }
 
+    // Verify real content type matches declared MIME (defense against
+    // ".exe renamed to .png" tricks). file-type sniffs the magic bytes.
+    let trustedMime = req.file.mimetype;
+    const detected = await FileType.fromBuffer(req.file.buffer);
+    if (detected) {
+      // Office files (xlsx/docx/pptx) are zip-shaped, detected.mime is application/zip
+      if (OFFICE_MIME.has(req.file.mimetype) && detected.mime === 'application/zip') {
+        // OK — trust declared Office mime
+      } else if (ALLOWED_MIME.has(detected.mime)) {
+        trustedMime = detected.mime; // override declared (could be spoofed)
+      } else {
+        console.warn('[files] upload rejected — detected mime mismatch:', {
+          declared: req.file.mimetype,
+          detected: detected.mime,
+          filename: req.file.originalname,
+          uid: req.user.id,
+        });
+        return res.status(400).json({ error: '檔案內容與宣告類型不符' });
+      }
+    } else if (!TEXT_MIME.has(req.file.mimetype)) {
+      // file-type returned undefined and it's not a known text type — suspicious
+      console.warn('[files] upload rejected — undetectable binary:', {
+        declared: req.file.mimetype,
+        filename: req.file.originalname,
+        uid: req.user.id,
+      });
+      return res.status(400).json({ error: '無法驗證檔案內容類型' });
+    }
+
     const { target_file_id, note } = req.body;
 
     // Permission: if target_file_id given, ensure user can add version to that file
@@ -69,7 +110,7 @@ router.post('/upload', authenticateToken, upload.single('file'), async (req, res
     const result = await fileService.uploadFile(req.db, req.user, {
       filename: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
       buffer: req.file.buffer,
-      mimeType: req.file.mimetype,
+      mimeType: trustedMime,
       note,
       targetFileId: target_file_id,
     });

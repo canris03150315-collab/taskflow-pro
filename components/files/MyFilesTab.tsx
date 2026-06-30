@@ -132,6 +132,9 @@ export const MyFilesTab: React.FC<MyFilesTabProps> = ({ currentUser }) => {
 
       {preview && (
         <ExcelPreview
+          // key forces remount on file/version switch so blob URLs get
+          // properly revoked instead of accumulating in objectUrlRef.
+          key={`${preview.fileId}-${preview.versionNo}`}
           fileId={preview.fileId}
           versionNo={preview.versionNo}
           filename={preview.filename}

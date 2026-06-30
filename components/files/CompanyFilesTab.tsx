@@ -84,6 +84,7 @@ export const CompanyFilesTab: React.FC<CompanyFilesTabProps> = ({ currentUser })
 
       {preview && (
         <ExcelPreview
+          key={`${preview.fileId}-${preview.versionNo}`}
           fileId={preview.fileId}
           versionNo={preview.versionNo}
           filename={preview.filename}

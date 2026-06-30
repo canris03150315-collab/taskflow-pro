@@ -135,9 +135,13 @@ router.post('/', authenticateToken, async (req, res) => {
     if (!date || !todayTasks || !tomorrowTasks) {
       return res.status(400).json({ error: '請填寫日期、今日任務及明日計畫' });
     }
+    const FIELD_LIMIT = 2000;
+    if (todayTasks.length > FIELD_LIMIT || tomorrowTasks.length > FIELD_LIMIT || (notes && notes.length > FIELD_LIMIT)) {
+      return res.status(400).json({ error: `每段最多 ${FIELD_LIMIT} 字、請精簡內容` });
+    }
 
     // Check if log already exists for this user and date
-    const existing = await dbCall(db, 'get', 
+    const existing = await dbCall(db, 'get',
       'SELECT id FROM work_logs WHERE user_id = ? AND date = ?',
       [currentUser.id, date]
     );
@@ -226,6 +230,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     if (existing.user_id !== currentUser.id) {
       return res.status(403).json({ error: '只能編輯自己的工作日誌' });
+    }
+
+    const FIELD_LIMIT = 2000;
+    if ((todayTasks && todayTasks.length > FIELD_LIMIT) ||
+        (tomorrowTasks && tomorrowTasks.length > FIELD_LIMIT) ||
+        (notes && notes.length > FIELD_LIMIT)) {
+      return res.status(400).json({ error: `每段最多 ${FIELD_LIMIT} 字、請精簡內容` });
     }
 
     const now = new Date().toISOString();

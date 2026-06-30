@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../../services/api';
 import { formatFileSize } from '../FileTypeIcon';
+import { showError } from '../../utils/dialogService';
 
 interface ExcelPreviewProps {
   fileId: string;
@@ -109,8 +110,8 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
   const handleDownload = async () => {
     try {
       await api.files.download(fileId, versionNo, filename);
-    } catch {
-      // Toast handled elsewhere; preview shouldn't break.
+    } catch (e: any) {
+      showError(e?.message || '下載失敗，請稍後再試');
     }
   };
 
@@ -217,8 +218,9 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank', 'noopener');
-    // Revoke later so the new tab has time to load the document
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    // Don't auto-revoke — the new tab needs the URL to persist for the
+    // user's entire viewing session. URL.createObjectURL holds a small
+    // (≤5 MB) blob; browser GC reclaims it when this tab closes.
   };
 
   return (
