@@ -145,7 +145,10 @@ router.get('/:id/v/:n', authenticateToken, async (req, res) => {
     res.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
     res.send(buffer);
   } catch (err) {
-    console.error('[files] download error:', err.message);
+    console.error('[files] download error:', err.code || '', err.message, 'fileId:', req.params.id, 'v:', req.params.n);
+    if (err.code === 'BLOB_NOT_FOUND') {
+      return res.status(410).json({ error: '檔案內容已不存在，請聯絡管理員' });
+    }
     res.status(500).json({ error: '下載失敗' });
   }
 });
@@ -195,7 +198,10 @@ router.get('/:id/v/:n/preview', authenticateToken, async (req, res) => {
 
     res.json({ type: 'unsupported', message: '此檔案類型不支援預覽，請下載查看' });
   } catch (err) {
-    console.error('[files] preview error:', err.message);
+    console.error('[files] preview error:', err.code || '', err.message, 'fileId:', req.params.id, 'v:', req.params.n);
+    if (err.code === 'BLOB_NOT_FOUND') {
+      return res.status(410).json({ error: '檔案內容已不存在，請聯絡管理員' });
+    }
     res.status(500).json({ error: '預覽失敗' });
   }
 });
@@ -203,6 +209,10 @@ router.get('/:id/v/:n/preview', authenticateToken, async (req, res) => {
 // DELETE /:id/v/:n — soft delete version
 router.delete('/:id/v/:n', authenticateToken, async (req, res) => {
   try {
+    const file = await req.db.get('SELECT * FROM files WHERE id = ? AND is_deleted = 0', [req.params.id]);
+    if (!file) return res.status(404).json({ error: '檔案不存在' });
+    if (!perms.canViewFile(req.user, file)) return res.status(403).json({ error: '無權限存取此檔案' });
+
     const version = await fileService.getVersion(req.db, req.params.id, parseInt(req.params.n, 10));
     if (!version) return res.status(404).json({ error: '版本不存在' });
     if (!perms.canDeleteVersion(req.user, version)) {
@@ -226,6 +236,10 @@ router.delete('/:id/v/:n', authenticateToken, async (req, res) => {
 // POST /:id/v/:n/restore
 router.post('/:id/v/:n/restore', authenticateToken, async (req, res) => {
   try {
+    const file = await req.db.get('SELECT * FROM files WHERE id = ? AND is_deleted = 0', [req.params.id]);
+    if (!file) return res.status(404).json({ error: '檔案不存在' });
+    if (!perms.canViewFile(req.user, file)) return res.status(403).json({ error: '無權限存取此檔案' });
+
     const version = await req.db.get(
       'SELECT * FROM file_versions WHERE file_id = ? AND version_no = ?',
       [req.params.id, parseInt(req.params.n, 10)]
