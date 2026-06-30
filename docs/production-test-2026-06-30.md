@@ -135,6 +135,35 @@ Backend `work-logs.js` 不做 HTML sanitize、直接存進 DB 的 `today_tasks` 
 
 ---
 
+## 加碼 3：WS Realtime + Heap + H6 + H5（凌晨 03:45 加跑）
+
+### WebSocket realtime
+- ✅ AUTH_SUCCESS / work_log_created / work_log_deleted 都正確推送
+- 🟡 **發現新 security 洞**：WebSocket AUTH **不驗證 JWT**、客戶端送 `{type:'AUTH', payload:{userId:'任意 user id'}}` 就被 register 成該 user。確認過：
+  - 不需要任何 token 就能 spoof
+  - 影響：可接收他人的廣播訊息（如目標 chat）、可冒名上線狀態
+  - 修法：[backend/dist/websocket-server.js](backend/dist/websocket-server.js) `handleConnection` 改成 require token + jwt.verify、用驗證過的 userId、棄用 client-claimed userId
+  - **不在凌晨修**：屬 breaking change（現有連線中的 tab 全部要 reconnect+ frontend 配合送 token）、白天再排
+  - 列入 [reference_testing_blindspots.md](C:/Users/canri/.claude/projects/C--Users-canri/memory/reference_testing_blindspots.md) 第 N 類：「WS auth 與 REST 不對稱、JWT 沒同步驗證」
+
+### Heap snapshot
+- ✅ blob URL revoke 流程正確（30 次 cycle、+0.1 MB）
+- ✅ 即使不 revoke、leak 也 < 1 MB（70-byte 測試圖）
+
+### H6 — work-logs pagination（已實作）
+- Backend 加 `?pageSize=&page=` opt-in pagination、預設行為不變
+- Response 多 `pagination: { page, pageSize, total, hasMore }` 欄位
+- 未來 frontend 可接 infinite scroll、現在不必動 frontend
+
+### H5 — work_log_images 索引表（已實作）
+- 新 migration `20260701000000_add_work_log_images_index.js`：建 `work_log_images` 表 (composite PK hash+log_id+section)、idempotent backfill 既有 JSON
+- Backend image 上傳：寫 JSON + 寫 index（dual write）
+- Backend image fetch：fast path 查 index、fall back 到 JSON scan
+- Backend image delete：兩邊同步刪
+- production 上既有 0 筆 image refs、零遷移成本
+
+---
+
 ## 過程留下的痕跡</new_str>
 </invoke>
 

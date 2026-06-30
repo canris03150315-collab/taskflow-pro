@@ -66,9 +66,17 @@ router.get('/', authenticateToken, async (req, res) => {
     const db = req.db;
     const currentUser = req.user;
     const { departmentId, userId, date, startDate, endDate } = req.query;
+    // Pagination — opt-in: only paginate if pageSize is explicitly passed.
+    // Backwards-compatible: clients that don't send pageSize get all rows (existing behavior).
+    const paginationEnabled = req.query.pageSize !== undefined;
+    const pageSize = paginationEnabled
+      ? Math.min(Math.max(parseInt(req.query.pageSize, 10) || 100, 1), 500)
+      : 999999;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const offset = (page - 1) * pageSize;
 
     let query = `
-      SELECT 
+      SELECT
         wl.*,
         u.name as user_name,
         d.name as department_name
@@ -77,43 +85,51 @@ router.get('/', authenticateToken, async (req, res) => {
       LEFT JOIN departments d ON wl.department_id = d.id
       WHERE 1=1
     `;
+    let countQuery = 'SELECT COUNT(*) AS total FROM work_logs wl WHERE 1=1';
     const params = [];
+
+    // Helper — append same condition to both data + count query, push param once
+    const addWhere = (sql, val) => {
+      query += sql;
+      countQuery += sql;
+      if (val !== undefined) params.push(val);
+    };
 
     // Permission-based filtering
     if (currentUser.role === 'BOSS' || currentUser.role === 'MANAGER') {
       // Can view all departments
       if (departmentId && departmentId !== 'ALL') {
-        query += ' AND wl.department_id = ?';
-        params.push(departmentId);
+        addWhere(' AND wl.department_id = ?', departmentId);
       }
     } else if (currentUser.role === 'SUPERVISOR') {
-      // Can only view own department
-      query += ' AND wl.department_id = ?';
-      params.push(currentUser.department);
+      addWhere(' AND wl.department_id = ?', currentUser.department);
     } else {
       // Regular employees can only view their own logs
-      query += ' AND wl.user_id = ?';
-      params.push(currentUser.id);
+      addWhere(' AND wl.user_id = ?', currentUser.id);
     }
 
     // User filter
     if (userId && userId !== 'ALL') {
-      query += ' AND wl.user_id = ?';
-      params.push(userId);
+      addWhere(' AND wl.user_id = ?', userId);
     }
 
     // Date filters
     if (date) {
-      query += ' AND wl.date = ?';
-      params.push(date);
+      addWhere(' AND wl.date = ?', date);
     } else if (startDate && endDate) {
-      query += ' AND wl.date BETWEEN ? AND ?';
+      addWhere(' AND wl.date BETWEEN ? AND ?');
       params.push(startDate, endDate);
     }
 
-    query += ' ORDER BY wl.date DESC, wl.created_at DESC';
+    query += ' ORDER BY wl.date DESC, wl.created_at DESC LIMIT ? OFFSET ?';
+
+    // Get count first (params is shared; add LIMIT params after)
+    const countParams = [...params];
+    params.push(pageSize, offset);
 
     const logs = await dbCall(db, 'all', query, params) || [];
+    const countRow = await dbCall(db, 'get', countQuery, countParams);
+    const total = countRow ? countRow.total : logs.length;
 
     // Map to camelCase
     const mappedLogs = logs.map(log => ({
@@ -131,7 +147,12 @@ router.get('/', authenticateToken, async (req, res) => {
       images: parseImages(log.images),
     }));
 
-    res.json({ logs: mappedLogs });
+    res.json({
+      logs: mappedLogs,
+      pagination: paginationEnabled
+        ? { page, pageSize, total, hasMore: offset + mappedLogs.length < total }
+        : null,
+    });
   } catch (error) {
     console.error('Error fetching work logs:', error);
     res.status(500).json({ error: '伺服器內部錯誤' });
@@ -404,6 +425,18 @@ router.post('/:id/images', authenticateToken, imageUploadWithErrorHandling, asyn
       id,
     ]);
 
+    // Also write to the fast-lookup index table (idempotent — composite PK on hash+log+section)
+    try {
+      await dbCall(db, 'run',
+        `INSERT OR IGNORE INTO work_log_images
+         (hash, work_log_id, section, filename, size, mime_type, uploader_id, uploaded_at, blob_path)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [hash, id, section, newImage.filename, newImage.size, newImage.mime_type, newImage.uploader_id, newImage.uploaded_at, newImage.blob_path]
+      );
+    } catch (e) {
+      console.warn('[work-logs] index insert failed (continuing — JSON column is canonical):', e.message);
+    }
+
     res.json({ image: newImage, section });
   } catch (err) {
     console.error('[work-logs] image upload error:', err.message);
@@ -418,21 +451,44 @@ router.get('/images/:hash/:filename', authenticateToken, async (req, res) => {
     const currentUser = req.user;
     const { hash } = req.params;
 
-    const logs = await dbCall(db, 'all', 'SELECT * FROM work_logs WHERE images IS NOT NULL', []);
     let foundImage = null;
     let foundLog = null;
-    for (const log of logs) {
-      const imgs = parseImages(log.images);
-      for (const section of ['today', 'tomorrow', 'notes']) {
-        const match = imgs[section].find((i) => i.hash === hash);
-        if (match) {
-          foundImage = match;
-          foundLog = log;
-          break;
-        }
+
+    // Fast path — index table lookup by hash
+    try {
+      const idx = await dbCall(db, 'get',
+        `SELECT wli.*, wl.user_id, wl.department_id
+         FROM work_log_images wli
+         JOIN work_logs wl ON wl.id = wli.work_log_id
+         WHERE wli.hash = ?
+         LIMIT 1`,
+        [hash]
+      );
+      if (idx) {
+        foundImage = {
+          hash: idx.hash, filename: idx.filename, size: idx.size,
+          mime_type: idx.mime_type, uploader_id: idx.uploader_id,
+          uploaded_at: idx.uploaded_at, blob_path: idx.blob_path,
+        };
+        foundLog = { user_id: idx.user_id, department_id: idx.department_id };
       }
-      if (foundImage) break;
+    } catch (e) {
+      // index table missing — falls through to JSON scan
     }
+
+    // Fallback — original JSON scan (for legacy data not in the index)
+    if (!foundImage) {
+      const logs = await dbCall(db, 'all', 'SELECT * FROM work_logs WHERE images IS NOT NULL', []);
+      for (const log of logs) {
+        const imgs = parseImages(log.images);
+        for (const section of ['today', 'tomorrow', 'notes']) {
+          const match = imgs[section].find((i) => i.hash === hash);
+          if (match) { foundImage = match; foundLog = log; break; }
+        }
+        if (foundImage) break;
+      }
+    }
+
     if (!foundImage) return res.status(404).json({ error: '圖片不存在' });
 
     const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
@@ -486,6 +542,14 @@ router.delete('/:id/images/:hash', authenticateToken, async (req, res) => {
       new Date().toISOString(),
       id,
     ]);
+
+    // Also remove from index table
+    try {
+      await dbCall(db, 'run',
+        'DELETE FROM work_log_images WHERE hash = ? AND work_log_id = ? AND section = ?',
+        [hash, id, section]
+      );
+    } catch (e) { /* index missing — ignore */ }
 
     res.json({ success: true });
   } catch (err) {
