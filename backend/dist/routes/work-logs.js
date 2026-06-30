@@ -310,7 +310,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: '找不到該工作日誌' });
     }
 
-    if (existing.user_id !== currentUser.id) {
+    const isManager = currentUser.role === 'BOSS' || currentUser.role === 'MANAGER';
+    if (existing.user_id !== currentUser.id && !isManager) {
       return res.status(403).json({ error: '只能刪除自己的工作日誌' });
     }
 
