@@ -36,7 +36,25 @@ function writeBlob(hash, ext, buffer) {
 }
 
 function readBlob(relativePath) {
+  if (!relativePath || typeof relativePath !== 'string') {
+    const err = new Error('blob_path missing');
+    err.code = 'BLOB_PATH_MISSING';
+    throw err;
+  }
   const fullPath = path.join(__dirname, '..', '..', 'data', relativePath);
+  // Prevent path traversal — final path must be within UPLOAD_ROOT
+  const resolved = path.resolve(fullPath);
+  const root = path.resolve(UPLOAD_ROOT);
+  if (!resolved.startsWith(root + path.sep) && resolved !== root) {
+    const err = new Error('blob_path outside upload root');
+    err.code = 'BLOB_PATH_INVALID';
+    throw err;
+  }
+  if (!fs.existsSync(fullPath)) {
+    const err = new Error(`Blob not found on disk: ${relativePath}`);
+    err.code = 'BLOB_NOT_FOUND';
+    throw err;
+  }
   return fs.readFileSync(fullPath);
 }
 
