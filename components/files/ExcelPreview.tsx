@@ -19,6 +19,7 @@ const isExcelMime = (m: string) =>
   m === 'application/vnd.ms-excel';
 
 const isPdfMime = (m: string) => m === 'application/pdf';
+const isImageMime = (m: string) => typeof m === 'string' && m.startsWith('image/');
 
 const Spinner = () => (
   <svg className="animate-spin h-6 w-6 text-blue-600" viewBox="0 0 24 24" fill="none">
@@ -44,6 +45,7 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
 }) => {
   const [data, setData] = useState<any>(null);
   const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [imageUrl, setImageUrl] = useState<string>('');
   const [activeSheet, setActiveSheet] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,10 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
           const url = await api.files.getPreviewBlobUrl(fileId, versionNo);
           objectUrlRef.current = url;
           setPdfUrl(url);
+        } else if (isImageMime(mimeType)) {
+          const url = await api.files.getPreviewBlobUrl(fileId, versionNo);
+          objectUrlRef.current = url;
+          setImageUrl(url);
         } else if (isExcelMime(mimeType)) {
           const result = await api.files.getPreview(fileId, versionNo);
           if (result.type === 'oversized' || result.type === 'unsupported') {
@@ -111,6 +117,10 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
   const openInNewTab = () => {
     if (pdfUrl) {
       window.open(pdfUrl, '_blank', 'noopener');
+      return;
+    }
+    if (imageUrl) {
+      window.open(imageUrl, '_blank', 'noopener');
       return;
     }
     if (!data) return;
@@ -252,7 +262,7 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {(pdfUrl || data) && (
+            {(pdfUrl || data || imageUrl) && (
               <button
                 onClick={openInNewTab}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 h-10 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
@@ -344,6 +354,16 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({
 
           {pdfUrl && !error && !loading && (
             <iframe src={pdfUrl} title={filename} className="w-full h-full border-0 bg-white" />
+          )}
+
+          {imageUrl && !error && !loading && (
+            <div className="h-full w-full flex items-center justify-center bg-slate-100 p-4 overflow-auto">
+              <img
+                src={imageUrl}
+                alt={filename}
+                className="max-w-full max-h-full object-contain bg-white shadow-lg rounded"
+              />
+            </div>
           )}
 
           {data && !error && !loading && (

@@ -184,6 +184,15 @@ router.get('/:id/v/:n/preview', authenticateToken, async (req, res) => {
       return res.send(buffer);
     }
 
+    // Image preview — stream the binary inline like PDF.
+    if (typeof version.mime_type === 'string' && version.mime_type.startsWith('image/')) {
+      const buffer = storage.readBlob(version.blob_path);
+      res.set('Content-Type', version.mime_type);
+      res.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+      res.set('Cache-Control', 'private, max-age=3600');
+      return res.send(buffer);
+    }
+
     res.json({ type: 'unsupported', message: '此檔案類型不支援預覽，請下載查看' });
   } catch (err) {
     console.error('[files] preview error:', err.message);
