@@ -233,10 +233,11 @@ router.delete('/:id/v/:n', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /:id/v/:n/restore
+// POST /:id/v/:n/restore — note: file row may itself be is_deleted=1
+// (when the last version was deleted), so don't filter on is_deleted here.
 router.post('/:id/v/:n/restore', authenticateToken, async (req, res) => {
   try {
-    const file = await req.db.get('SELECT * FROM files WHERE id = ? AND is_deleted = 0', [req.params.id]);
+    const file = await req.db.get('SELECT * FROM files WHERE id = ?', [req.params.id]);
     if (!file) return res.status(404).json({ error: '檔案不存在' });
     if (!perms.canViewFile(req.user, file)) return res.status(403).json({ error: '無權限存取此檔案' });
 
