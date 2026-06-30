@@ -262,6 +262,10 @@ router.delete('/:id', auth_1.authenticateToken, async (req, res) => {
         const db = req.db;
         const currentUser = req.user;
         const { id } = req.params;
+        // First-line role gate: only BOSS / MANAGER may delete users
+        if (currentUser.role !== types_1.Role.BOSS && currentUser.role !== types_1.Role.MANAGER) {
+            return res.status(403).json({ error: '無權刪除用戶' });
+        }
         // 不能刪除自己
         if (currentUser.id === id) {
             return res.status(400).json({ error: '不能刪除自己的帳號' });
@@ -271,7 +275,7 @@ router.delete('/:id', auth_1.authenticateToken, async (req, res) => {
         if (!userToDelete) {
             return res.status(404).json({ error: '用戶不存在' });
         }
-        // 權限檢查
+        // 細部權限檢查
         if (currentUser.role === types_1.Role.MANAGER) {
             // MANAGER 不能刪除 BOSS 或其他 MANAGER
             if (userToDelete.role === types_1.Role.BOSS || userToDelete.role === types_1.Role.MANAGER) {
