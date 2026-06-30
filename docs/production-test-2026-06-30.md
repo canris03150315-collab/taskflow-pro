@@ -110,6 +110,31 @@ E2E 過程中發現之前 smoke test 留下的 `smoke-img-1782840173191.png` 在
 
 ---
 
+## 加碼 2：Security + Ops Log 完整性（凌晨 03:30 加跑）
+
+### 4 類測試結果
+
+| 測試 | 結果 |
+|------|------|
+| **XSS injection**（5 種 payload 進工作日誌 todayTasks/notes） | 🟡 backend 原樣存、React frontend 透過 JSX 自動 escape（實際安全；任何將來改用 `dangerouslySetInnerHTML` 會破） |
+| **SQL injection**（`'; DROP TABLE`、`' OR 1=1`、`UNION SELECT` 等） | ✅ users 表完整、role 未改、全部 payload 安全 bounce（prepared statement 有效） |
+| **JWT tampering** | ✅ tampered sig / `alg=none` / expired / malformed / empty 全部 401 拒收（5/5） |
+| **Ops log 完整性** | ✅ 23 筆完整、schema 正確、action 分佈與今天測試吻合（10 delete / 9 upload / 2 restore / 2 download） |
+
+### XSS 補充
+
+Backend `work-logs.js` 不做 HTML sanitize、直接存進 DB 的 `today_tasks` 等欄位。Frontend 在 `WorkLogTab.tsx` / `WorkLogView.tsx` 用 React JSX 文字 render — JSX 對字串自動 escape、**目前安全**。
+
+**未來開發者要小心**：若有人改用 `dangerouslySetInnerHTML={{__html: log.todayTasks}}` 來支援 markdown / rich text、**就會立刻變成 stored XSS**。建議：
+- 加 server-side sanitize（如 `DOMPurify` 在 frontend 或 `sanitize-html` 在 backend）
+- 或保留純文字限制、永遠不用 dangerouslySetInnerHTML
+
+### Ops log 補充
+
+之前 smoke test 顯示 0 entries 是因為當時 central 還沒有任何檔案操作。後來今天所有 smoke / boundary / permission test 都正確 log 進去了、23 筆都有 IP 地址、actor_name、filename。**ops log 正常運作**。
+
+---
+
 ## 過程留下的痕跡</new_str>
 </invoke>
 
