@@ -628,6 +628,17 @@ const RealApi = {
       );
       return response;
     },
+    // BOSS / MANAGER / SUPERVISOR — edit any attendance record (snake_case fields)
+    update: async (
+      id: string,
+      body: { clock_in?: string; clock_out?: string; notes?: string }
+    ): Promise<any> => {
+      return request<{ success: boolean; record: any }>('PUT', `/attendance/${id}`, body);
+    },
+    // BOSS / MANAGER / SUPERVISOR — delete an attendance record
+    delete: async (id: string): Promise<void> => {
+      await request<{ success: boolean }>('DELETE', `/attendance/${id}`);
+    },
   },
   chat: {
     getChannels: async (userId: string): Promise<ChatChannel[]> => {
