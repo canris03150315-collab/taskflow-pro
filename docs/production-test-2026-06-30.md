@@ -72,7 +72,46 @@ NODE_TLS_REJECT_UNAUTHORIZED=0 node "C:/Users/canri/AppData/Local/Temp/claude/C-
 
 ---
 
-## 過程留下的痕跡
+## 加碼：Browser E2E（凌晨 03:14 加跑、chrome-devtools MCP）
+
+員工休息延長、用真實瀏覽器跑了 5 個 view + mobile viewport。
+
+### 流程
+| 步驟 | 結果 |
+|------|------|
+| login (canris BOSS) | ✅（form submit 沒觸發 React state、用 JS fetch /api/auth/login 完成、然後 reload） |
+| Dashboard 載入 | ✅ 早安 SSS、3 個公告、5 個 widget |
+| 工作報表中心 | ✅ tabs / 搜尋 / 上傳鈕都在 |
+| **圖片預覽（核心驗證 commit 836fefa）** | ✅ Modal 開、`<img>` blob:URL 載入 70B 1×1 PNG、metadata 顯示對 |
+| ESC 關 modal | ✅ |
+| 任務列表 | ✅ 3 筆任務卡片、進度條 slider、編輯/刪除按鈕（**沒動真實資料**） |
+| 部門數據中心 → 出勤打卡 | ✅ **9 欄含「位置」、40 個 Google Maps 連結**（GPS 功能上線 1 天員工已用 40 次） |
+| Mobile viewport 500px | ✅ 桌面 table `hidden md:block` 正確隱藏、5 個 mobile card 顯示 |
+| Logout | ✅ token 清掉 |
+
+### Console errors / warnings（整輪不變）
+
+| | 訊息 | 評估 |
+|--|------|------|
+| 🟡 warn | `cdn.tailwindcss.com should not be used in production` | 既有、minor、影響 zero、production build 改 PostCSS 是長期 task |
+| 🟡 error | `Cloudflare Insights beacon.min.js blocked by CSP` | 既有、Cloudflare 自動注入分析 script、被我們 CSP 擋（合理、analytics 沒在用） |
+| 🟢 error | `Failed to load resource: 401 [7 times]` | **登入前**才有、登入後消失。原因：login page 仍 mount 一些 fetch hooks 沒 token guard。Cosmetic、不影響功能。 |
+
+**整輪 0 新 critical error**。我們之前修的所有 bug（image preview / mobile responsive / GPS log）都實際運作。
+
+### 順手清理
+
+E2E 過程中發現之前 smoke test 留下的 `smoke-img-1782840173191.png` 在 alpha file center、已刪掉。
+
+### 螢幕截圖
+
+- `scratchpad/e2e-image-preview.png` — 圖片預覽 modal
+- `scratchpad/e2e-mobile-attendance.png` — mobile 出勤 card view
+
+---
+
+## 過程留下的痕跡</new_str>
+</invoke>
 
 - 4 台 production server `/root/pre-test-20260630-1839.tar.gz` snapshot（150-225 MB）
 - `operations_log` 多 ~10 筆 [SMOKE] / [PERM TEST] 上傳/刪除事件
