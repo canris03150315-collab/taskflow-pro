@@ -623,6 +623,19 @@ const timelineImageUpload = multer({
     limits: { fileSize: TIMELINE_IMG_MAX_SIZE },
 });
 
+function timelineImageUploadWithErrorHandling(req, res, next) {
+    timelineImageUpload.single('file')(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: '圖片太大（上限 10 MB）' });
+            }
+            console.error('[tasks] multer error:', err.code, err.message);
+            return res.status(400).json({ error: '上傳失敗：' + (err.message || err.code || 'unknown') });
+        }
+        next();
+    });
+}
+
 function parseTimelineImages(jsonStr) {
     if (!jsonStr) return [];
     try {
@@ -645,7 +658,7 @@ async function canAccessTaskTimeline(db, currentUser, task) {
 }
 
 // POST /api/tasks/:taskId/timeline/:tid/images - upload image to timeline entry
-router.post('/:taskId/timeline/:tid/images', auth_1.authenticateToken, timelineImageUpload.single('file'), async (req, res) => {
+router.post('/:taskId/timeline/:tid/images', auth_1.authenticateToken, timelineImageUploadWithErrorHandling, async (req, res) => {
     try {
         const db = req.db;
         const currentUser = req.user;

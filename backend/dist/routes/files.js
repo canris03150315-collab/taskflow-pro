@@ -17,6 +17,20 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
 });
 
+// Wrap multer to surface LIMIT_FILE_SIZE as a friendly 413 instead of opaque 500
+function uploadWithErrorHandling(req, res, next) {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: '檔案太大（上限 25 MB）' });
+      }
+      console.error('[files] multer error:', err.code, err.message);
+      return res.status(400).json({ error: '上傳失敗：' + (err.message || err.code || 'unknown') });
+    }
+    next();
+  });
+}
+
 const ALLOWED_MIME = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
@@ -60,7 +74,7 @@ router.post('/check-conflict', authenticateToken, async (req, res) => {
 });
 
 // POST /upload
-router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
+router.post('/upload', authenticateToken, uploadWithErrorHandling, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: '請選擇檔案' });
     if (!ALLOWED_MIME.has(req.file.mimetype)) {

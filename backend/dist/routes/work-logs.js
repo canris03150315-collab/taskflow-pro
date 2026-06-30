@@ -18,6 +18,20 @@ const imageUpload = multer({
   limits: { fileSize: MAX_IMAGE_SIZE },
 });
 
+// Wrap multer to surface LIMIT_FILE_SIZE as a friendly 413 instead of 500
+function imageUploadWithErrorHandling(req, res, next) {
+  imageUpload.single('file')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: '圖片太大（上限 10 MB）' });
+      }
+      console.error('[work-logs] multer error:', err.code, err.message);
+      return res.status(400).json({ error: '上傳失敗：' + (err.message || err.code || 'unknown') });
+    }
+    next();
+  });
+}
+
 function parseImages(jsonStr) {
   if (!jsonStr) return { today: [], tomorrow: [], notes: [] };
   try {
@@ -341,7 +355,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/work-logs/:id/images - Upload image to specific section
-router.post('/:id/images', authenticateToken, imageUpload.single('file'), async (req, res) => {
+router.post('/:id/images', authenticateToken, imageUploadWithErrorHandling, async (req, res) => {
   try {
     const db = req.db;
     const currentUser = req.user;
