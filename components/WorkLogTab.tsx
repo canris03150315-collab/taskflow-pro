@@ -64,9 +64,31 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
     notes: { file: File; localUrl: string; hash: string }[];
   }>({ today: [], tomorrow: [], notes: [] });
   const [yesterdayLog, setYesterdayLog] = useState<WorkLog | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(
+    null
+  );
 
   const [lightbox, setLightbox] = useState<{ images: WorkLogImage[]; idx: number } | null>(null);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  // Cleanup pending image blob URLs when the modal closes by ANY path
+  // (ESC, backdrop, cancel, X) so they don't leak across the session.
+  // The success path also calls clearPendingImages() explicitly before close;
+  // running again here is a no-op (set is already empty).
+  useEffect(() => {
+    if (isModalOpen) return;
+    setPendingImages((p) => {
+      let hasAny = false;
+      for (const sec of ['today', 'tomorrow', 'notes'] as Section[]) {
+        for (const item of p[sec]) {
+          URL.revokeObjectURL(item.localUrl);
+          hasAny = true;
+        }
+      }
+      return hasAny ? { today: [], tomorrow: [], notes: [] } : p;
+    });
+  }, [isModalOpen]);
 
   const availableDepts = useMemo(
     () => (isManager ? departments : departments.filter((d) => d.id === currentUser.department)),
@@ -175,11 +197,13 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setFormError('');
     if (!formData.todayTasks.trim() || !formData.tomorrowTasks.trim()) {
       showWarning('請填寫今日工作事項和明天工作事項');
       return;
     }
+    setIsSubmitting(true);
     try {
       if (editingLog) {
         await api.workLogs.update(editingLog.id, formData);
@@ -188,17 +212,29 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
         const newLogId = result?.log?.id || result?.id;
         if (newLogId) {
           // Upload buffered pending images now that we have a log id
-          let failed = 0;
+          const totalImages = (['today', 'tomorrow', 'notes'] as Section[]).reduce(
+            (sum, sec) => sum + pendingImages[sec].length,
+            0
+          );
+          let uploaded = 0;
+          const failures: string[] = [];
+          if (totalImages > 0) setUploadProgress({ current: 0, total: totalImages });
           for (const sec of ['today', 'tomorrow', 'notes'] as Section[]) {
             for (const item of pendingImages[sec]) {
               try {
                 await api.workLogs.images.upload(newLogId, sec, item.file);
-              } catch {
-                failed++;
+              } catch (err: any) {
+                failures.push(`${item.file.name}（${err?.message || '未知錯誤'}）`);
               }
+              uploaded += 1;
+              setUploadProgress({ current: uploaded, total: totalImages });
             }
           }
-          if (failed > 0) showError(`${failed} 張圖片上傳失敗，可在編輯時重試`);
+          if (failures.length > 0) {
+            showError(
+              `${failures.length} 張圖片上傳失敗：${failures.join('、')}（可在編輯時重試）`
+            );
+          }
         }
         clearPendingImages();
       }
@@ -213,6 +249,9 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
           : msg;
       setFormError(displayMsg);
       showError(displayMsg);
+    } finally {
+      setIsSubmitting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -627,21 +666,42 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
               })}
             </form>
 
-            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 h-10 text-slate-600 font-bold hover:bg-slate-100 rounded-lg"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={(e) => handleSubmit(e as any)}
-                className="px-5 h-10 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700"
-              >
-                {editingLog ? '更新' : '建立'}
-              </button>
+            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex flex-col gap-2">
+              {uploadProgress && (
+                <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">
+                  📤 上傳圖片中… {uploadProgress.current}/{uploadProgress.total}
+                  <div className="mt-1 h-1 bg-blue-100 rounded overflow-hidden">
+                    <div
+                      className="h-full bg-blue-600 transition-all"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 h-10 text-slate-600 font-bold hover:bg-slate-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleSubmit(e as any)}
+                  disabled={isSubmitting}
+                  className="px-5 h-10 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSubmitting
+                    ? uploadProgress
+                      ? '上傳中…'
+                      : '送出中…'
+                    : editingLog
+                      ? '更新'
+                      : '建立'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
