@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { WorkLogImage } from '../../types';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
+import { AuthedWorkLogImage } from './AuthedWorkLogImage';
 
 interface ImageLightboxProps {
   images: WorkLogImage[];
@@ -99,9 +100,11 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ images, initialInd
         </div>
 
         <div className="flex-1 flex items-center justify-center bg-slate-900 relative">
-          <img
-            src={api.workLogs.images.getUrl(current.hash, current.filename)}
+          <AuthedWorkLogImage
+            hash={current.hash}
+            filename={current.filename}
             alt={current.filename}
+            loading="eager"
             className="max-w-full max-h-[80vh] object-contain"
           />
           {idx > 0 && (

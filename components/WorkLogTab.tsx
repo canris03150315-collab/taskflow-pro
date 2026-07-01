@@ -6,6 +6,7 @@ import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialo
 import { EmptyState } from './EmptyState';
 import { ImageUploader } from './files/ImageUploader';
 import { ImageLightbox } from './files/ImageLightbox';
+import { AuthedWorkLogImage } from './files/AuthedWorkLogImage';
 
 interface WorkLogTabProps {
   currentUser: User;
@@ -434,9 +435,9 @@ const WorkLogTab: React.FC<WorkLogTabProps> = ({ currentUser, departments, users
                         className="aspect-square rounded-lg overflow-hidden border border-slate-200 hover:opacity-90 bg-slate-50"
                         aria-label={`預覽 ${img.filename}`}
                       >
-                        <img
-                          src={api.workLogs.images.getUrl(img.hash, img.filename)}
-                          alt={img.filename}
+                        <AuthedWorkLogImage
+                          hash={img.hash}
+                          filename={img.filename}
                           className="w-full h-full object-cover"
                           loading="lazy"
                         />

@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { WorkLogImage } from '../../types';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
+import { AuthedWorkLogImage } from './AuthedWorkLogImage';
 
 interface ImageUploaderProps {
   images: WorkLogImage[];
@@ -27,8 +28,6 @@ const formatSize = (bytes: number) =>
     : bytes < 1024 * 1024
       ? `${(bytes / 1024).toFixed(0)} KB`
       : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-
-const defaultResolveUrl = (img: WorkLogImage) => api.workLogs.images.getUrl(img.hash, img.filename);
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   images,
@@ -113,12 +112,23 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               className="w-full h-full hover:opacity-90 transition"
               aria-label={`預覽 ${img.filename}`}
             >
-              <img
-                src={(resolveUrl || defaultResolveUrl)(img)}
-                alt={img.filename}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
+              {resolveUrl ? (
+                // Pending images use a local blob: URL; render directly
+                <img
+                  src={resolveUrl(img)}
+                  alt={img.filename}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                // Persisted images sit behind Bearer-auth; use the auth-fetching component
+                <AuthedWorkLogImage
+                  hash={img.hash}
+                  filename={img.filename}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              )}
             </button>
             {canRemove(img) && (
               <button
