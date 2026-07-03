@@ -141,10 +141,10 @@ router.post('/', auth_1.authenticateToken, (0, auth_1.requireRole)([types_1.Role
         // 返回創建的用戶資訊（不包含密碼）
         const { password: _, ...userWithoutPassword } = newUser;
         
-        // Broadcast WebSocket event
+        // Broadcast WebSocket event（廣播給所有連線端，務必用去掉密碼雜湊的版本）
         if (req.wsServer) {
             req.wsServer.broadcastToAll('USER_CREATED', {
-                user: newUser,
+                user: userWithoutPassword,
                 timestamp: new Date().toISOString()
             });
         }

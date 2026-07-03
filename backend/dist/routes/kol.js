@@ -31,6 +31,10 @@ function checkKOLPermission(req, res, next) {
   if (!currentUser) {
     return res.status(403).json({ error: '權限不足' });
   }
+  // KOL 網紅資料與撥款金流敏感，限老闆/經理（BOSS/MANAGER）
+  if (currentUser.role !== 'BOSS' && currentUser.role !== 'MANAGER') {
+    return res.status(403).json({ error: '權限不足：僅限主管層級存取 KOL 管理' });
+  }
   next();
 }
 

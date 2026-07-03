@@ -115,9 +115,13 @@ router.post('/', authenticateToken, async (req, res) => {
     const leave = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
     
     // Broadcast notification via WebSocket
+    // 只廣播非敏感的信號欄位（不含 reason 等隱私內容）；需要細節的前端自行走有授權的 REST API 取回
     if (req.wsServer) {
       req.wsServer.broadcastToAll('LEAVE_CREATED', {
-        leave: leave,
+        leaveId: leave.id,
+        userId: leave.user_id,
+        departmentId: leave.department_id,
+        status: leave.status,
         timestamp: new Date().toISOString()
       });
     }
@@ -159,6 +163,11 @@ router.post('/:id/approve', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: '不可批准自己的請假申請' });
     }
 
+    // 跨部門防護：SUPERVISOR 只能核准自己部門的假單（BOSS/MANAGER 不受限）
+    if (currentUser.role === 'SUPERVISOR' && leave.department_id !== currentUser.department) {
+      return res.status(403).json({ error: '只能核准自己部門的請假申請' });
+    }
+
     // L2/L8 fix: Only PENDING leaves can be approved
     if (leave.status !== 'PENDING') {
       return res.status(400).json({ error: `此假單狀態為「${leave.status}」，無法再次操作` });
@@ -180,10 +189,13 @@ router.post('/:id/approve', authenticateToken, async (req, res) => {
     
     const updatedLeave = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
     
-    // Broadcast update
+    // Broadcast update（只廣播非敏感信號欄位，不含 reason 等隱私內容）
     if (req.wsServer) {
       req.wsServer.broadcastToAll('LEAVE_UPDATED', {
-        leave: updatedLeave,
+        leaveId: updatedLeave.id,
+        userId: updatedLeave.user_id,
+        departmentId: updatedLeave.department_id,
+        status: updatedLeave.status,
         timestamp: new Date().toISOString()
       });
     }
@@ -220,6 +232,11 @@ router.post('/:id/reject', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: '找不到該請假申請' });
     }
 
+    // 跨部門防護：SUPERVISOR 只能駁回自己部門的假單（BOSS/MANAGER 不受限）
+    if (currentUser.role === 'SUPERVISOR' && leave.department_id !== currentUser.department) {
+      return res.status(403).json({ error: '只能駁回自己部門的請假申請' });
+    }
+
     // L2/L8 fix: Only PENDING leaves can be rejected
     if (leave.status !== 'PENDING') {
       return res.status(400).json({ error: `此假單狀態為「${leave.status}」，無法再次操作` });
@@ -240,10 +257,13 @@ router.post('/:id/reject', authenticateToken, async (req, res) => {
     
     const updatedLeave = await db.get('SELECT * FROM leave_requests WHERE id = ?', [id]);
     
-    // Broadcast update
+    // Broadcast update（只廣播非敏感信號欄位，不含 reason 等隱私內容）
     if (req.wsServer) {
       req.wsServer.broadcastToAll('LEAVE_UPDATED', {
-        leave: updatedLeave,
+        leaveId: updatedLeave.id,
+        userId: updatedLeave.user_id,
+        departmentId: updatedLeave.department_id,
+        status: updatedLeave.status,
         timestamp: new Date().toISOString()
       });
     }

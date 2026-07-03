@@ -9,6 +9,10 @@ const logger_1 = require("../utils/logger");
 const auth_1 = require("../middleware/auth");
 const router = express_1.default.Router();
 exports.syncRoutes = router;
+// 允許離線同步操作的資料表白名單——防止 table 名稱字串注入與跨表提權
+// （例如帶 table:'users' + resolvedData:{role:'BOSS'} 把自己升級成 BOSS）。
+// 目前離線同步的寫入邏輯本來就只處理 tasks，白名單不會減少任何既有功能。
+const SYNC_ALLOWED_TABLES = new Set(['tasks']);
 // GET /api/sync/status - 獲取同步狀態
 router.get('/status', auth_1.authenticateToken, async (req, res) => {
     try {
@@ -55,6 +59,11 @@ router.post('/upload', auth_1.authenticateToken, async (req, res) => {
                 for (const change of changes) {
                     try {
                         const { table, recordId, data, version, timestamp } = change;
+                        // 只允許白名單資料表，擋掉任意 table 名稱注入/探測
+                        if (!SYNC_ALLOWED_TABLES.has(table)) {
+                            results.errors.push({ recordId, error: `不允許同步資料表: ${table}` });
+                            continue;
+                        }
                         // 檢查記錄是否存在及版本
                         const existingRecord = db.get(`SELECT * FROM ${table} WHERE id = ?`, [recordId]);
                         if (!existingRecord) {
@@ -240,6 +249,11 @@ router.post('/resolve', auth_1.authenticateToken, async (req, res) => {
         }
         if (!['local', 'remote', 'merge'].includes(strategy)) {
             return res.status(400).json({ error: '無效的解決策略' });
+        }
+        // 只允許白名單資料表，擋掉任意 table 名稱注入/跨表提權
+        // （table 若非 'tasks'，下方的權限檢查會被跳過——這正是原本的提權漏洞）
+        if (!SYNC_ALLOWED_TABLES.has(table)) {
+            return res.status(403).json({ error: '不允許同步此資料表' });
         }
         // 獲取現有記錄
         const existingRecord = await db.get(`SELECT * FROM ${table} WHERE id = ?`, [recordId]);

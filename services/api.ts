@@ -262,7 +262,7 @@ const RealApi = {
     create: (task: Task) => request<Task>('POST', '/tasks', task),
     update: (task: Task) => request<Task>('PUT', `/tasks/${task.id}`, task),
     updateProgress: (id: string, updates: Partial<Task>) =>
-      request<void>('PATCH', `/tasks/${id}`, updates),
+      request<void>('PUT', `/tasks/${id}`, updates),
     accept: (id: string) => request<{ task: any }>('POST', `/tasks/${id}/accept`, {}),
     delete: (id: string) => request<void>('DELETE', `/tasks/${id}`),
     timelineImages: {
@@ -825,11 +825,12 @@ const RealApi = {
   },
   system: {
     resetFactoryDefault: async (): Promise<void> => {
-      await delay(1000);
+      // 真的呼叫後端恢復原廠（BOSS-only；後端會清空所有資料表並重建預設部門）。
+      // 清空後 users 表為空，下次載入會進入 SetupPage 讓管理員重新建立帳號。
+      await request<{ success: boolean; message: string }>('POST', '/system/reset-factory');
+      // 自己的帳號已被刪除、token 失效，清掉本機殘留登入/快取狀態
+      localStorage.removeItem('auth_token');
       localStorage.removeItem(STORAGE_KEY);
-      // Reset in-memory
-      MOCK_DB.users = [];
-      // ... reset others
     },
     exportData: async (): Promise<string> => {
       await delay();
@@ -1114,7 +1115,7 @@ const RealApi = {
       paymentDate: string;
       notes?: string;
     }): Promise<any> => {
-      return request<any>('POST', `/kol/profiles/${data.kolId}/payments`, data);
+      return request<any>('POST', '/kol/payments', data);
     },
     updateKolPayment: async (paymentId: string, data: any): Promise<any> => {
       return request<any>('PUT', `/kol/payments/${paymentId}`, data);
@@ -1129,10 +1130,10 @@ const RealApi = {
       return request<any>('GET', `/kol/payment-stats${qs ? '?' + qs : ''}`);
     },
     importExcel: async (data: any[]): Promise<any> => {
-      return request<any>('POST', '/kol/import', { profiles: data });
+      return request<any>('POST', '/kol/import-excel', { data });
     },
     exportExcel: async (): Promise<{ profiles: any[] }> => {
-      return request<{ profiles: any[] }>('GET', '/kol/export');
+      return request<{ profiles: any[] }>('GET', '/kol/export-excel');
     },
   },
   aiAssistant: {

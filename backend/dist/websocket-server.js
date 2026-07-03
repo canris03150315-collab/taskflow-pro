@@ -1,5 +1,7 @@
 // WebSocket Server for Real-time Updates (Pure ASCII with Unicode Escape)
 const WebSocket = require('ws');
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 class ChatWebSocketServer {
     constructor(httpServer) {
@@ -26,14 +28,25 @@ class ChatWebSocketServer {
                 const message = JSON.parse(data.toString());
 
                 if (message.type === 'AUTH') {
-                    userId = message.payload?.userId || message.userId;
-                    this.clients.set(userId, ws);
-                    console.log(`\u2705 \u7528\u6236 ${userId} \u5DF2\u9023\u63A5`);
-                    
-                    ws.send(JSON.stringify({
-                        type: 'AUTH_SUCCESS',
-                        message: '\u9023\u63A5\u6210\u529F'
-                    }));
+                    // \u9A57\u8B49 JWT\uFF1AuserId \u4E00\u5F8B\u53D6\u81EA token payload\uFF0C\u7D55\u4E0D\u63A1\u4FE1 client \u81EA\u5831\u503C\uFF08\u9632\u5192\u540D\u7ACA\u807D\uFF09
+                    const token = message.payload?.token || message.token;
+                    try {
+                        const decoded = jwt.verify(token, JWT_SECRET);
+                        userId = decoded.id;
+                        this.clients.set(userId, ws);
+                        console.log(`\u2705 \u7528\u6236 ${userId} \u5DF2\u9A57\u8B49\u9023\u63A5`);
+                        ws.send(JSON.stringify({
+                            type: 'AUTH_SUCCESS',
+                            message: '\u9023\u63A5\u6210\u529F'
+                        }));
+                    } catch (err) {
+                        console.warn('WebSocket AUTH \u9A57\u8B49\u5931\u6557:', err.message);
+                        ws.send(JSON.stringify({
+                            type: 'AUTH_FAILED',
+                            message: '\u8A8D\u8B49\u5931\u6557'
+                        }));
+                        ws.close(1008, 'AUTH failed');
+                    }
                 } else if (message.type === 'PING') {
                     ws.send(JSON.stringify({ type: 'PONG' }));
                 }

@@ -74,7 +74,15 @@ const STATUS_TRANSITIONS = {
     ["已指派"]: ["進行中", "已取消"],
     ["進行中"]: ["已完成", "已取消"],
     ["已完成"]: [], // 完成狀態不可更改
-    ["已取消"]: [] // 取消狀態不可更改
+    ["已取消"]: ["待接取"] // 允許「重新開啟」已取消的任務回到待接取（對應前端 reopen）
+};
+// 前端 cancel/reopen 送的是英文 TaskStatus（Open/Cancelled），但 DB 與狀態機用中文——正規化避免比對失敗
+const STATUS_EN_TO_CN = {
+    'Open': '待接取',
+    'Assigned': '已指派',
+    'In Progress': '進行中',
+    'Completed': '已完成',
+    'Cancelled': '已取消'
 };
 // GET /api/tasks - 獲取任務列表
 router.get('/', auth_1.authenticateToken, async (req, res) => {
@@ -333,7 +341,9 @@ router.put('/:id', auth_1.authenticateToken, async (req, res) => {
         const db = req.db;
         const currentUser = req.user;
         const { id } = req.params;
-        const { title, description, urgency, deadline, assigned_to_user_id, assigned_to_department, status, progress, is_offline, note, is_archived } = req.body;
+        const { title, description, urgency, deadline, assigned_to_user_id, assigned_to_department, status: rawStatus, progress, is_offline, note, is_archived } = req.body;
+        // 把傳入的狀態正規化成後端使用的中文值（英文 enum → 中文；已是中文則原樣保留）
+        const status = rawStatus !== undefined ? (STATUS_EN_TO_CN[rawStatus] || rawStatus) : undefined;
         // 獲取現有任務
         const existingTask = await db.get('SELECT * FROM tasks WHERE id = ?', [id]);
         if (!existingTask) {
@@ -348,13 +358,16 @@ router.put('/:id', auth_1.authenticateToken, async (req, res) => {
         if (!canEdit) {
             return res.status(403).json({ error: '無權編輯此任務' });
         }
-        // 檢查狀態轉換
-        if (status && status !== existingTask.status) {
-            const allowedTransitions = STATUS_TRANSITIONS[existingTask.status];
-            if (!allowedTransitions.includes(status)) {
-                return res.status(400).json({
-                    error: `無法從 ${existingTask.status} 狀態變更為 ${status}`
-                });
+        // 檢查狀態轉換（兩邊都正規化成中文再比對，並防呆未知狀態不致 crash）
+        if (status !== undefined) {
+            const existingStatusCN = STATUS_EN_TO_CN[existingTask.status] || existingTask.status;
+            if (status !== existingStatusCN) {
+                const allowedTransitions = STATUS_TRANSITIONS[existingStatusCN] || [];
+                if (!allowedTransitions.includes(status)) {
+                    return res.status(400).json({
+                        error: `無法從 ${existingStatusCN} 狀態變更為 ${status}`
+                    });
+                }
             }
         }
         // 構建更新語句
