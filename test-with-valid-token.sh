@@ -7,7 +7,7 @@ echo ""
 echo "Step 1: Login to get token..."
 LOGIN_RESPONSE=$(curl -s -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"boss","password":"boss123"}')
+  -d '{"username":"boss","password":"REDACTED-PW-ROTATE-ME"}')
 
 echo "Login response: $LOGIN_RESPONSE"
 

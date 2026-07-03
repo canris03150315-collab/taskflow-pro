@@ -14,7 +14,7 @@ async function api(token, method, path, body) {
 (async () => {
   console.log('=== WebSocket Realtime Test ===\n');
 
-  const login = await api(null, 'POST', '/api/auth/login', { username: 'canris', password: 'kico123123' });
+  const login = await api(null, 'POST', '/api/auth/login', { username: 'canris', password: 'REDACTED-PW-ROTATE-ME' });
   const token = login.data.token;
   const userId = login.data.user.id;
   console.log('Logged in.');

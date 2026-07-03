@@ -21,7 +21,7 @@ try {
   console.log('- Password hash length:', user.password ? user.password.length : 0);
   
   // Test password verification
-  const testPassword = 'kico123123';
+  const testPassword = 'REDACTED-PW-ROTATE-ME';
   console.log('\nTesting password verification...');
   
   try {

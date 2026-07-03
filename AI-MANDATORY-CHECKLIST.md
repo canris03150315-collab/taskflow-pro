@@ -40,7 +40,7 @@
 - Docker 映像: `taskflow-pro:v8.9.191-backup-api-path-fixed`
 - 容器 ID: `689732b10678`
 - 伺服器: root@165.227.147.40
-- SSH 密碼: j7WW03n4emoh
+- SSH 密碼: REDACTED-ROOT-PW-ROTATE-ME
 
 **最後更新**: 檢查 `WORK_LOG_CURRENT.md` 第 3 行
 

@@ -44,7 +44,7 @@ docker run -d \
   -p 3000:3000 \
   -p 3001:3001 \
   -e PORT=3000 \
-  -e GEMINI_API_KEY=AIzaSyC6pLVQnosilci4Oe-Yl0yLhLxrRFOPRLLk \
+  -e GEMINI_API_KEY=REDACTED-GEMINI-KEY-ROTATE-MEk \
   -v /root/taskflow-data:/app/data \
   -v /root/taskflow-backups:/app/data/backups:ro \
   --restart unless-stopped \

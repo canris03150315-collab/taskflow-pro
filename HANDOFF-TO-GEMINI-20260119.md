@@ -27,7 +27,7 @@
   - 伺服器: root@165.227.147.40
   - 容器名稱: `taskflow-pro`
   - 當前版本: `taskflow-pro:v8.9.136-ai-temp-disabled`
-  - SSH 密碼: `j7WW03n4emoh`
+  - SSH 密碼: `REDACTED-ROOT-PW-ROTATE-ME`
 
 ### 關鍵規則（必須遵守）
 1. **後端路由必須 Pure ASCII**：中文使用 Unicode Escape
@@ -74,7 +74,7 @@ CREATE TABLE ai_conversations (
 #### 3. 環境變數設置
 已在容器中設置：
 ```bash
-GEMINI_API_KEY=AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI
+GEMINI_API_KEY=REDACTED-GEMINI-KEY-ROTATE-ME
 ```
 
 #### 4. Git 版本控制
@@ -99,12 +99,12 @@ GEMINI_API_KEY=AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI
 2. ✅ 設置計費帳戶
 3. ✅ 修改 API Key 限制為「無」
 4. ✅ 等待 5+ 分鐘讓 Key 生效
-5. ✅ 創建新的 API Key：`AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI`
+5. ✅ 創建新的 API Key：`REDACTED-GEMINI-KEY-ROTATE-ME`
 6. ✅ 測試不同的 API endpoint 和模型
 7. ❌ **所有方法都失敗**
 
 ### API Key 詳情
-- **API Key**: `AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI`
+- **API Key**: `REDACTED-GEMINI-KEY-ROTATE-ME`
 - **專案**: task pro (gen-lang-client-0130697287)
 - **專案編號**: 573459402239
 - **狀態**: AI Studio 可用，但程式調用返回 `API_KEY_INVALID`
@@ -261,7 +261,7 @@ dbCall(db, 'prepare', ...).all(...);  // ❌
 ### 伺服器登入
 - **主機**: 165.227.147.40
 - **用戶**: root
-- **密碼**: j7WW03n4emoh
+- **密碼**: REDACTED-ROOT-PW-ROTATE-ME
 - **容器**: taskflow-pro
 
 ### Git Repository
@@ -272,7 +272,7 @@ dbCall(db, 'prepare', ...).all(...);  // ❌
 ### Gemini API
 - **Console**: https://console.cloud.google.com/apis/credentials?project=573459402239
 - **AI Studio**: https://aistudio.google.com
-- **API Key**: AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI
+- **API Key**: REDACTED-GEMINI-KEY-ROTATE-ME
 
 ---
 
@@ -284,7 +284,7 @@ dbCall(db, 'prepare', ...).all(...);  // ❌
 ssh root@165.227.147.40 "docker stop taskflow-pro && docker rm taskflow-pro"
 
 # 啟動暫時停用版本
-ssh root@165.227.147.40 "docker run -d --name taskflow-pro -p 3000-3001:3000-3001 -v /root/taskflow-data:/app/data -e GEMINI_API_KEY=AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI taskflow-pro:v8.9.136-ai-temp-disabled"
+ssh root@165.227.147.40 "docker run -d --name taskflow-pro -p 3000-3001:3000-3001 -v /root/taskflow-data:/app/data -e GEMINI_API_KEY=REDACTED-GEMINI-KEY-ROTATE-ME taskflow-pro:v8.9.136-ai-temp-disabled"
 ```
 
 ---

@@ -6,7 +6,7 @@ async function testLogin() {
         const db = new Database('/app/data/taskflow.db');
         
         const username = 'canris';
-        const password = 'kico123123';
+        const password = 'REDACTED-PW-ROTATE-ME';
         
         console.log('1. Fetching user...');
         const userRow = db.prepare('SELECT * FROM users WHERE username = ?').get(username);

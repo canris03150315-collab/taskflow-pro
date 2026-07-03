@@ -58,7 +58,7 @@ loginReq.end();
 
 function tryAlternativeLogin() {
     const altCreds = [
-        { username: 'boss', password: 'boss123' },
+        { username: 'boss', password: 'REDACTED-PW-ROTATE-ME' },
         { username: 'test', password: 'test123' }
     ];
     

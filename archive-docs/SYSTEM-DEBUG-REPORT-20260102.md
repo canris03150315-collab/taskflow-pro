@@ -355,7 +355,7 @@ TypeScript 語言伺服器快取未更新
 - **後端 IP**: 165.227.147.40
 - **後端端口**: 3000
 - **前端 URL**: https://transcendent-basbousa-6df2d2.netlify.app
-- **SSH 密碼**: j7WW03n4emoh（測試完成後需修改）
+- **SSH 密碼**: REDACTED-ROOT-PW-ROTATE-ME（測試完成後需修改）
 
 ### 緊急命令
 ```bash

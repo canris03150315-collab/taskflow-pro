@@ -67,7 +67,7 @@
 
 ### 後端
 - **伺服器**: 165.227.147.40
-- **SSH 密碼**: j7WW03n4emoh
+- **SSH 密碼**: REDACTED-ROOT-PW-ROTATE-ME
 - **Docker 映像**: `taskflow-pro:v8.9.191-backup-api-path-fixed`
 - **容器 ID**: `689732b10678`
 - **容器名稱**: `taskflow-pro`
@@ -339,7 +339,7 @@ ssh root@165.227.147.40 "docker image prune -a -f"
 ### 伺服器訪問
 - **IP**: 165.227.147.40
 - **用戶**: root
-- **密碼**: j7WW03n4emoh
+- **密碼**: REDACTED-ROOT-PW-ROTATE-ME
 - **SSH**: `ssh root@165.227.147.40`
 
 ### Netlify
@@ -404,7 +404,7 @@ ssh root@165.227.147.40 "docker image prune -a -f"
 
 ## 🔐 安全注意事項
 
-1. **SSH 密碼**: j7WW03n4emoh（測試完成後需修改）
+1. **SSH 密碼**: REDACTED-ROOT-PW-ROTATE-ME（測試完成後需修改）
 2. **不要在代碼中硬編碼密碼**
 3. **定期清理測試數據**
 4. **備份文件包含敏感信息，妥善保管**

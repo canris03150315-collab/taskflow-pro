@@ -6,7 +6,7 @@ console.log('Step 1: Login to get valid token...');
 
 const loginData = JSON.stringify({
     username: 'boss',
-    password: 'boss123'
+    password: 'REDACTED-PW-ROTATE-ME'
 });
 
 const loginOptions = {

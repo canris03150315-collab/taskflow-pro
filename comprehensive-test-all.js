@@ -6,14 +6,16 @@ let token = '';
 const results = {
   passed: [],
   failed: [],
-  warnings: []
+  warnings: [],
 };
 
 function makeRequest(options, data = null) {
   return new Promise((resolve, reject) => {
     const req = http.request(options, (res) => {
       let responseData = '';
-      res.on('data', (chunk) => { responseData += chunk; });
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
       res.on('end', () => {
         resolve({ statusCode: res.statusCode, data: responseData });
       });
@@ -28,29 +30,32 @@ async function testLogin() {
   console.log('1. Testing Login & Authentication...');
   const loginData = JSON.stringify({
     username: 'canris',
-    password: 'kico123123'
+    password: 'REDACTED-PW-ROTATE-ME',
   });
-  
-  const res = await makeRequest({
-    hostname: 'localhost',
-    port: 3001,
-    path: '/api/auth/login',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': loginData.length
-    }
-  }, loginData);
-  
+
+  const res = await makeRequest(
+    {
+      hostname: 'localhost',
+      port: 3001,
+      path: '/api/auth/login',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': loginData.length,
+      },
+    },
+    loginData
+  );
+
   if (res.statusCode === 200) {
     const response = JSON.parse(res.data);
     token = response.token;
-    
+
     if (!response.user || !response.user.role || !response.user.id) {
       results.failed.push('Login: Missing critical user fields');
       return false;
     }
-    
+
     results.passed.push('Login: Complete user info with role');
     console.log('   [PASS] Login successful\n');
     return true;
@@ -62,16 +67,16 @@ async function testLogin() {
 
 async function testUsersAPIComplete() {
   console.log('2. Testing Users API (All Refactored Routes)...');
-  
+
   // Test GET /api/users
   const getAllRes = await makeRequest({
     hostname: 'localhost',
     port: 3001,
     path: '/api/users',
     method: 'GET',
-    headers: { 'Authorization': 'Bearer ' + token }
+    headers: { Authorization: 'Bearer ' + token },
   });
-  
+
   if (getAllRes.statusCode === 200) {
     const users = JSON.parse(getAllRes.data);
     if (Array.isArray(users) && users.length > 0) {
@@ -85,16 +90,16 @@ async function testUsersAPIComplete() {
     results.failed.push('Users GET /: Status ' + getAllRes.statusCode);
     console.log('   [FAIL] GET /api/users - Status ' + getAllRes.statusCode);
   }
-  
+
   // Test GET /api/users/:id
   const getByIdRes = await makeRequest({
     hostname: 'localhost',
     port: 3001,
     path: '/api/users/admin-1767449914767',
     method: 'GET',
-    headers: { 'Authorization': 'Bearer ' + token }
+    headers: { Authorization: 'Bearer ' + token },
   });
-  
+
   if (getByIdRes.statusCode === 200) {
     results.passed.push('Users GET /:id: Works correctly');
     console.log('   [PASS] GET /api/users/:id');
@@ -102,16 +107,16 @@ async function testUsersAPIComplete() {
     results.failed.push('Users GET /:id: Status ' + getByIdRes.statusCode);
     console.log('   [FAIL] GET /api/users/:id');
   }
-  
+
   // Test GET /api/users/department/:departmentId
   const getByDeptRes = await makeRequest({
     hostname: 'localhost',
     port: 3001,
     path: '/api/users/department/Management',
     method: 'GET',
-    headers: { 'Authorization': 'Bearer ' + token }
+    headers: { Authorization: 'Bearer ' + token },
   });
-  
+
   if (getByDeptRes.statusCode === 200) {
     const users = JSON.parse(getByDeptRes.data);
     if (Array.isArray(users)) {
@@ -125,63 +130,69 @@ async function testUsersAPIComplete() {
     results.failed.push('Users GET /department/:id: Status ' + getByDeptRes.statusCode);
     console.log('   [FAIL] GET /api/users/department/:departmentId');
   }
-  
+
   // Test PUT /api/users/:id (update)
   const updateData = JSON.stringify({
-    name: 'Seven Test'
+    name: 'Seven Test',
   });
-  
-  const updateRes = await makeRequest({
-    hostname: 'localhost',
-    port: 3001,
-    path: '/api/users/admin-1767449914767',
-    method: 'PUT',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json',
-      'Content-Length': updateData.length
-    }
-  }, updateData);
-  
-  if (updateRes.statusCode === 200) {
-    results.passed.push('Users PUT /:id: Updates correctly');
-    console.log('   [PASS] PUT /api/users/:id');
-    
-    // Restore original name
-    const restoreData = JSON.stringify({ name: 'Seven' });
-    await makeRequest({
+
+  const updateRes = await makeRequest(
+    {
       hostname: 'localhost',
       port: 3001,
       path: '/api/users/admin-1767449914767',
       method: 'PUT',
       headers: {
-        'Authorization': 'Bearer ' + token,
+        Authorization: 'Bearer ' + token,
         'Content-Type': 'application/json',
-        'Content-Length': restoreData.length
-      }
-    }, restoreData);
+        'Content-Length': updateData.length,
+      },
+    },
+    updateData
+  );
+
+  if (updateRes.statusCode === 200) {
+    results.passed.push('Users PUT /:id: Updates correctly');
+    console.log('   [PASS] PUT /api/users/:id');
+
+    // Restore original name
+    const restoreData = JSON.stringify({ name: 'Seven' });
+    await makeRequest(
+      {
+        hostname: 'localhost',
+        port: 3001,
+        path: '/api/users/admin-1767449914767',
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Content-Length': restoreData.length,
+        },
+      },
+      restoreData
+    );
   } else {
     results.failed.push('Users PUT /:id: Status ' + updateRes.statusCode);
     console.log('   [FAIL] PUT /api/users/:id');
   }
-  
+
   console.log('');
 }
 
 async function testFinanceAPIComplete() {
   console.log('3. Testing Finance API (All CRUD Operations)...');
-  
+
   let testRecordId = '';
-  
+
   // Test GET /api/finance
   const getAllRes = await makeRequest({
     hostname: 'localhost',
     port: 3001,
     path: '/api/finance',
     method: 'GET',
-    headers: { 'Authorization': 'Bearer ' + token }
+    headers: { Authorization: 'Bearer ' + token },
   });
-  
+
   if (getAllRes.statusCode === 200) {
     const response = JSON.parse(getAllRes.data);
     if (response.records && Array.isArray(response.records)) {
@@ -195,32 +206,35 @@ async function testFinanceAPIComplete() {
     results.failed.push('Finance GET /: Status ' + getAllRes.statusCode);
     console.log('   [FAIL] GET /api/finance');
   }
-  
+
   // Test POST /api/finance
   const createData = JSON.stringify({
     type: 'EXPENSE',
     amount: 5000,
     description: 'Comprehensive test',
     category: 'OTHER',
-    date: '2026-01-29'
+    date: '2026-01-29',
   });
-  
-  const createRes = await makeRequest({
-    hostname: 'localhost',
-    port: 3001,
-    path: '/api/finance',
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json',
-      'Content-Length': createData.length
-    }
-  }, createData);
-  
+
+  const createRes = await makeRequest(
+    {
+      hostname: 'localhost',
+      port: 3001,
+      path: '/api/finance',
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        'Content-Length': createData.length,
+      },
+    },
+    createData
+  );
+
   if (createRes.statusCode === 200) {
     const record = JSON.parse(createRes.data);
     testRecordId = record.id;
-    
+
     if (record.amount === 5000) {
       results.passed.push('Finance POST /: Amount correct (防禦性編程有效)');
       console.log('   [PASS] POST /api/finance - Amount: ' + record.amount);
@@ -232,26 +246,29 @@ async function testFinanceAPIComplete() {
     results.failed.push('Finance POST /: Status ' + createRes.statusCode);
     console.log('   [FAIL] POST /api/finance');
   }
-  
+
   if (testRecordId) {
     // Test PUT /api/finance/:id
     const updateData = JSON.stringify({
       amount: 6000,
-      description: 'Updated test'
+      description: 'Updated test',
     });
-    
-    const updateRes = await makeRequest({
-      hostname: 'localhost',
-      port: 3001,
-      path: '/api/finance/' + testRecordId,
-      method: 'PUT',
-      headers: {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json',
-        'Content-Length': updateData.length
-      }
-    }, updateData);
-    
+
+    const updateRes = await makeRequest(
+      {
+        hostname: 'localhost',
+        port: 3001,
+        path: '/api/finance/' + testRecordId,
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          'Content-Type': 'application/json',
+          'Content-Length': updateData.length,
+        },
+      },
+      updateData
+    );
+
     if (updateRes.statusCode === 200) {
       const updated = JSON.parse(updateRes.data);
       if (updated.amount === 6000) {
@@ -265,16 +282,16 @@ async function testFinanceAPIComplete() {
       results.failed.push('Finance PUT /:id: Status ' + updateRes.statusCode);
       console.log('   [FAIL] PUT /api/finance/:id');
     }
-    
+
     // Test DELETE /api/finance/:id
     const deleteRes = await makeRequest({
       hostname: 'localhost',
       port: 3001,
       path: '/api/finance/' + testRecordId,
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token }
+      headers: { Authorization: 'Bearer ' + token },
     });
-    
+
     if (deleteRes.statusCode === 200) {
       results.passed.push('Finance DELETE /:id: Works correctly (修復後)');
       console.log('   [PASS] DELETE /api/finance/:id');
@@ -283,13 +300,13 @@ async function testFinanceAPIComplete() {
       console.log('   [FAIL] DELETE /api/finance/:id');
     }
   }
-  
+
   console.log('');
 }
 
 async function testLeavesPermissions() {
   console.log('4. Testing Leaves Delete Permissions (New Feature)...');
-  
+
   // Create a test leave
   const createData = JSON.stringify({
     leave_type: 'ANNUAL',
@@ -298,34 +315,37 @@ async function testLeavesPermissions() {
     start_period: 'FULL',
     end_period: 'FULL',
     days: 3,
-    reason: 'Permission test'
+    reason: 'Permission test',
   });
-  
-  const createRes = await makeRequest({
-    hostname: 'localhost',
-    port: 3001,
-    path: '/api/leaves',
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type': 'application/json',
-      'Content-Length': createData.length
-    }
-  }, createData);
-  
+
+  const createRes = await makeRequest(
+    {
+      hostname: 'localhost',
+      port: 3001,
+      path: '/api/leaves',
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        'Content-Length': createData.length,
+      },
+    },
+    createData
+  );
+
   if (createRes.statusCode === 200) {
     const leave = JSON.parse(createRes.data);
     console.log('   [PASS] POST /api/leaves - Created: ' + leave.id);
-    
+
     // Test DELETE with BOSS permission (new feature)
     const deleteRes = await makeRequest({
       hostname: 'localhost',
       port: 3001,
       path: '/api/leaves/' + leave.id,
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token }
+      headers: { Authorization: 'Bearer ' + token },
     });
-    
+
     if (deleteRes.statusCode === 200) {
       results.passed.push('Leaves: BOSS can delete (新權限正常)');
       console.log('   [PASS] DELETE /api/leaves/:id - BOSS permission works');
@@ -337,27 +357,27 @@ async function testLeavesPermissions() {
     results.warnings.push('Leaves: Cannot create test leave');
     console.log('   [WARN] Cannot create test leave');
   }
-  
+
   console.log('');
 }
 
 async function testSchedulesAPI() {
   console.log('5. Testing Schedules API...');
-  
+
   const getAllRes = await makeRequest({
     hostname: 'localhost',
     port: 3001,
     path: '/api/schedules',
     method: 'GET',
-    headers: { 'Authorization': 'Bearer ' + token }
+    headers: { Authorization: 'Bearer ' + token },
   });
-  
+
   if (getAllRes.statusCode === 200) {
     const schedules = JSON.parse(getAllRes.data);
     results.passed.push('Schedules: GET works correctly');
     console.log('   [PASS] GET /api/schedules - ' + schedules.length + ' schedules');
-    
-    const approvedSchedules = schedules.filter(s => s.status === 'APPROVED');
+
+    const approvedSchedules = schedules.filter((s) => s.status === 'APPROVED');
     if (approvedSchedules.length > 0) {
       results.passed.push('Schedules: APPROVED schedules exist');
       console.log('   [INFO] ' + approvedSchedules.length + ' APPROVED schedules available');
@@ -366,22 +386,22 @@ async function testSchedulesAPI() {
     results.failed.push('Schedules: GET failed');
     console.log('   [FAIL] GET /api/schedules');
   }
-  
+
   console.log('');
 }
 
 async function testErrorHandling() {
   console.log('6. Testing Error Handling...');
-  
+
   // Test invalid user ID
   const invalidUserRes = await makeRequest({
     hostname: 'localhost',
     port: 3001,
     path: '/api/users/invalid-id-12345',
     method: 'GET',
-    headers: { 'Authorization': 'Bearer ' + token }
+    headers: { Authorization: 'Bearer ' + token },
   });
-  
+
   if (invalidUserRes.statusCode === 404) {
     results.passed.push('Error: Returns 404 for invalid user ID');
     console.log('   [PASS] Invalid user ID returns 404');
@@ -389,16 +409,16 @@ async function testErrorHandling() {
     results.warnings.push('Error: Unexpected status for invalid user ID');
     console.log('   [WARN] Invalid user ID returns ' + invalidUserRes.statusCode);
   }
-  
+
   // Test invalid finance ID
   const invalidFinanceRes = await makeRequest({
     hostname: 'localhost',
     port: 3001,
     path: '/api/finance/invalid-id-12345',
     method: 'DELETE',
-    headers: { 'Authorization': 'Bearer ' + token }
+    headers: { Authorization: 'Bearer ' + token },
   });
-  
+
   if (invalidFinanceRes.statusCode === 404 || invalidFinanceRes.statusCode === 500) {
     results.passed.push('Error: Handles invalid finance ID');
     console.log('   [PASS] Invalid finance ID handled');
@@ -406,7 +426,7 @@ async function testErrorHandling() {
     results.warnings.push('Error: Unexpected status for invalid finance ID');
     console.log('   [WARN] Invalid finance ID returns ' + invalidFinanceRes.statusCode);
   }
-  
+
   console.log('');
 }
 
@@ -417,36 +437,41 @@ async function runTests() {
       console.log('\n[CRITICAL] Login failed, cannot continue\n');
       return;
     }
-    
+
     await testUsersAPIComplete();
     await testFinanceAPIComplete();
     await testLeavesPermissions();
     await testSchedulesAPI();
     await testErrorHandling();
-    
+
     console.log('=== Comprehensive Test Results ===\n');
-    
+
     console.log('PASSED (' + results.passed.length + '):');
-    results.passed.forEach(p => console.log('  [PASS] ' + p));
-    
+    results.passed.forEach((p) => console.log('  [PASS] ' + p));
+
     if (results.warnings.length > 0) {
       console.log('\nWARNINGS (' + results.warnings.length + '):');
-      results.warnings.forEach(w => console.log('  [WARN] ' + w));
+      results.warnings.forEach((w) => console.log('  [WARN] ' + w));
     }
-    
+
     if (results.failed.length > 0) {
       console.log('\nFAILED (' + results.failed.length + '):');
-      results.failed.forEach(f => console.log('  [FAIL] ' + f));
+      results.failed.forEach((f) => console.log('  [FAIL] ' + f));
       console.log('\n[CRITICAL] Found ' + results.failed.length + ' issues!');
     } else {
       console.log('\n[SUCCESS] All tests passed!');
       console.log('No other issues found.');
     }
-    
-    console.log('\nTotal: ' + results.passed.length + ' passed, ' + 
-                results.warnings.length + ' warnings, ' + 
-                results.failed.length + ' failed');
-    
+
+    console.log(
+      '\nTotal: ' +
+        results.passed.length +
+        ' passed, ' +
+        results.warnings.length +
+        ' warnings, ' +
+        results.failed.length +
+        ' failed'
+    );
   } catch (error) {
     console.error('\n[ERROR] Test execution failed:', error.message);
   }

@@ -21,7 +21,7 @@ console.log('User found:', {
 });
 
 // Test password
-const testPassword = 'kico123123';
+const testPassword = 'REDACTED-PW-ROTATE-ME';
 const isValid = bcrypt.compareSync(testPassword, user.password);
 
 console.log('Password test result:', isValid ? 'VALID' : 'INVALID');

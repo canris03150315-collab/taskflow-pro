@@ -5,7 +5,7 @@ console.log('=== Testing GET /api/users ===');
 // Test credentials (from WORK_LOG_CURRENT.md)
 const testLogin = {
   username: 'canris',
-  password: 'kico123123'
+  password: 'REDACTED-PW-ROTATE-ME'
 };
 
 // Step 1: Login to get token

@@ -18,7 +18,7 @@ console.log('Hash length:', user.password ? user.password.length : 0);
 console.log('Hash starts with $2b$:', user.password ? user.password.startsWith('$2b$') : false);
 
 // Test password verification
-bcrypt.compare('kico123123', user.password).then(isValid => {
+bcrypt.compare('REDACTED-PW-ROTATE-ME', user.password).then(isValid => {
     console.log('Password verification result:', isValid);
     db.close();
     if (!isValid) {

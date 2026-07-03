@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const GEMINI_API_KEY = 'AIzaSyC6R9gl7hIepi-DhaApDD9m0p2sDpcv0hw';
+const GEMINI_API_KEY = 'REDACTED-GEMINI-KEY-ROTATE-ME';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 async function testGeminiAPI() {

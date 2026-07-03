@@ -10,7 +10,7 @@ Write-Host "Done"
 Write-Host ""
 
 Write-Host "Step 2: Upload and execute..."
-Write-Host "Password: j7WW03n4emoh"
+Write-Host "Password: REDACTED-ROOT-PW-ROTATE-ME"
 Write-Host ""
 
 scp fix.sh root@165.227.147.40:/tmp/fix.sh

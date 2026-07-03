@@ -5,7 +5,7 @@
 
 ## 新 Token 資訊
 - Token Name: GitHub Actions Deploy - All Sites
-- Token Value: `nfp_aNaFU9SgN37WHMnRLffCyD3ZE8CBMYg7H3e`
+- Token Value: `REDACTED-NETLIFY-PAT-ROTATE-ME`
 - Expiration: Never
 - Access: All sites (包含 transcendent-basbousa-6df2d2)
 
@@ -20,7 +20,7 @@
 2. 點擊右側的 **Update** 按鈕（鉛筆圖標）
 3. 在 **Value** 欄位中：
    - 清除舊的 Token 值
-   - 貼上新的 Token：`nfp_aNaFU9SgN37WHMnRLffCyD3ZE8CBMYg7H3e`
+   - 貼上新的 Token：`REDACTED-NETLIFY-PAT-ROTATE-ME`
 4. 點擊 **Update secret** 按鈕保存
 
 ### 步驟 3：確認更新成功

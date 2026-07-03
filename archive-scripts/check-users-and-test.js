@@ -7,7 +7,7 @@ console.log('=== Checking Users and Testing API ===\n');
 
 const credentials = [
     { username: 'admin', password: 'admin123' },
-    { username: 'boss', password: 'boss123' },
+    { username: 'boss', password: 'REDACTED-PW-ROTATE-ME' },
     { username: 'test', password: 'test123' }
 ];
 

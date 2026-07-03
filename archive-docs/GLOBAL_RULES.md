@@ -171,7 +171,7 @@ scp file.js root@host:/path/  # 會要求密碼
 ## 🔐 安全規則
 
 ### 密碼和密鑰
-- SSH 密碼: j7WW03n4emoh（測試完成後必須修改）
+- SSH 密碼: REDACTED-ROOT-PW-ROTATE-ME（測試完成後必須修改）
 - 不要在代碼中硬編碼密碼
 - 使用環境變數或配置文件
 

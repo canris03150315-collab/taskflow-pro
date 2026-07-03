@@ -4,7 +4,7 @@ console.log('=== Testing GET /api/users/:id ===');
 
 const testLogin = {
   username: 'canris',
-  password: 'kico123123'
+  password: 'REDACTED-PW-ROTATE-ME'
 };
 
 // Step 1: Login

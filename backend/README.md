@@ -26,7 +26,7 @@ TaskFlow-Backend-Transfer/
 ## 🔑 重要環境變數
 
 已包含在 .env 檔案中：
-- GEMINI_API_KEY: AIzaSyC6pLVQnosilci4Oe-Yl0yLhLxrRFOPRLLk
+- GEMINI_API_KEY: REDACTED-GEMINI-KEY-ROTATE-MEk
 - PORT: 3000
 - NODE_ENV: production
 

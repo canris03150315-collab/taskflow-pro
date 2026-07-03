@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyC6R9gl7hIepi-DhaApDD9m0p2sDpcv0hw';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'REDACTED-GEMINI-KEY-ROTATE-ME';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
 
 function authenticateToken(req, res, next) {

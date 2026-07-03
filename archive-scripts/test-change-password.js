@@ -27,7 +27,7 @@ async function testChangePassword() {
         console.log('User ID:', user.id);
         
         // 4. 測試密碼驗證
-        const testPassword = 'kico123123';
+        const testPassword = 'REDACTED-PW-ROTATE-ME';
         const isValid = await bcrypt.compare(testPassword, user.password);
         console.log('Current password valid:', isValid);
         

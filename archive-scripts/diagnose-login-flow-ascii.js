@@ -6,7 +6,7 @@ async function testLogin() {
   return new Promise((resolve, reject) => {
     const loginData = JSON.stringify({
       username: 'canris',
-      password: 'kico123123'
+      password: 'REDACTED-PW-ROTATE-ME'
     });
 
     const options = {

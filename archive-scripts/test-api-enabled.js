@@ -2,7 +2,7 @@ const https = require('https');
 
 console.log('Checking if Generative Language API is properly enabled...\n');
 
-const apiKey = 'AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI';
+const apiKey = 'REDACTED-GEMINI-KEY-ROTATE-ME';
 
 // Try the v1 endpoint instead of v1beta
 console.log('Test 1: Using v1 endpoint...');

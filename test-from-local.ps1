@@ -1,5 +1,5 @@
 # 從本地 Windows 測試 API Key（不是從伺服器）
-$apiKey = "AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI"
+$apiKey = "REDACTED-GEMINI-KEY-ROTATE-ME"
 $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$apiKey"
 
 $body = @{

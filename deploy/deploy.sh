@@ -24,38 +24,30 @@
 
 set -e
 
-# --- Server registry (single source of truth) ---
-declare -A SERVER_IP=(
-  [alpha]="139.59.126.243"
-  [bravo]="139.59.119.156"
-  [charlie]="178.128.27.97"
-  [central]="178.128.90.19"
-)
+# --- Paths ---
+SOURCE_DIR="/c/Users/canri/Projects/Migrated_From_USB/公司內部"
+TEST_SCRIPT="/c/tmp/e2e-taskflow/run-all-tests.sh"
 
-declare -A SERVER_TOKEN=(
-  [alpha]="alpha-svc-token-2026-wukon"
-  [bravo]="bravo-svc-token-2026-wukon"
-  [charlie]="charlie-svc-token-2026-wukon"
-  [central]="central-svc-token-2026-wukon"
-)
+# --- 密鑰與伺服器清單：不寫死在此腳本，改從 deploy/.env.deploy 讀取 ---
+# 該檔已列入 .gitignore（不進版控）。需定義關聯陣列 SERVER_IP / SERVER_TOKEN /
+# SERVER_JWT 以及 GEMINI_KEY。範本見 deploy/.env.deploy.example。
+# 輪替密鑰時只改 .env.deploy，不動此腳本。
+SECRETS_FILE="$SOURCE_DIR/deploy/.env.deploy"
+if [ ! -f "$SECRETS_FILE" ]; then
+  echo "X 找不到密鑰檔：$SECRETS_FILE"
+  echo "  請參考 deploy/.env.deploy.example 建立它（含各站 IP / SERVICE_TOKEN / JWT_SECRET / GEMINI_KEY）。"
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$SECRETS_FILE"
 
-declare -A SERVER_JWT=(
-  [alpha]="alpha-jwt-secret-2026-wukon"
-  [bravo]="bravo-jwt-secret-2026-wukon"
-  [charlie]="charlie-jwt-secret-2026-wukon"
-  [central]="central-jwt-secret-2026-wukon"
-)
-
+# --- 各站模式（非密鑰，保留在版控）---
 declare -A SERVER_MODE=(
   [alpha]="subsidiary"
   [bravo]="subsidiary"
   [charlie]="subsidiary"
   [central]="central"
 )
-
-GEMINI_KEY="AIzaSyAoQOSfQsvt6R7W0iHXpkBPxf5SWf6qwY8"
-SOURCE_DIR="/c/Users/canri/Projects/Migrated_From_USB/公司內部"
-TEST_SCRIPT="/c/tmp/e2e-taskflow/run-all-tests.sh"
 
 # --- Color output ---
 GREEN='\033[0;32m'
@@ -202,6 +194,7 @@ deploy_one() {
       --exclude='.env' \
       --exclude='.env.production' \
       --exclude='.env.local' \
+      --exclude='deploy/.env.deploy' \
       --exclude='*.db' \
       --exclude='*.db-shm' \
       --exclude='*.db-wal' \

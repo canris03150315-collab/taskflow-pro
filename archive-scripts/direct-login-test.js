@@ -2,7 +2,7 @@ const http = require('http');
 
 const postData = JSON.stringify({
     username: 'canris',
-    password: 'kico123123'
+    password: 'REDACTED-PW-ROTATE-ME'
 });
 
 const options = {

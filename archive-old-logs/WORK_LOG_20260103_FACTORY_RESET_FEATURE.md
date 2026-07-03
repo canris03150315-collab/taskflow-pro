@@ -204,7 +204,7 @@ ssh root@165.227.147.40 "/root/create-snapshot.sh v8.9.8-before-test"
 ### 測試步驟
 
 1. **登入系統**
-   - 使用 BOSS 帳號登入（canris / kico123123）
+   - 使用 BOSS 帳號登入（canris / REDACTED-PW-ROTATE-ME）
 
 2. **進入系統設定**
    - 點擊左側邊欄「系統設定」

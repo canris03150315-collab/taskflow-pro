@@ -18,7 +18,7 @@
 
 3. 填寫以下資訊：
    - Name: `NETLIFY_AUTH_TOKEN`
-   - Secret: `nfp_7B6P1ZgjGPU4E9kEQY2umffBxBQqaXxRed53`
+   - Secret: `REDACTED-NETLIFY-PAT-ROTATE-ME`
 
 4. 點擊 "Add secret" 按鈕
 

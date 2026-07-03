@@ -29,7 +29,7 @@ const testLogin = async () => {
         // 發送測試請求
         const postData = JSON.stringify({
             username: 'canris',
-            password: 'kico123123'
+            password: 'REDACTED-PW-ROTATE-ME'
         });
         
         const options = {

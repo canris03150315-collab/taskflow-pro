@@ -6,16 +6,16 @@ echo ========================================
 echo.
 
 echo 步驟 1：上傳修復腳本...
-echo j7WW03n4emoh| plink -batch -pw j7WW03n4emoh root@165.227.147.40 "cat > /tmp/reset.sh" < reset-and-fix.sh
+echo REDACTED-ROOT-PW-ROTATE-ME| plink -batch -pw REDACTED-ROOT-PW-ROTATE-ME root@165.227.147.40 "cat > /tmp/reset.sh" < reset-and-fix.sh
 if errorlevel 1 (
     echo 使用 SCP 上傳...
-    echo j7WW03n4emoh| pscp -batch -pw j7WW03n4emoh reset-and-fix.sh root@165.227.147.40:/tmp/reset.sh
+    echo REDACTED-ROOT-PW-ROTATE-ME| pscp -batch -pw REDACTED-ROOT-PW-ROTATE-ME reset-and-fix.sh root@165.227.147.40:/tmp/reset.sh
 )
 echo ✅ 腳本已上傳
 echo.
 
 echo 步驟 2：執行修復腳本...
-plink -batch -pw j7WW03n4emoh root@165.227.147.40 "chmod +x /tmp/reset.sh && /tmp/reset.sh"
+plink -batch -pw REDACTED-ROOT-PW-ROTATE-ME root@165.227.147.40 "chmod +x /tmp/reset.sh && /tmp/reset.sh"
 echo.
 
 echo 步驟 3：等待後端啟動...

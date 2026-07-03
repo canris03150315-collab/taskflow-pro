@@ -82,6 +82,10 @@ backups/
 deploy-tmp/
 *.deploy.tar.gz
 
+# === Deploy 密鑰檔（真實密鑰，絕不入 git；只追蹤 .example 範本）===
+/deploy/.env.deploy
+!/deploy/.env.deploy.example
+
 # === OS ===
 Thumbs.db
 desktop.ini

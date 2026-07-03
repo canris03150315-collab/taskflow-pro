@@ -1,6 +1,6 @@
 const https = require('https');
 
-const apiKey = 'AIzaSyC13jOlDBMpyEL9d-xQ4dvCrnoDBtOpYiI';
+const apiKey = 'REDACTED-GEMINI-KEY-ROTATE-ME';
 
 console.log('Testing with correct API format (same as AI Studio)...\n');
 

@@ -111,12 +111,12 @@
 
 ### 測試帳號
 - **用戶名**：canris
-- **密碼**：kico123123
+- **密碼**：REDACTED-PW-ROTATE-ME
 - **角色**：BOSS (Seven)
 - **ID**：admin-1767325980478
 
 ### 伺服器資訊
-- **SSH 密碼**：j7WW03n4emoh（⚠️ 測試完成後必須修改）
+- **SSH 密碼**：REDACTED-ROOT-PW-ROTATE-ME（⚠️ 測試完成後必須修改）
 - **後端 IP**：165.227.147.40
 - **端口**：3000 (HTTPS), 3001 (HTTP)
 

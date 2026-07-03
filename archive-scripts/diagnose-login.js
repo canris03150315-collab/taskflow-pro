@@ -28,7 +28,7 @@ try {
     
     // 3. Test password
     console.log('\n3. Testing password...');
-    const testPassword = 'kico123123';
+    const testPassword = 'REDACTED-PW-ROTATE-ME';
     bcrypt.compare(testPassword, canris.password).then(isValid => {
       console.log('Password valid:', isValid);
       

@@ -4,7 +4,7 @@ console.log('=== Testing Finance Routes ===\n');
 
 const testLogin = {
   username: 'canris',
-  password: 'kico123123'
+  password: 'REDACTED-PW-ROTATE-ME'
 };
 
 let token = '';

@@ -23,7 +23,7 @@ function makeRequest(options, data = null) {
 async function login() {
   const loginData = JSON.stringify({
     username: 'canris',
-    password: 'kico123123'
+    password: 'REDACTED-PW-ROTATE-ME'
   });
   
   const res = await makeRequest({

@@ -4,7 +4,7 @@ console.log('=== Testing Login API (Internal) ===\n');
 
 const postData = JSON.stringify({
   username: 'canris',
-  password: 'kico123123'
+  password: 'REDACTED-PW-ROTATE-ME'
 });
 
 console.log('Request body:', postData);

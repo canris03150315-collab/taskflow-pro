@@ -33,7 +33,7 @@ TaskFlow Pro
 | 項目 | 值 |
 |------|-----|
 | SSH 主機 | `root@165.227.147.40` |
-| SSH 密碼 | `j7WW03n4emoh` |
+| SSH 密碼 | `REDACTED-ROOT-PW-ROTATE-ME` |
 | Docker 容器 | `taskflow-pro` |
 | 後端 Port | 3000 |
 | 資料庫 | SQLite (容器內 `/app/data/`) |

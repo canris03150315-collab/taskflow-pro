@@ -1,0 +1,33 @@
+{
+  "reports": [
+    {
+      "id": "report-1773377899684",
+      "type": "daily",
+      "user_id": "admin-1773377695379",
+      "created_at": "2026-03-13T04:58:19.684Z",
+      "content": "\"QA test daily report\""
+    },
+    {
+      "id": "report-1773378157792",
+      "type": "daily",
+      "user_id": "admin-1773377695379",
+      "created_at": "2026-03-13T05:02:37.792Z",
+      "content": "\"QA daily report content\""
+    },
+    {
+      "id": "report-1773378478364",
+      "type": "daily",
+      "user_id": "admin-1773377695379",
+      "created_at": "2026-03-13T05:07:58.364Z",
+      "content": "\"QA daily report\""
+    },
+    {
+      "id": "report-1773379637027",
+      "type": "daily",
+      "user_id": "admin-1773377695379",
+      "created_at": "2026-03-13T05:27:17.027Z",
+      "content": "\"今日工作內容\""
+    }
+  ],
+  "report_authorizations": []
+}
