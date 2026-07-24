@@ -85,24 +85,24 @@ TOKEN=$(curl -s -X POST $BASE/api/auth/login \
 | 3 | **部門管理** | /api/departments | ❌ |
 | 4 | 任務 | /api/tasks | ✅ |
 | 5 | **考勤** | /api/attendance | ❌ |
-| 6 | **績效** | /api/performance | ❌ |
+| 6 | **績效** | /api/performance/reviews | ❌ |
 | 7 | 財務 | /api/finance | ✅ |
-| 8 | **報表** | /api/reports | ❌ |
+| 8 | ~~報表~~ | ~~/api/reports~~ **已下線**（e016cc9 拆表+移除路由；前端殘留死碼：App.tsx WS handler、AuditLogView 未被引用） | — |
 | 9 | 論壇 | /api/forum | ✅ |
 | 10 | 聊天 | /api/chat/channels | ✅ |
 | 11 | 備忘錄 | /api/memos | ✅ |
-| 12 | **日常工作** | /api/routines | ❌ |
+| 12 | **日常工作** | /api/routines/templates | ❌ |
 | 13 | **排程** | /api/schedules | ❌ |
 | 14 | 請假 | /api/leaves | ✅ |
 | 15 | 工作日誌 | /api/work-logs | ✅ |
 | 16 | **檔案** | /api/files | ❌ |
 | 17 | **同步** | /api/sync | ❌ |
-| 18 | **系統設定** | /api/system | ❌ |
+| 18 | **系統設定** | /api/system（僅 POST reset-factory/backup；API-ENDPOINTS.md 寫的 GET /system/settings 不存在＝文件過時） | ❌ |
 | 19 | **備份** | /api/backup | ❌ |
 | 20 | 公告 | /api/announcements | ✅ |
 | 21 | AI 助手 | /api/ai-assistant | ✅ |
 | 22 | **KOL** | /api/kol | ❌ |
-| 23 | **平台營收** | /api/platform-revenue | ❌ |
+| 23 | ~~平台營收~~ | ~~/api/platform-revenue~~ 已由 platform-accounts 取代（server.js 註解） | — |
 | 24 | **平台帳戶** | /api/platform-accounts | ❌ |
 | 25 | 版本 | /api/version | ❌ |
 | 26-30 | central/*（4 檔）+ service-api | 依 instance mode 測 | ❌ |
@@ -217,3 +217,25 @@ Layer 3：交 canris 清單，勾選回報
 **分類**：B（後端設計如此）＋ C（前端吞錯誤）複合。
 **修法方向**（待 canris 核可後動工）：handleDeleteUser 補 try/catch + showError；
 UX 上可加「停用帳號」按鈕作為刪除被拒時的引導。
+
+---
+
+## 附錄 2：首次執行紀錄（2026-07-25，本機）
+
+- **修復**：14 處吞錯誤呼叫點已批修（commit 9a94819），含 reader.onload 逃逸外層 try 的變體
+  與兩處「載入失敗永遠卡 loading 動畫」（MemoView / DailyRoutineWidget）。
+- **Layer 1**：全模組 GET smoke 通過（reports/system-settings 為文件過時，非壞）；
+  D1–D6 全數符合預期 → 後端刪除功能 100% 正常。
+- **Segment B 瀏覽器驗證**：刪除有關聯資料的員工，畫面正確顯示
+  「該用戶有相關聯的數據…建議停用帳號而非刪除。」Console 無 unhandled rejection。
+- **測試資料**：qa_del_* 全部清除，資料庫回到基線（用戶 3/任務 5/出勤 15）。
+- **執行時的坑（下次照抄避雷）**：
+  1. `POST /api/users` 會**忽略 client 端 id**、由 server 生成 `user-<ts>-<rand>` → 測試必須用回傳的 id 操作。
+  2. `POST /api/tasks` 欄位是 **snake_case + 小寫 urgency**（`assigned_to_user_id`、`medium`），跟前端 camelCase 型別不同。
+  3. 本機 Git Bash：`grep -P` 因 locale 不可用；curl -d 帶中文會亂碼 → 測試資料一律用 ASCII。
+- **待辦（發現但未處理）**：
+  1. 登入前 App 會發 10+ 發 API 全數 401（Console 噪音+浪費請求），應在有 token 後才載入資料。
+  2. 前端 reports 殘留死碼可清（App.tsx WS handler、AuditLogView、api.ts reports 區塊）。
+  3. API-ENDPOINTS.md 過時（reports/system-settings），需要更新。
+  4. KOLManagementView-backup.tsx / -Complete.tsx 備份殘檔污染 tsc 掃描，建議刪除。
+  5. index.html 使用 cdn.tailwindcss.com（Console 警告不建議 production 使用）。
