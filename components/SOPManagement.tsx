@@ -35,8 +35,13 @@ export const SOPManagement: React.FC<SOPManagementProps> = ({ departments, curre
   }, []);
 
   const loadTemplates = async () => {
-    const data = await api.routines.getTemplates();
-    setTemplates(data);
+    try {
+      const data = await api.routines.getTemplates();
+      setTemplates(data);
+    } catch (error: any) {
+      console.error('載入文件失敗:', error);
+      showError(error?.message || '載入文件失敗');
+    }
   };
 
   // --- Filtering Logic ---
@@ -91,8 +96,12 @@ export const SOPManagement: React.FC<SOPManagementProps> = ({ departments, curre
       readBy: [], // Reset read status
     };
 
-    await api.routines.saveTemplate(newDoc);
-    loadTemplates();
+    try {
+      await api.routines.saveTemplate(newDoc);
+      loadTemplates();
+    } catch (error: any) {
+      showError(error?.message || '複製文件失敗');
+    }
   };
 
   const handleItemChange = (index: number, val: string) => {

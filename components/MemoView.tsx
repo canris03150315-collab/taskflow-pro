@@ -53,9 +53,16 @@ export const MemoView: React.FC<MemoViewProps> = ({ currentUser }) => {
 
   const loadMemos = async () => {
     setIsLoading(true);
-    const data = await api.memos.getAll(currentUser.id);
-    setMemos(data);
-    setIsLoading(false);
+    try {
+      const data = await api.memos.getAll(currentUser.id);
+      setMemos(data);
+    } catch (error: any) {
+      console.error('載入備忘錄失敗:', error);
+      showError(error?.message || '載入備忘錄失敗');
+    } finally {
+      // 失敗時也要結束 loading，否則畫面永遠卡在載入動畫
+      setIsLoading(false);
+    }
   };
 
   // 快速新增待辦 - 直接建立新便條

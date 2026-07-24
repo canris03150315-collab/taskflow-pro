@@ -63,10 +63,14 @@ export const DailyTasksTab: React.FC<DailyTasksTabProps> = ({
 
   const handleDelete = async (id: string) => {
     if (!(await showConfirm('確定要刪除此每日任務嗎？'))) return;
-    await api.routines.deleteTemplate(id);
-    toast.success('已刪除');
-    loadTemplates();
-    onRefresh();
+    try {
+      await api.routines.deleteTemplate(id);
+      toast.success('已刪除');
+      loadTemplates();
+      onRefresh();
+    } catch (error: any) {
+      toast.error(error?.message || '刪除失敗');
+    }
   };
 
   const handleSave = async () => {

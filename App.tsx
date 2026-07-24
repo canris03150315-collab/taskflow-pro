@@ -843,24 +843,35 @@ function AppContent() {
     console.log('[DEBUG] Sending to API:', dataToSend);
     console.log('[DEBUG] Permissions in dataToSend:', dataToSend.permissions);
 
-    // 使用後端返回的完整用戶數據（包含 permissions）
-    const response = await api.users.update(dataToSend);
-    const updatedUser = (response as any).user || response;
+    try {
+      // 使用後端返回的完整用戶數據（包含 permissions）
+      const response = await api.users.update(dataToSend);
+      const updatedUser = (response as any).user || response;
 
-    console.log('[DEBUG] Received from API:', updatedUser);
-    console.log('[DEBUG] Permissions in updatedUser:', updatedUser.permissions);
+      console.log('[DEBUG] Received from API:', updatedUser);
+      console.log('[DEBUG] Permissions in updatedUser:', updatedUser.permissions);
 
-    setUsers(users.map((u) => (u.id === editingUser.id ? updatedUser : u)));
-    if (isSelf) {
-      setCurrentUser(updatedUser);
+      setUsers(users.map((u) => (u.id === editingUser.id ? updatedUser : u)));
+      if (isSelf) {
+        setCurrentUser(updatedUser);
+      }
+      setEditingUser(null);
+    } catch (error: any) {
+      showError(error?.message || '更新用戶失敗');
+      throw error; // 重新拋出錯誤，防止模態框關閉
     }
-    setEditingUser(null);
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (window.confirm('確定要刪除此使用者嗎？')) {
-      await api.users.delete(userId);
-      setUsers(users.filter((u) => u.id !== userId));
+      try {
+        await api.users.delete(userId);
+        setUsers(users.filter((u) => u.id !== userId));
+        showSuccess('用戶已刪除');
+      } catch (error: any) {
+        // 後端會在用戶有關聯資料時回 400 並建議停用帳號，訊息要讓使用者看到
+        showError(error?.message || '刪除用戶失敗');
+      }
     }
   };
 
@@ -964,24 +975,38 @@ function AppContent() {
   };
 
   const handleAddFinanceRecord = async (record: Omit<FinanceRecord, 'id'>) => {
-    const result = await api.finance.create(record as FinanceRecord);
-    // 使用後端返回的記錄（包含正確的 ID）
-    const newRecord: FinanceRecord = {
-      ...record,
-      id: result.id || `fr-${Date.now()}`,
-      status: result.status || record.status,
-    };
-    setFinanceRecords([newRecord, ...financeRecords]);
+    try {
+      const result = await api.finance.create(record as FinanceRecord);
+      // 使用後端返回的記錄（包含正確的 ID）
+      const newRecord: FinanceRecord = {
+        ...record,
+        id: result.id || `fr-${Date.now()}`,
+        status: result.status || record.status,
+      };
+      setFinanceRecords([newRecord, ...financeRecords]);
+    } catch (error: any) {
+      showError(error?.message || '新增財務紀錄失敗');
+    }
   };
 
   const handleConfirmFinanceRecord = async (id: string) => {
-    await api.finance.confirm(id);
-    setFinanceRecords((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'COMPLETED' } : r)));
+    try {
+      await api.finance.confirm(id);
+      setFinanceRecords((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: 'COMPLETED' } : r))
+      );
+    } catch (error: any) {
+      showError(error?.message || '確認財務紀錄失敗');
+    }
   };
 
   const handleDeleteFinanceRecord = async (id: string) => {
-    await api.finance.delete(id);
-    setFinanceRecords(financeRecords.filter((r) => r.id !== id));
+    try {
+      await api.finance.delete(id);
+      setFinanceRecords(financeRecords.filter((r) => r.id !== id));
+    } catch (error: any) {
+      showError(error?.message || '刪除財務紀錄失敗');
+    }
   };
 
   const handleAddSuggestion = async (
@@ -1011,8 +1036,12 @@ function AppContent() {
     const sug = suggestions.find((s) => s.id === id);
     if (sug) {
       const updated = { ...sug, status };
-      await api.forum.update(updated);
-      setSuggestions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      try {
+        await api.forum.update(updated);
+        setSuggestions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      } catch (error: any) {
+        showError(error?.message || '更新提案狀態失敗');
+      }
     }
   };
 
@@ -1025,8 +1054,12 @@ function AppContent() {
         ? sug.upvotes.filter((uid) => uid !== currentUser.id)
         : [...sug.upvotes, currentUser.id];
       const updated = { ...sug, upvotes: newUpvotes };
-      await api.forum.update(updated);
-      setSuggestions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      try {
+        await api.forum.update(updated);
+        setSuggestions((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      } catch (error: any) {
+        showError(error?.message || '按讚操作失敗');
+      }
     }
   };
 
@@ -1043,21 +1076,25 @@ function AppContent() {
       isOfficial = true;
     }
 
-    // 使用專門的評論 API
-    const result = await api.forum.addComment(suggestionId, content, isOfficial);
+    try {
+      // 使用專門的評論 API
+      const result = await api.forum.addComment(suggestionId, content, isOfficial);
 
-    // 使用後端返回的評論資料更新本地狀態
-    const newComment: SuggestionComment = {
-      id: result.comment?.id || `c-${Date.now()}`,
-      userId: result.comment?.author_id || currentUser.id,
-      content,
-      createdAt: result.comment?.created_at || new Date().toISOString().split('T')[0],
-      isOfficialReply: isOfficial,
-    };
+      // 使用後端返回的評論資料更新本地狀態
+      const newComment: SuggestionComment = {
+        id: result.comment?.id || `c-${Date.now()}`,
+        userId: result.comment?.author_id || currentUser.id,
+        content,
+        createdAt: result.comment?.created_at || new Date().toISOString().split('T')[0],
+        isOfficialReply: isOfficial,
+      };
 
-    if (suggestion) {
-      const updated = { ...suggestion, comments: [...suggestion.comments, newComment] };
-      setSuggestions((prev) => prev.map((s) => (s.id === suggestionId ? updated : s)));
+      if (suggestion) {
+        const updated = { ...suggestion, comments: [...suggestion.comments, newComment] };
+        setSuggestions((prev) => prev.map((s) => (s.id === suggestionId ? updated : s)));
+      }
+    } catch (error: any) {
+      showError(error?.message || '新增評論失敗');
     }
   };
 

@@ -224,15 +224,22 @@ export const ChatSystem: React.FC<ChatSystemProps> = ({ currentUser, users, depa
     try {
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64 = reader.result as string;
-        const isImage = file.type.startsWith('image/');
+        // 外層 try/catch 接不到這個 async 回調內的錯誤，必須在回調內自己處理
+        try {
+          const base64 = reader.result as string;
+          const isImage = file.type.startsWith('image/');
 
-        // 圖片和檔案都發送 Base64，但格式不同
-        const content = isImage ? `[IMG]${base64}` : `[FILE]${file.name}|${base64}`; // 檔案格式：檔名|Base64
+          // 圖片和檔案都發送 Base64，但格式不同
+          const content = isImage ? `[IMG]${base64}` : `[FILE]${file.name}|${base64}`; // 檔案格式：檔名|Base64
 
-        await api.chat.sendMessage(activeChannelId, currentUser.id, content, currentUser);
-        loadMessages(activeChannelId);
-        setIsUploading(false);
+          await api.chat.sendMessage(activeChannelId, currentUser.id, content, currentUser);
+          loadMessages(activeChannelId);
+        } catch (error: any) {
+          console.error('Failed to upload file:', error);
+          toast.error(error?.message || '檔案上傳失敗，請重試');
+        } finally {
+          setIsUploading(false);
+        }
       };
       reader.onerror = () => {
         toast.error('檔案讀取失敗');
