@@ -17,6 +17,12 @@ interface FinanceViewProps {
   onDeleteRecord: (id: string) => void;
 }
 
+// 用本地時區組年月，避免 toISOString() 的 UTC 在月初/月底跨日誤判
+const getCurrentMonth = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
 export const FinanceView: React.FC<FinanceViewProps> = ({
   currentUser,
   users,
@@ -34,6 +40,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Filter States (View Level)
   const [filterDept, setFilterDept] = useState<string>(currentUser.department);
   const [filterUser, setFilterUser] = useState<string>(currentUser.id);
+  // 月結檢視：'YYYY-MM' 或 null（全部期間），預設當月
+  const [filterMonth, setFilterMonth] = useState<string | null>(getCurrentMonth());
+  const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
   // Modal Form States
   const [formAmount, setFormAmount] = useState('');
@@ -75,8 +85,13 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   }, []);
 
   // --- Logic: Filter Records based on Tab & Role ---
-  const filteredRecords = useMemo(() => {
+  // scopedRecords＝月份+範圍篩選後（分類小計吃這層，才不會點了分類後長條圖自己消失）
+  const scopedRecords = useMemo(() => {
     let result = records;
+
+    if (filterMonth) {
+      result = result.filter((r) => (r.date || '').startsWith(filterMonth));
+    }
 
     if (activeTab === 'ALL') {
       // Boss Only View
@@ -99,8 +114,33 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
       }
     }
 
-    return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [records, activeTab, filterDept, filterUser, currentUser, isBoss, isSupervisor]);
+    // 複製後再排序，避免無篩選路徑時 in-place sort 改動到 props 的 records 陣列
+    return [...result].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [records, filterMonth, activeTab, filterDept, filterUser, currentUser, isBoss, isSupervisor]);
+
+  // 最終清單＝再套分類篩選
+  const filteredRecords = useMemo(() => {
+    if (!filterCategory) return scopedRecords;
+    return scopedRecords.filter((r) => r.category === filterCategory);
+  }, [scopedRecords, filterCategory]);
+
+  // 分類小計：僅已入帳支出，由大到小
+  const categoryStats = useMemo(() => {
+    const totals = new Map<string, number>();
+    scopedRecords.forEach((r) => {
+      if (r.type === 'EXPENSE' && r.status === 'COMPLETED') {
+        totals.set(r.category, (totals.get(r.category) || 0) + r.amount);
+      }
+    });
+    const grand = Array.from(totals.values()).reduce((s, v) => s + v, 0);
+    return Array.from(totals.entries())
+      .map(([category, total]) => ({
+        category,
+        total,
+        pct: grand > 0 ? Math.round((total / grand) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [scopedRecords]);
 
   // Pagination State
   const [visibleCount, setVisibleCount] = useState(50);
@@ -108,7 +148,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
   // Reset pagination when filters change
   useEffect(() => {
     setVisibleCount(50);
-  }, [activeTab, filterDept, filterUser]);
+  }, [activeTab, filterDept, filterUser, filterMonth, filterCategory]);
 
   const displayedRecords = useMemo(() => {
     return filteredRecords.slice(0, visibleCount);
@@ -191,6 +231,46 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
     if (isSupervisor && activeTab === 'PERSONAL' && targetUserId !== currentUser.id) return true;
     return false;
   }, [formType, isBoss, isSupervisor, activeTab, targetUserId, currentUser]);
+
+  // --- 月結檢視 helpers ---
+  const monthLabel = filterMonth
+    ? `${filterMonth.slice(0, 4)}年${parseInt(filterMonth.slice(5), 10)}月`
+    : '全部期間';
+
+  const shiftMonth = (delta: number) => {
+    if (!filterMonth) return;
+    const [y, m] = filterMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setFilterMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setFilterCategory(null);
+  };
+
+  const exportCsv = () => {
+    const userName = (id: string) => users.find((u) => u.id === id)?.name || id;
+    const rows = [
+      ['日期', '類型', '分類', '說明', '金額', '狀態', '部門', '記錄人'],
+      ...filteredRecords.map((r) => [
+        r.date,
+        r.type === 'INCOME' ? '收入' : '支出',
+        r.category,
+        r.description,
+        String(r.amount),
+        r.status === 'COMPLETED' ? '已入帳' : '待確認',
+        getDeptName(r.departmentId),
+        userName(r.recordedBy),
+      ]),
+    ];
+    const csv = rows
+      .map((row) => row.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
+    // 前綴 UTF-8 BOM，Excel 開中文 CSV 才不會亂碼
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `零用金_${filterMonth ?? '全部期間'}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const handleOpenModal = () => {
     setFormAmount('');
@@ -444,6 +524,52 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
           </div>
 
+          {/* Month Switcher */}
+          <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+            <button
+              type="button"
+              onClick={() => shiftMonth(-1)}
+              disabled={!filterMonth}
+              aria-label="上一個月"
+              className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 font-black text-slate-600 hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ‹
+            </button>
+            <div className="min-w-[7.5rem] text-center text-base font-black text-slate-800 whitespace-nowrap">
+              {monthLabel}
+            </div>
+            <button
+              type="button"
+              onClick={() => shiftMonth(1)}
+              disabled={!filterMonth}
+              aria-label="下一個月"
+              className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 font-black text-slate-600 hover:bg-slate-100 transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ›
+            </button>
+            <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block"></div>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterMonth(getCurrentMonth());
+                setFilterCategory(null);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition ${filterMonth === getCurrentMonth() ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+            >
+              本月
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterMonth(null);
+                setFilterCategory(null);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition ${filterMonth === null ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+            >
+              全部期間
+            </button>
+          </div>
+
           {/* Dashboard Cards - Responsive Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group col-span-1 md:col-span-2">
@@ -451,7 +577,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 💰
               </div>
               <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">
-                當前可用餘額 (Balance)
+                {filterMonth ? `${monthLabel}結餘` : '當前可用餘額 (Balance)'}
               </h3>
               <div
                 className={`text-4xl font-black font-mono tracking-tight ${stats.balance >= 0 ? 'text-slate-800' : 'text-red-500'}`}
@@ -468,7 +594,9 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition text-6xl text-emerald-500">
                 📈
               </div>
-              <h3 className="text-sm font-bold text-emerald-600 uppercase mb-2">總撥款 / 收入</h3>
+              <h3 className="text-sm font-bold text-emerald-600 uppercase mb-2">
+                {filterMonth ? '當月撥款 / 收入' : '總撥款 / 收入'}
+              </h3>
               <div className="text-3xl font-black font-mono text-emerald-600">
                 +${stats.income.toLocaleString()}
               </div>
@@ -477,24 +605,89 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
               <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition text-6xl text-red-500">
                 📉
               </div>
-              <h3 className="text-sm font-bold text-red-500 uppercase mb-2">總支出 / 報銷</h3>
+              <h3 className="text-sm font-bold text-red-500 uppercase mb-2">
+                {filterMonth ? '當月支出 / 報銷' : '總支出 / 報銷'}
+              </h3>
               <div className="text-3xl font-black font-mono text-red-500">
                 -${stats.expense.toLocaleString()}
               </div>
             </div>
           </div>
 
+          {/* Category Subtotals */}
+          {categoryStats.length > 0 && (
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-slate-400 uppercase">{monthLabel}支出分類</h3>
+                {filterCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterCategory(null)}
+                    className="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    清除分類篩選 ✕
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                {(showAllCategories ? categoryStats : categoryStats.slice(0, 5)).map((c) => (
+                  <button
+                    key={c.category}
+                    type="button"
+                    onClick={() =>
+                      setFilterCategory(filterCategory === c.category ? null : c.category)
+                    }
+                    className={`w-full flex items-center gap-3 text-left transition ${filterCategory && filterCategory !== c.category ? 'opacity-40' : ''}`}
+                  >
+                    <span className="w-16 shrink-0 text-sm font-bold text-slate-600 truncate">
+                      {c.category}
+                    </span>
+                    <span className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
+                      <span
+                        className="block h-full bg-red-400 rounded-full transition-all"
+                        style={{ width: `${Math.max(c.pct, 2)}%` }}
+                      ></span>
+                    </span>
+                    <span className="w-24 shrink-0 text-right text-sm font-mono font-bold text-slate-700 tabular-nums">
+                      ${c.total.toLocaleString()}
+                    </span>
+                    <span className="w-10 shrink-0 text-right text-xs font-bold text-slate-400">
+                      {c.pct}%
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {categoryStats.length > 5 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllCategories(!showAllCategories)}
+                  className="mt-3 text-xs font-bold text-slate-500 hover:text-slate-700"
+                >
+                  {showAllCategories ? '收合 ▲' : `更多分類 (${categoryStats.length - 5}) ▼`}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Action Bar */}
-          {canAddRecord && (
-            <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={filteredRecords.length === 0}
+              className="px-5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>📤</span> 匯出{filterMonth ? '本月' : '全部'} CSV
+            </button>
+            {canAddRecord && (
               <button
                 onClick={handleOpenModal}
                 className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold shadow-lg shadow-slate-200 transition flex items-center gap-2"
               >
                 <span>＋</span> 新增收支紀錄
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Transaction List Container */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -514,7 +707,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
                 {displayedRecords.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="p-0">
-                      <EmptyState icon="💰" title="目前沒有相關紀錄" />
+                      <EmptyState
+                        icon="💰"
+                        title={filterMonth ? `${monthLabel}沒有紀錄` : '目前沒有相關紀錄'}
+                      />
                     </td>
                   </tr>
                 ) : (
@@ -607,7 +803,10 @@ export const FinanceView: React.FC<FinanceViewProps> = ({
             {/* Mobile View: Cards */}
             <div className="md:hidden p-4 space-y-4 bg-slate-50/50">
               {displayedRecords.length === 0 ? (
-                <EmptyState icon="💰" title="目前沒有相關紀錄" />
+                <EmptyState
+                  icon="💰"
+                  title={filterMonth ? `${monthLabel}沒有紀錄` : '目前沒有相關紀錄'}
+                />
               ) : (
                 displayedRecords.map((record) => (
                   <div
