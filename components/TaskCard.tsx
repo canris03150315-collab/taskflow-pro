@@ -2,6 +2,7 @@
 import { Task, User, Role, TaskStatus, Urgency, DepartmentDef, WorkLogImage } from '../types';
 import { Badge } from './Badge';
 import { translateTaskContent } from '../utils/taskTranslations';
+import { normalizeTaskStatus } from '../utils/taskStatus';
 import { showSuccess, showError, showWarning, showConfirm } from '../utils/dialogService';
 import { ImageUploader } from './files/ImageUploader';
 import { api } from '../services/api';
@@ -46,16 +47,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   isExpanded,
   onToggleExpand,
 }) => {
-  // 狀態正規化：後端使用中文狀態值，前端 enum 使用英文
-  // 建立一個正規化的狀態值以便統一比較
-  const STATUS_CN_TO_EN: Record<string, string> = {
-    待接取: TaskStatus.OPEN,
-    已指派: TaskStatus.ASSIGNED,
-    進行中: TaskStatus.IN_PROGRESS,
-    已完成: TaskStatus.COMPLETED,
-    已取消: TaskStatus.CANCELLED,
-  };
-  const normalizedStatus = STATUS_CN_TO_EN[task.status] || task.status;
+  // 狀態正規化：後端使用中文狀態值，前端 enum 使用英文（共用表在 utils/taskStatus）
+  const normalizedStatus = normalizeTaskStatus(task.status);
 
   const toast = useToast();
   const [showProgressPanel, setShowProgressPanel] = useState(false);
@@ -119,6 +112,28 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const isExpired = task.deadline
     ? new Date(task.deadline) < new Date() && normalizedStatus !== TaskStatus.COMPLETED
     : false;
+
+  // 期限 chip：逾期=紅、48 小時內=橘；已完成/已取消不顯示
+  const deadlineChip = (() => {
+    if (!task.deadline) return null;
+    if (normalizedStatus === TaskStatus.COMPLETED || normalizedStatus === TaskStatus.CANCELLED)
+      return null;
+    const dayMs = 86400000;
+    const diffMs = new Date(task.deadline).getTime() - Date.now();
+    if (diffMs < 0) {
+      return {
+        text: `逾期 ${Math.max(1, Math.ceil(-diffMs / dayMs))} 天`,
+        cls: 'bg-red-100 text-red-700 border-red-200',
+      };
+    }
+    if (diffMs <= 2 * dayMs) {
+      return {
+        text: diffMs <= dayMs ? '今天到期' : '明天到期',
+        cls: 'bg-amber-100 text-amber-700 border-amber-200',
+      };
+    }
+    return null;
+  })();
 
   // 格式化截止日期 (將 T 替換為空格，並保留時分)
   const formatDeadline = (deadline?: string) => {
@@ -427,7 +442,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-lg">📅</span>
               <span className="text-slate-500 font-bold text-xs uppercase">截止:</span>
               <span
@@ -435,6 +450,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               >
                 {formatDeadline(task.deadline)}
               </span>
+              {deadlineChip && (
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-black border ${deadlineChip.cls}`}
+                >
+                  {deadlineChip.text}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

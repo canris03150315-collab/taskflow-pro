@@ -33,6 +33,14 @@ import { ToastProvider, useToast } from './components/Toast';
 import { WebSocketClient, WebSocketMessage } from './utils/websocketClient';
 import { GlobalDialogs } from './components/GlobalDialogs';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import {
+  normalizeTaskStatus,
+  normalizeUrgency,
+  urgencyRank,
+  isTaskOverdue,
+  taskCompletedAt,
+  startOfWeek,
+} from './utils/taskStatus';
 import { showToast, showSuccess, showError, showWarning, showConfirm } from './utils/dialogService';
 
 // 動態載入大型組件 - 程式碼分割優化
@@ -142,6 +150,14 @@ function AppContent() {
   );
   const [boardTab, setBoardTab] = useState<'my_tasks' | 'available' | 'all' | 'archived'>('all');
   const [selectedTaskCategory, setSelectedTaskCategory] = useState<string | null>(null);
+  // 任務看板：篩選、排序與快速篩選（統計列 chip）
+  const [taskFilterAssignee, setTaskFilterAssignee] = useState<string>('ALL');
+  const [taskFilterDept, setTaskFilterDept] = useState<string>('ALL');
+  const [taskFilterUrgency, setTaskFilterUrgency] = useState<string>('ALL');
+  const [taskSort, setTaskSort] = useState<'deadline' | 'created' | 'urgency'>('deadline');
+  const [taskQuickFilter, setTaskQuickFilter] = useState<
+    'overdue' | 'in_progress' | 'done_week' | null
+  >(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [teamViewTab, setTeamViewTab] = useState<'tasks' | 'routines'>('tasks');
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
@@ -1247,8 +1263,111 @@ function AppContent() {
       if (selectedTaskCategory === 'OPEN') filtered = filtered.filter((t) => !t.targetDepartment);
       else filtered = filtered.filter((t) => t.targetDepartment === selectedTaskCategory);
     }
-    return filtered;
-  }, [tasks, boardTab, currentUser, searchQuery, selectedTaskCategory, selectedDate]);
+
+    // 篩選器：負責人 / 部門 / 緊急度（AND 疊加）
+    if (taskFilterAssignee !== 'ALL')
+      filtered = filtered.filter(
+        (t) =>
+          t.assignedToUserId === taskFilterAssignee || t.acceptedByUserId === taskFilterAssignee
+      );
+    if (taskFilterDept !== 'ALL')
+      filtered = filtered.filter(
+        (t) => t.assignedToDepartment === taskFilterDept || t.targetDepartment === taskFilterDept
+      );
+    if (taskFilterUrgency !== 'ALL')
+      filtered = filtered.filter((t) => normalizeUrgency(t.urgency) === taskFilterUrgency);
+
+    // 統計列 chip 的快速篩選
+    if (taskQuickFilter === 'overdue') {
+      filtered = filtered.filter(isTaskOverdue);
+    } else if (taskQuickFilter === 'in_progress') {
+      filtered = filtered.filter((t) => normalizeTaskStatus(t.status) === TaskStatus.IN_PROGRESS);
+    } else if (taskQuickFilter === 'done_week') {
+      const ws = startOfWeek();
+      filtered = filtered.filter((t) => {
+        const c = taskCompletedAt(t);
+        return !!c && new Date(c) >= ws;
+      });
+    }
+
+    // 排序（預設截止日近→遠，無期限沉底）
+    const sorted = [...filtered];
+    if (taskSort === 'deadline') {
+      sorted.sort(
+        (a, b) =>
+          (a.deadline ? new Date(a.deadline).getTime() : Infinity) -
+          (b.deadline ? new Date(b.deadline).getTime() : Infinity)
+      );
+    } else if (taskSort === 'created') {
+      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      sorted.sort((a, b) => urgencyRank(a.urgency) - urgencyRank(b.urgency));
+    }
+    return sorted;
+  }, [
+    tasks,
+    boardTab,
+    currentUser,
+    searchQuery,
+    selectedTaskCategory,
+    selectedDate,
+    taskFilterAssignee,
+    taskFilterDept,
+    taskFilterUrgency,
+    taskQuickFilter,
+    taskSort,
+  ]);
+
+  // 任務統計列（全量計算，不受篩選影響，數字才穩定）
+  const taskStats = useMemo(() => {
+    const active = tasks.filter(
+      (t) => !t.isArchived && normalizeTaskStatus(t.status) !== TaskStatus.CANCELLED
+    );
+    const ws = startOfWeek();
+    return {
+      inProgress: active.filter((t) => normalizeTaskStatus(t.status) === TaskStatus.IN_PROGRESS)
+        .length,
+      open: active.filter((t) => normalizeTaskStatus(t.status) === TaskStatus.OPEN).length,
+      overdue: active.filter(isTaskOverdue).length,
+      doneThisWeek: active.filter((t) => {
+        const c = taskCompletedAt(t);
+        return !!c && new Date(c) >= ws;
+      }).length,
+    };
+  }, [tasks]);
+
+  const hasTaskFilters =
+    taskFilterAssignee !== 'ALL' ||
+    taskFilterDept !== 'ALL' ||
+    taskFilterUrgency !== 'ALL' ||
+    taskQuickFilter !== null;
+
+  const clearTaskFilters = () => {
+    setTaskFilterAssignee('ALL');
+    setTaskFilterDept('ALL');
+    setTaskFilterUrgency('ALL');
+    setTaskQuickFilter(null);
+  };
+
+  const renderTaskCard = (t: Task) => (
+    <TaskCard
+      key={t.id}
+      task={t}
+      currentUser={currentUser!}
+      users={users}
+      departments={departments}
+      onAccept={handleAcceptTask}
+      onUpdateProgress={handleUpdateProgress}
+      onArchive={handleArchiveTask}
+      onEdit={handleEditTask}
+      onDelete={handleDeleteTask}
+      onCancel={handleCancelTask}
+      onReopen={handleReopenTask}
+      isHighlighted={t.id === highlightId}
+      isExpanded={expandedTaskId === t.id}
+      onToggleExpand={() => toggleExpandTask(t.id)}
+    />
+  );
 
   const deptGroups = useMemo(() => {
     if (boardTab !== 'all' || !currentUser) return { openTasks: [], groups: [] };
@@ -1956,6 +2075,47 @@ function AppContent() {
                   </button>
                 )}
               </div>
+              {/* 任務統計列 */}
+              <div className="flex flex-wrap gap-3 mb-6">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTaskQuickFilter(taskQuickFilter === 'in_progress' ? null : 'in_progress')
+                  }
+                  className={`px-4 py-2 rounded-xl text-sm font-bold border transition ${taskQuickFilter === 'in_progress' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}
+                >
+                  🔵 進行中 <span className="font-black">{taskStats.inProgress}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBoardTab('available');
+                    setSelectedTaskCategory(null);
+                  }}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold border transition ${boardTab === 'available' ? 'bg-slate-800 text-white border-slate-800 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'}`}
+                >
+                  📋 待接取 <span className="font-black">{taskStats.open}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTaskQuickFilter(taskQuickFilter === 'overdue' ? null : 'overdue')
+                  }
+                  className={`px-4 py-2 rounded-xl text-sm font-bold border transition ${taskQuickFilter === 'overdue' ? 'bg-red-600 text-white border-red-600 shadow-sm' : taskStats.overdue > 0 ? 'bg-red-50 text-red-600 border-red-200 hover:border-red-400' : 'bg-white text-slate-600 border-slate-200'}`}
+                >
+                  ⚠️ 逾期 <span className="font-black">{taskStats.overdue}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTaskQuickFilter(taskQuickFilter === 'done_week' ? null : 'done_week')
+                  }
+                  className={`px-4 py-2 rounded-xl text-sm font-bold border transition ${taskQuickFilter === 'done_week' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'}`}
+                >
+                  ✅ 本週完成 <span className="font-black">{taskStats.doneThisWeek}</span>
+                </button>
+              </div>
+
               {/* 搜尋欄 */}
               <div className="mb-6">
                 <div className="relative">
@@ -1996,6 +2156,65 @@ function AppContent() {
                 )}
               </div>
 
+              {/* 篩選與排序 */}
+              <div className="flex flex-wrap items-center gap-3 mb-6 bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                <select
+                  value={taskFilterAssignee}
+                  onChange={(e) => setTaskFilterAssignee(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">👤 全部負責人</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={taskFilterDept}
+                  onChange={(e) => setTaskFilterDept(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">🏢 全部部門</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={taskFilterUrgency}
+                  onChange={(e) => setTaskFilterUrgency(e.target.value)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ALL">⚡ 全部緊急度</option>
+                  <option value="urgent">緊急</option>
+                  <option value="high">高</option>
+                  <option value="medium">中</option>
+                  <option value="low">低</option>
+                </select>
+                <select
+                  value={taskSort}
+                  onChange={(e) =>
+                    setTaskSort(e.target.value as 'deadline' | 'created' | 'urgency')
+                  }
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="deadline">排序：截止日</option>
+                  <option value="created">排序：最新建立</option>
+                  <option value="urgency">排序：緊急度</option>
+                </select>
+                {hasTaskFilters && (
+                  <button
+                    type="button"
+                    onClick={clearTaskFilters}
+                    className="px-3 py-1.5 text-sm font-bold text-blue-600 hover:underline"
+                  >
+                    清除篩選 ✕
+                  </button>
+                )}
+              </div>
+
               <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
                 {['all', 'my_tasks', 'available', 'archived'].map((tab) => (
                   <button
@@ -2016,32 +2235,64 @@ function AppContent() {
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-1 gap-6">
-                {displayedTasks.map((t) => (
-                  <TaskCard
-                    key={t.id}
-                    task={t}
-                    currentUser={currentUser}
-                    users={users}
-                    departments={departments}
-                    onAccept={handleAcceptTask}
-                    onUpdateProgress={handleUpdateProgress}
-                    onArchive={handleArchiveTask}
-                    onEdit={handleEditTask}
-                    onDelete={handleDeleteTask}
-                    onCancel={handleCancelTask}
-                    onReopen={handleReopenTask}
-                    isHighlighted={t.id === highlightId}
-                    isExpanded={expandedTaskId === t.id}
-                    onToggleExpand={() => toggleExpandTask(t.id)}
-                  />
-                ))}
-                {displayedTasks.length === 0 && (
-                  <div className="text-center py-20 text-slate-400 font-bold border-2 border-dashed rounded-2xl">
-                    目前沒有任務
-                  </div>
-                )}
-              </div>
+              {boardTab === 'all' ? (
+                // 總覽：依狀態分組（進行中 → 已指派 → 待接取 → 已完成最近 10 筆）
+                <div className="space-y-8">
+                  {[
+                    { key: TaskStatus.IN_PROGRESS, label: '🔵 進行中' },
+                    { key: TaskStatus.ASSIGNED, label: '🟡 已指派待開始' },
+                    { key: TaskStatus.OPEN, label: '📋 待接取' },
+                    { key: TaskStatus.COMPLETED, label: '✅ 已完成' },
+                  ].map(({ key, label }) => {
+                    let groupTasks = displayedTasks.filter(
+                      (t) => normalizeTaskStatus(t.status) === key
+                    );
+                    const total = groupTasks.length;
+                    if (key === TaskStatus.COMPLETED) {
+                      groupTasks = [...groupTasks]
+                        .sort(
+                          (a, b) =>
+                            new Date(taskCompletedAt(b) || 0).getTime() -
+                            new Date(taskCompletedAt(a) || 0).getTime()
+                        )
+                        .slice(0, 10);
+                    }
+                    if (total === 0) return null;
+                    return (
+                      <section key={key}>
+                        <h3 className="flex items-center gap-2 text-sm font-black text-slate-500 uppercase mb-3">
+                          {label}
+                          <span className="px-2 py-0.5 bg-slate-100 rounded-full text-xs">
+                            {total}
+                          </span>
+                          {key === TaskStatus.COMPLETED && total > 10 && (
+                            <span className="text-xs font-bold text-slate-400">
+                              （顯示最近 10 筆）
+                            </span>
+                          )}
+                        </h3>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                          {groupTasks.map(renderTaskCard)}
+                        </div>
+                      </section>
+                    );
+                  })}
+                  {displayedTasks.length === 0 && (
+                    <div className="text-center py-20 text-slate-400 font-bold border-2 border-dashed rounded-2xl">
+                      目前沒有任務
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6">
+                  {displayedTasks.map(renderTaskCard)}
+                  {displayedTasks.length === 0 && (
+                    <div className="text-center py-20 text-slate-400 font-bold border-2 border-dashed rounded-2xl">
+                      目前沒有任務
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
