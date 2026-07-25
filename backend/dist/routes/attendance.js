@@ -11,34 +11,42 @@ const getTaiwanToday = () => {
     return twTime.toISOString().split('T')[0];
 };
 
-// 殘留未簽退紀錄自動補簽退：忘記簽退＝前一（台灣）日以前仍未簽退的紀錄，
-// 以「上限 8 小時」自動補簽退（480 分鐘）。此政策沿用原本打卡路徑既有的
-// `date < today` 補簽退邏輯，未更動判準。
+// 忘記簽退門檻：公司正常班為 12 小時（10 工作 + 2 休息）。開卡超過此門檻仍未簽退
+// ＝判定「可能忘記簽退」。加 1 小時緩衝（=13h），讓「準時上滿 12h、只是晚幾分鐘按簽退」
+// 或「跨午夜的 12h 班」不會被誤判。要調整判準改這個常數即可。
+const FORGOT_CLOCKOUT_MS = 13 * 60 * 60 * 1000;
+
+// 標記殘留（可能忘記簽退）紀錄：
+// 依 canris 決策——**不補任何工時**（duration = 0），只標記 clockout_missing = 1（前端顯示
+// 「可能未打卡」），並把 clock_out 設為 clock_in（工時 0、且非 NULL 以解開死鎖），
+// 由主管用手動補登填真實時數。不再像舊版補 8 小時（不合公司 12h 班現實）。
 //
-// 修復重點：此清理**必須在所有讀取路徑執行**（status / clock-in / clock-out），
-// 原本只掛在 clock-in。一旦殘留紀錄存在，status 會回報「工作中」、canClockIn=false、
-// 前端隱藏打卡按鈕 → 打卡路徑（唯一的清理處）永遠不會被呼叫 → 死鎖，
-// 員工每天看到「已上十幾～上千小時」且無法重新打卡。改在 status 讀取前先清理即解開死鎖。
-const closeStaleOpenRecords = async (db, userId, today) => {
+// 為何要在「所有讀取路徑」跑（status / clock-in）：殘留紀錄一存在，status 會回報
+// 「工作中」、canClockIn=false → 前端隱藏打卡鈕 → 清理永不觸發 → 死鎖。改在 status
+// 讀取前先標記即解開。門檻用「開卡時長 > 13h」而非「date < today」，才不會把跨午夜的
+// 進行中 12h 班誤標。
+const flagStaleOpenRecords = async (db, userId) => {
     try {
-        const staleRecords = await dbCall(db, 'all',
-            'SELECT id, clock_in FROM attendance_records WHERE user_id = ? AND clock_out IS NULL AND date < ?',
-            [userId, today]
+        const openRecords = await dbCall(db, 'all',
+            'SELECT id, clock_in FROM attendance_records WHERE user_id = ? AND clock_out IS NULL',
+            [userId]
         );
-        for (const stale of staleRecords) {
-            const clockInMs = new Date(stale.clock_in).getTime();
-            // clock_in 若損毀（非有效時間）以現在為基準，避免寫出 Invalid Date
-            const baseMs = Number.isFinite(clockInMs) ? clockInMs : Date.now();
-            const staleClockOut = new Date(baseMs + 8 * 60 * 60 * 1000);
-            await dbCall(db, 'run',
-                "UPDATE attendance_records SET clock_out = ?, duration_minutes = 480, status = 'OFFLINE' WHERE id = ?",
-                [staleClockOut.toISOString(), stale.id]
-            );
-            console.log(`[Attendance] Auto-closed stale record ${stale.id} (clock_in ${stale.clock_in})`);
+        const now = Date.now();
+        for (const rec of openRecords) {
+            const clockInMs = new Date(rec.clock_in).getTime();
+            if (!Number.isFinite(clockInMs) || now - clockInMs > FORGOT_CLOCKOUT_MS) {
+                // clock_out = clock_in → 工時 0；clock_in 損毀時退回用現在時間（仍記 0 工時）
+                const clockOut = Number.isFinite(clockInMs) ? rec.clock_in : new Date(now).toISOString();
+                await dbCall(db, 'run',
+                    "UPDATE attendance_records SET clock_out = ?, duration_minutes = 0, status = 'OFFLINE', clockout_missing = 1 WHERE id = ?",
+                    [clockOut, rec.id]
+                );
+                console.log(`[Attendance] Flagged missing-clockout record ${rec.id} (clock_in ${rec.clock_in})`);
+            }
         }
     } catch (staleErr) {
-        // 補簽退失敗不能擋住原本的讀取/打卡流程
-        console.error('[Attendance] Stale auto-close error:', staleErr.message);
+        // 標記失敗不能擋住原本的讀取/打卡流程
+        console.error('[Attendance] Stale flag error:', staleErr.message);
     }
 };
 
@@ -110,8 +118,8 @@ router.post('/clock-in', authenticateToken, async (req, res) => {
         const today = getTaiwanToday();
         console.log(`[Attendance V37.3] Clock-in attempt by ${currentUser.name} (${currentUser.id}) for date ${today}`);
 
-        // 自動補簽退殘留紀錄（見 closeStaleOpenRecords 註解）
-        await closeStaleOpenRecords(db, currentUser.id, today);
+        // 先標記殘留（可能忘記簽退）紀錄，解開死鎖（見 flagStaleOpenRecords 註解）
+        await flagStaleOpenRecords(db, currentUser.id);
 
         const activeRecord = await dbCall(db, 'get',
             'SELECT id FROM attendance_records WHERE user_id = ? AND clock_out IS NULL AND date = ? ORDER BY clock_in DESC LIMIT 1',
@@ -151,23 +159,38 @@ router.post('/clock-out', authenticateToken, async (req, res) => {
         
         console.log(`[Attendance V37.3] Clock-out attempt by ${currentUser.name}`);
 
-        // 先補簽退跨日殘留紀錄，避免把它當成本班而簽退出十幾小時的工時
-        await closeStaleOpenRecords(db, currentUser.id, getTaiwanToday());
-
         const activeRecord = await dbCall(db, 'get',
             'SELECT * FROM attendance_records WHERE user_id = ? AND clock_out IS NULL ORDER BY clock_in DESC LIMIT 1',
             [currentUser.id]
         );
-        
+
         if (!activeRecord) {
             console.log(`[Attendance V37.3] No active record found for ${currentUser.name}`);
             return res.status(400).json({ success: false, error: '尚未打卡，請先簽到' });
         }
-        
+
+        // 若最近一筆開卡已超過 12 小時（+緩衝）＝可能忘記簽退：不記十幾小時工時，
+        // 標記「可能未打卡」（0 工時），實際時數由主管手動補登。
+        const activeClockInMs = new Date(activeRecord.clock_in).getTime();
+        if (!Number.isFinite(activeClockInMs) || Date.now() - activeClockInMs > FORGOT_CLOCKOUT_MS) {
+            const flaggedClockOut = Number.isFinite(activeClockInMs) ? activeRecord.clock_in : new Date().toISOString();
+            await dbCall(db, 'run',
+                "UPDATE attendance_records SET clock_out = ?, duration_minutes = 0, status = 'OFFLINE', clockout_missing = 1 WHERE id = ?",
+                [flaggedClockOut, activeRecord.id]
+            );
+            await flagStaleOpenRecords(db, currentUser.id); // 其他更舊的殘留一併標記
+            console.log(`[Attendance] Clock-out on stale record ${activeRecord.id} → flagged missing-clockout`);
+            return res.json({
+                success: true,
+                message: '偵測到此筆開卡已超過 12 小時未簽退，已標記為「可能未打卡」，實際工時請聯絡主管於後台補登。',
+                record: { ...activeRecord, clock_out: flaggedClockOut, duration_minutes: 0, status: 'OFFLINE', clockout_missing: 1 }
+            });
+        }
+
         const clockOutTime = client_timestamp ? new Date(client_timestamp) : new Date();
         const clockInTime = new Date(activeRecord.clock_in);
         const durationMinutes = Math.round((clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60));
-        
+
         await dbCall(db, 'run',
             "UPDATE attendance_records SET clock_out = ?, duration_minutes = ?, status = 'OFFLINE', location_lat = ?, location_lng = ?, location_address = ?, is_offline = ? WHERE id = ?",
             [clockOutTime.toISOString(), durationMinutes, location_lat || activeRecord.location_lat, location_lng || activeRecord.location_lng, location_address || activeRecord.location_address, is_offline ? 1 : 0, activeRecord.id]
@@ -203,9 +226,9 @@ router.get('/status', authenticateToken, async (req, res) => {
         const currentUser = req.user;
         const today = getTaiwanToday();
 
-        // 死鎖修復核心：status 讀取前先補簽退殘留紀錄，
+        // 死鎖修復核心：status 讀取前先標記殘留（可能忘記簽退）紀錄，
         // 否則舊的未簽退紀錄會讓前端永遠顯示「工作中 已上 N 小時」且無法打卡
-        await closeStaleOpenRecords(db, currentUser.id, today);
+        await flagStaleOpenRecords(db, currentUser.id);
 
         let record = await dbCall(db, 'get',
             'SELECT * FROM attendance_records WHERE user_id = ? AND date = ? ORDER BY clock_in DESC LIMIT 1',

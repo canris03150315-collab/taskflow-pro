@@ -243,6 +243,11 @@ export const AttendanceWidget: React.FC<AttendanceWidgetProps> = ({ currentUser 
       const loc = await captureLocation();
       const data = await api.attendance.clockOut(record.id, loc);
       setRecord(data);
+      if (data.clockoutMissing) {
+        toast.warning(
+          '此筆開卡已超過 12 小時未簽退，已標記「可能未打卡」，實際工時請聯絡主管於後台補登'
+        );
+      }
     } catch (e) {
       console.error('Clock out failed', e);
       toast.error('簽退失敗，系統將重新整理狀態');

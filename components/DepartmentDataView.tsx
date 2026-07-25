@@ -689,17 +689,25 @@ export const DepartmentDataView: React.FC<DepartmentDataViewProps> = ({
                           })}
                         </td>
                         <td className="p-4 font-mono">
-                          {r.clockOut
-                            ? new Date(r.clockOut).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : '-'}
+                          {r.clockoutMissing ? (
+                            <span className="inline-block px-2 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700 whitespace-nowrap font-sans">
+                              ⚠️ 可能未打卡
+                            </span>
+                          ) : r.clockOut ? (
+                            new Date(r.clockOut).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
+                          ) : (
+                            '-'
+                          )}
                         </td>
                         <td className="p-4">
-                          {r.durationMinutes
-                            ? `${Math.floor(r.durationMinutes / 60)}h ${r.durationMinutes % 60}m`
-                            : '0h'}
+                          {r.clockoutMissing
+                            ? '待補登'
+                            : r.durationMinutes
+                              ? `${Math.floor(r.durationMinutes / 60)}h ${r.durationMinutes % 60}m`
+                              : '0h'}
                         </td>
                         <td className="p-4">
                           {r.locationLat != null && r.locationLng != null ? (

@@ -373,6 +373,8 @@ export interface AttendanceRecord {
   locationLng?: number | null;
   locationAddress?: string | null;
   isManual?: boolean;
+  // true = 系統判定「可能忘記簽退」（開卡超過 12 小時未簽退），未記工時、待主管補登
+  clockoutMissing?: boolean;
 }
 
 // --- System Audit Log Types ---
