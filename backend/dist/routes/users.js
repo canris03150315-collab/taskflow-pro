@@ -285,20 +285,58 @@ router.delete('/:id', auth_1.authenticateToken, async (req, res) => {
         // 檢查是否有相關聯的數據（任務、出勤記錄等）
         const taskCount = await db.get('SELECT COUNT(*) as count FROM tasks WHERE assigned_to_user_id = ? OR created_by = ?', [id, id]);
         const attendanceCount = await db.get('SELECT COUNT(*) as count FROM attendance_records WHERE user_id = ?', [id]);
+        const force = req.query.force === 'true' || (req.body && req.body.force === true);
         if (taskCount.count > 0 || attendanceCount.count > 0) {
-            return res.status(400).json({
-                error: '該用戶有相關聯的數據（任務或出勤記錄），無法刪除。建議停用帳號而非刪除。'
-            });
+            if (!force) {
+                return res.status(400).json({
+                    error: `該用戶有相關聯的數據（${taskCount.count} 個任務、${attendanceCount.count} 筆出勤紀錄），無法直接刪除。可改為停用帳號保留紀錄，或由 BOSS 強制刪除。`,
+                    taskCount: taskCount.count,
+                    attendanceCount: attendanceCount.count,
+                });
+            }
+            // 強制刪除僅限 BOSS；只刪除用戶本人，歷史任務與出勤紀錄保留（薪資佐證不可滅失）
+            if (currentUser.role !== types_1.Role.BOSS) {
+                return res.status(403).json({ error: '只有 BOSS 可以強制刪除有歷史資料的用戶' });
+            }
         }
-        // 刪除用戶
-        // Delete related data first to avoid foreign key constraints
+        // 刪除用戶（僅刪除 users 資料列；關聯的歷史紀錄保留）
         await UserService.deleteUser(db, id);
         // 記錄日誌
-        await (0, logger_1.logSystemAction)(db, currentUser, 'DELETE_USER', `刪除用戶: ${userToDelete.name} (${userToDelete.username})`);
+        await (0, logger_1.logSystemAction)(db, currentUser, 'DELETE_USER', `刪除用戶: ${userToDelete.name} (${userToDelete.username})${force ? '（強制刪除，歷史紀錄保留）' : ''}`);
         res.json({ message: '用戶刪除成功' });
     }
     catch (error) {
         console.error('刪除用戶錯誤:', error);
+        res.status(500).json({ error: '伺服器內部錯誤' });
+    }
+});
+// POST /api/users/:id/set-active - 停用/啟用帳號（權限規則同刪除用戶）
+router.post('/:id/set-active', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const db = req.db;
+        const currentUser = req.user;
+        const { id } = req.params;
+        const active = req.body && req.body.active === true;
+        if (currentUser.role !== types_1.Role.BOSS && currentUser.role !== types_1.Role.MANAGER) {
+            return res.status(403).json({ error: '無權停用/啟用用戶' });
+        }
+        if (currentUser.id === id) {
+            return res.status(400).json({ error: '不能停用自己的帳號' });
+        }
+        const target = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+        if (!target) {
+            return res.status(404).json({ error: '用戶不存在' });
+        }
+        if (currentUser.role === types_1.Role.MANAGER &&
+            (target.role === types_1.Role.BOSS || target.role === types_1.Role.MANAGER)) {
+            return res.status(403).json({ error: '無權停用/啟用該用戶' });
+        }
+        await db.run("UPDATE users SET is_active = ?, updated_at = datetime('now') WHERE id = ?", [active ? 1 : 0, id]);
+        await (0, logger_1.logSystemAction)(db, currentUser, active ? 'ACTIVATE_USER' : 'DEACTIVATE_USER', `${active ? '啟用' : '停用'}用戶: ${target.name} (${target.username})`);
+        res.json({ message: active ? '帳號已啟用' : '帳號已停用' });
+    }
+    catch (error) {
+        console.error('停用/啟用用戶錯誤:', error);
         res.status(500).json({ error: '伺服器內部錯誤' });
     }
 });

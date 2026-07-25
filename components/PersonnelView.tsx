@@ -10,6 +10,7 @@ interface PersonnelViewProps {
   onAddUser: () => void;
   onEditUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
+  onSetUserActive: (userId: string, active: boolean) => void;
   onAddDepartment: (dept: DepartmentDef) => void;
   onUpdateDepartment: (dept: DepartmentDef) => void; // New Prop
   onDeleteDepartment: (id: string) => void;
@@ -22,6 +23,7 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
   onAddUser,
   onEditUser,
   onDeleteUser,
+  onSetUserActive,
   onAddDepartment,
   onUpdateDepartment,
   onDeleteDepartment,
@@ -119,6 +121,11 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
         >
           {getRoleLabel(user.role)}
         </span>
+        {user.is_active === false && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase inline-block mb-1 ml-1 bg-slate-200 text-slate-500">
+            停用
+          </span>
+        )}
         <div className="text-[10px] text-slate-400 font-bold">{getDeptName(user.department)}</div>
       </div>
 
@@ -141,6 +148,32 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
               ></path>
             </svg>
           </button>
+          {(currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER) &&
+            currentUser.id !== user.id && (
+              <button
+                onClick={() => onSetUserActive(user.id, user.is_active === false)}
+                className="p-1 text-amber-600 hover:bg-amber-50 rounded"
+                title={user.is_active === false ? '啟用帳號' : '停用帳號'}
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {user.is_active === false ? (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    ></path>
+                  ) : (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    ></path>
+                  )}
+                </svg>
+              </button>
+            )}
           {currentUser.id !== user.id && (
             <button
               onClick={() => onDeleteUser(user.id)}
@@ -407,6 +440,11 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
                   >
                     {getRoleLabel(user.role)}
                   </span>
+                  {user.is_active === false && (
+                    <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase bg-slate-200 text-slate-500">
+                      已停用
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 font-bold mb-1">
                   {getDeptName(user.department)}
@@ -441,6 +479,37 @@ export const PersonnelView: React.FC<PersonnelViewProps> = ({
                       ></path>
                     </svg>
                   </button>
+                  {(currentUser.role === Role.BOSS || currentUser.role === Role.MANAGER) &&
+                    currentUser.id !== user.id && (
+                      <button
+                        onClick={() => onSetUserActive(user.id, user.is_active === false)}
+                        className="p-1.5 text-amber-600 hover:bg-amber-50 rounded"
+                        title={user.is_active === false ? '啟用帳號' : '停用帳號'}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          {user.is_active === false ? (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                            ></path>
+                          ) : (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                            ></path>
+                          )}
+                        </svg>
+                      </button>
+                    )}
                   {currentUser.id !== user.id && (
                     <button
                       onClick={() => onDeleteUser(user.id)}

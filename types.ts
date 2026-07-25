@@ -65,6 +65,11 @@ export interface User {
    * 工作日誌缺漏提醒等。適用於管理層、顧問、外包等不需打卡的角色。
    */
   exclude_from_attendance?: boolean;
+  /**
+   * 帳號啟用狀態：false 表示已停用（無法登入、既有 token 立即失效）。
+   * 未定義視為啟用（migration 前的舊資料）。
+   */
+  is_active?: boolean;
 }
 
 // 權限檢查輔助函式

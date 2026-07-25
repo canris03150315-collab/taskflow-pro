@@ -3,7 +3,7 @@
 // User Service - provides CRUD operations for users with permissions parsing
 
 const SELECT_FIELDS =
-  'id, name, role, department, avatar, username, permissions, exclude_from_attendance, created_at, updated_at';
+  'id, name, role, department, avatar, username, permissions, exclude_from_attendance, is_active, created_at, updated_at';
 
 function normalizeUser(u) {
   if (!u) return null;
@@ -11,6 +11,12 @@ function normalizeUser(u) {
     ...u,
     permissions: u.permissions ? JSON.parse(u.permissions) : undefined,
     exclude_from_attendance: u.exclude_from_attendance === 1 || u.exclude_from_attendance === true,
+    // 缺欄位（migration 前的舊資料）視為啟用
+    is_active:
+      u.is_active === undefined ||
+      u.is_active === null ||
+      u.is_active === 1 ||
+      u.is_active === true,
   };
 }
 

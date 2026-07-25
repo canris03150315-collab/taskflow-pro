@@ -27,6 +27,11 @@ async function authenticateToken(req, res, next) {
             res.status(401).json({ error: '用戶不存在' });
             return;
         }
+        // 停用帳號：既有 token 也立即失效（本 middleware 每個請求都會查 DB）
+        if (userRow.is_active === 0) {
+            res.status(403).json({ error: '帳號已停用，請聯絡管理員' });
+            return;
+        }
         const user = {
             id: userRow.id,
             name: userRow.name,

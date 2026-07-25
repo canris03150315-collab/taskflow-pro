@@ -879,15 +879,51 @@ function AppContent() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (window.confirm('確定要刪除此使用者嗎？')) {
-      try {
-        await api.users.delete(userId);
-        setUsers(users.filter((u) => u.id !== userId));
-        showSuccess('用戶已刪除');
-      } catch (error: any) {
-        // 後端會在用戶有關聯資料時回 400 並建議停用帳號，訊息要讓使用者看到
-        showError(error?.message || '刪除用戶失敗');
+    if (!window.confirm('確定要刪除此使用者嗎？')) return;
+    try {
+      await api.users.delete(userId);
+      setUsers(users.filter((u) => u.id !== userId));
+      showSuccess('用戶已刪除');
+    } catch (error: any) {
+      const msg = error?.message || '';
+      // 有關聯資料時後端回 400：BOSS 可二次確認後強制刪除（歷史紀錄保留）
+      if (
+        error?.status === 400 &&
+        msg.includes('相關聯的數據') &&
+        currentUser?.role === Role.BOSS
+      ) {
+        const confirmForce = window.confirm(
+          `${msg}\n\n仍要永久刪除嗎？\n（歷史任務與出勤紀錄會保留，但操作人名稱將無法顯示；若想保留完整資訊請改用「停用帳號」）`
+        );
+        if (!confirmForce) return;
+        try {
+          await api.users.delete(userId, true);
+          setUsers(users.filter((u) => u.id !== userId));
+          showSuccess('用戶已永久刪除（歷史紀錄保留）');
+        } catch (err2: any) {
+          showError(err2?.message || '刪除用戶失敗');
+        }
+        return;
       }
+      showError(msg || '刪除用戶失敗');
+    }
+  };
+
+  const handleSetUserActive = async (userId: string, active: boolean) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    const ok = window.confirm(
+      active
+        ? `確定要重新啟用「${target.name}」的帳號嗎？`
+        : `確定要停用「${target.name}」的帳號嗎？停用後將立即無法登入，可隨時重新啟用。`
+    );
+    if (!ok) return;
+    try {
+      await api.users.setActive(userId, active);
+      setUsers(users.map((u) => (u.id === userId ? { ...u, is_active: active } : u)));
+      showSuccess(active ? '帳號已啟用' : '帳號已停用');
+    } catch (error: any) {
+      showError(error?.message || '操作失敗');
     }
   };
 
@@ -1947,6 +1983,7 @@ function AppContent() {
                     setUserModalOpen(true);
                   }}
                   onDeleteUser={handleDeleteUser}
+                  onSetUserActive={handleSetUserActive}
                   onAddDepartment={handleAddDepartment}
                   onUpdateDepartment={handleUpdateDepartment}
                   onDeleteDepartment={handleDeleteDepartment}

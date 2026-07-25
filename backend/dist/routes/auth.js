@@ -107,6 +107,10 @@ router.post('/login', async (req, res) => {
             recordLoginFailure(username);
             return res.status(401).json({ error: '用戶名或密碼錯誤' });
         }
+        // 停用帳號不得登入（密碼驗證後才回報，避免向未授權者洩漏帳號狀態）
+        if (userRow.is_active === 0) {
+            return res.status(403).json({ error: '帳號已停用，請聯絡管理員' });
+        }
         clearLoginFailures(username);
         // 建構用戶物件
         const user = {

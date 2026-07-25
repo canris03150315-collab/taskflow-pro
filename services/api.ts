@@ -201,7 +201,10 @@ const RealApi = {
         return null;
       }
     },
-    delete: (id: string) => request<void>('DELETE', `/users/${id}`),
+    delete: (id: string, force?: boolean) =>
+      request<void>('DELETE', `/users/${id}${force ? '?force=true' : ''}`),
+    setActive: (id: string, active: boolean) =>
+      request<{ message: string }>('POST', `/users/${id}/set-active`, { active }),
     updateAvatar: async (userId: string, avatar: string) => {
       return await request<{ avatar: string; message: string }>('POST', `/users/${userId}/avatar`, {
         avatar,
